@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elevation Bend — Farmers Market</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f8f7f4;color:#1a1a1a;min-height:100vh}
+/* ── Auth screen ── */
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem}
+.auth-card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,0.1)}
+.auth-logo{font-size:22px;font-weight:700;color:#1a1a1a;margin-bottom:4px}
+.auth-sub{font-size:12px;color:#888;margin-bottom:1.75rem}
+.auth-title{font-size:16px;font-weight:600;margin-bottom:1.25rem;color:#1a1a1a}
+.auth-fg{margin-bottom:.85rem}
+.auth-fg label{font-size:11px;color:#555;display:block;margin-bottom:4px;font-weight:500}
+.auth-fg input{width:100%;border:1px solid #d0cec7;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;transition:border-color .15s}
+.auth-fg input:focus{border-color:#22c55e;box-shadow:0 0 0 3px #dcfce7}
+.auth-btn{width:100%;background:#1a1a1a;color:#fff;border:none;padding:11px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:.25rem}
+.auth-btn:hover{background:#333}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-err{background:#FCEBEB;color:#791F1F;border-radius:8px;padding:.75rem 1rem;font-size:12px;margin-bottom:.85rem;display:none}
+.auth-footer{text-align:center;font-size:12px;color:#888;margin-top:1rem}
+.auth-link{color:#1a1a1a;font-weight:500;cursor:pointer;text-decoration:underline}
+/* ── Main app ── */
+#app-screen{display:none;padding:.75rem;max-width:920px;margin:0 auto}
+.env-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;margin-bottom:.75rem;border:0.5px solid #22c55e;background:#dcfce7}
+.env-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0}
+.env-label{font-size:11px;font-weight:500;flex:1;color:#15803d}
+.env-user{font-size:10px;color:#15803d}
+.signout-btn{font-size:10px;padding:4px 9px;border-radius:6px;border:0.5px solid #639922;background:#fff;color:#27500A;cursor:pointer;font-family:inherit}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px}
+.hdr-title{font-size:16px;font-weight:700;color:#1a1a1a}
+.hdr-sub{font-size:11px;color:#888;margin-top:1px}
+.hdr-btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+nav{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-bottom:.85rem;background:#f0ede6;border-radius:8px;padding:3px}
+.nb{background:none;border:none;padding:7px 4px;font-size:11px;font-weight:500;color:#888;cursor:pointer;border-radius:6px;text-align:center;font-family:inherit}
+.nb.active{background:#fff;color:#1a1a1a;border:0.5px solid #e5e3de;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin-bottom:.85rem}
+.stat{background:#fff;border:0.5px solid #e5e3de;border-radius:10px;padding:.6rem .75rem}
+.sl{font-size:10px;color:#888;margin-bottom:2px;text-transform:uppercase;letter-spacing:.03em}
+.sv{font-size:18px;font-weight:700;color:#1a1a1a}
+.vrow{background:#fff;border:0.5px solid #e5e3de;border-radius:10px;padding:.75rem;margin-bottom:6px}
+.vrow.vstatus-active{border-left:3px solid #22c55e}
+.vrow.vstatus-inwork{border-left:3px solid #eab308}
+.vrow.vstatus-inactive{border-left:3px solid #9ca3af;opacity:.8}
+.vname{font-size:13px;font-weight:600}
+.vmeta{font-size:11px;color:#888;margin-top:2px}
+.vtags{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500}
+.tg{background:#EAF3DE;color:#27500A}.tb{background:#E6F1FB;color:#0C447C}
+.tw{background:#FAEEDA;color:#633806}.tr{background:#FCEBEB;color:#791F1F}.tgr{background:#f0ede6;color:#555}
+.tag-vs-active{background:#dcfce7;color:#15803d}
+.tag-vs-inwork{background:#fef9c3;color:#a16207}
+.tag-vs-inactive{background:#f3f4f6;color:#6b7280}
+.vs-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle}
+.vactions{display:flex;align-items:center;gap:5px;margin-top:7px;flex-wrap:wrap}
+.vactions select{font-size:11px;padding:4px 6px;border-radius:6px;border:0.5px solid #d0cec7;background:#f8f7f4;color:#1a1a1a;font-family:inherit}
+.iBtn{background:none;border:0.5px solid #e5e3de;border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer;color:#888;display:inline-flex;align-items:center}
+.iBtn:hover{background:#f0ede6;color:#1a1a1a}
+.empty{text-align:center;padding:2rem .5rem;color:#aaa;font-size:13px;background:#fff;border:0.5px solid #e5e3de;border-radius:10px}
+.glabel{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin:.65rem 0 .3rem;padding-left:2px}
+.btn-p{background:#1a1a1a;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600}
+.btn-p:hover{background:#333}
+.btn-s{background:#fff;border:0.5px solid #d0cec7;color:#555;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit}
+.btn-s:hover{background:#f0ede6}
+.btn-g{background:#dcfce7;border:0.5px solid #22c55e;color:#15803d;padding:7px 11px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px}
+.filter-bar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.75rem}
+.fchip{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid #e5e3de;background:#f0ede6;color:#888;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px}
+.fchip.on{border-color:#1a1a1a;background:#1a1a1a;color:#fff}
+.cal-nav{display:flex;align-items:center;gap:8px;margin-bottom:.65rem}
+.cal-nav span{font-size:13px;font-weight:600;flex:1;text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.chd{text-align:center;font-size:10px;color:#888;padding:3px 0;font-weight:600}
+.cday{text-align:center;font-size:11px;padding:7px 2px;border-radius:8px;border:0.5px solid transparent;cursor:pointer;font-weight:500}
+.cday:hover{background:#f0ede6}
+.cday.capproved{background:#EAF3DE;border-color:#639922;color:#27500A}
+.cday.cwait{background:#FAEEDA;border-color:#BA7517;color:#633806}
+.cday.cother{color:#ccc}
+.cday.ctoday{box-shadow:0 0 0 2px #378ADD}
+.tent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:7px;margin-top:.5rem}
+.tcell{border:0.5px solid #e5e3de;border-radius:10px;padding:.65rem .75rem;min-height:80px;cursor:pointer;background:#fff}
+.tcell:hover{border-color:#aaa}
+.tcell.tocc{background:#EAF3DE;border-color:#639922}
+.tcell.twait{background:#FAEEDA;border-color:#BA7517}
+.tnum{font-size:9px;font-weight:700;color:#aaa;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em}
+.tvname{font-size:12px;font-weight:600}
+.tvmeta{font-size:10px;color:#666;margin-top:2px}
+.overlay{background:rgba(0,0,0,0.4);position:fixed;inset:0;z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto}
+.modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:500px;margin:auto}
+.mtitle{font-size:14px;font-weight:700;margin-bottom:1rem;padding-bottom:.65rem;border-bottom:0.5px solid #e5e3de}
+.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:1rem;padding-top:.75rem;border-top:0.5px solid #e5e3de}
+.sec{background:#f8f7f4;border:0.5px solid #e5e3de;border-radius:10px;padding:1rem;margin-bottom:.75rem}
+.stitle{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.65rem}
+.fg{margin-bottom:.65rem}
+.fg label{font-size:11px;color:#555;display:block;margin-bottom:3px;font-weight:500}
+.fg input,.fg select,.fg textarea{width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:#1a1a1a;font-family:inherit;outline:none}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:#22c55e}
+.fg textarea{height:56px;resize:vertical}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rg{display:flex;flex-direction:column;gap:4px}
+.ropt{display:flex;align-items:flex-start;gap:7px;padding:7px 9px;border:0.5px solid #e5e3de;border-radius:8px;cursor:pointer;background:#fff}
+.ropt.sel{border-color:#22c55e;background:#dcfce7}
+.ropt input[type=radio]{margin-top:2px;flex-shrink:0;accent-color:#22c55e}
+.ropt span{font-size:12px}
+.copt{display:flex;align-items:flex-start;gap:7px;padding:7px 9px;border:0.5px solid #e5e3de;border-radius:8px;cursor:pointer;background:#fff}
+.copt span{font-size:12px}
+.copt input[type=checkbox]{accent-color:#22c55e;margin-top:2px;flex-shrink:0}
+.sub{margin-top:5px;padding-left:13px;border-left:2px solid #d0cec7}
+.q{font-size:12px;font-weight:600;color:#1a1a1a;margin-bottom:5px}
+.upload-zone{border:1.5px dashed #d0cec7;border-radius:10px;padding:1rem;text-align:center;cursor:pointer;color:#aaa;font-size:12px;margin-bottom:.65rem}
+.upload-zone:hover{background:#f8f7f4;border-color:#aaa}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:5px;margin-top:.5rem}
+.pthumb{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:0.5px solid #e5e3de}
+.vs-selector{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:4px}
+.vs-card{border:1.5px solid #e5e3de;border-radius:8px;padding:10px 6px;text-align:center;cursor:pointer;background:#fff}
+.vs-card.sel-active{border-color:#22c55e;background:#dcfce7}
+.vs-card.sel-inwork{border-color:#eab308;background:#fef9c3}
+.vs-card.sel-inactive{border-color:#9ca3af;background:#f3f4f6}
+.vs-card-dot{width:12px;height:12px;border-radius:50%;margin:0 auto 5px}
+.vs-card-label{font-size:11px;font-weight:600}
+.export-opt{display:flex;align-items:center;gap:10px;padding:.75rem;border:0.5px solid #e5e3de;border-radius:10px;cursor:pointer;background:#fff;margin-bottom:6px}
+.export-opt:hover{background:#f8f7f4}
+.export-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.sum-table{width:100%;border-collapse:collapse;font-size:11px}
+.sum-table th{text-align:left;padding:5px 7px;font-weight:600;color:#888;border-bottom:0.5px solid #e5e3de;font-size:10px;text-transform:uppercase}
+.sum-table td{padding:5px 7px;border-bottom:0.5px solid #f0ede6}
+.loading{text-align:center;padding:2rem;color:#888;font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- ── Auth screen ── -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">Elevation Bend</div>
+    <div class="auth-sub">Farmers Market — Vendor Management</div>
+    <div class="auth-title" id="auth-title">Sign in to your account</div>
+    <div class="auth-err" id="auth-err"></div>
+    <div class="auth-fg">
+      <label>Email address</label>
+      <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="auth-fg">
+      <label>Password</label>
+      <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="auth-fg" id="auth-confirm-wrap" style="display:none">
+      <label>Confirm password</label>
+      <input type="password" id="auth-confirm" placeholder="••••••••">
+    </div>
+    <button class="auth-btn" id="auth-btn">Sign in</button>
+    <div class="auth-footer">
+      <span id="auth-toggle-text">Don't have an account?</span>
+      <span class="auth-link" id="auth-toggle">Sign up</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main app ── -->
+<div id="app-screen">
+  <div class="env-bar">
+    <div class="env-dot"></div>
+    <div style="flex:1">
+      <div class="env-label">Elevation Bend — Live</div>
+      <div class="env-user" id="user-email"></div>
+    </div>
+    <button class="signout-btn" id="signout-btn">Sign out</button>
+  </div>
+
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">Elevation Bend</div>
+      <div class="hdr-sub">Farmers Market Vendors</div>
+    </div>
+    <div class="hdr-btns">
+      <button class="btn-g" id="exportBtn">↓ Export</button>
+      <button class="btn-p" id="newBtn">+ New</button>
+    </div>
+  </div>
+
+  <nav>
+    <button class="nb active" data-tab="vendors">Vendors</button>
+    <button class="nb" data-tab="calendar">Calendar</button>
+    <button class="nb" data-tab="tents">Tents</button>
+    <button class="nb" data-tab="waitlist">Waitlist</button>
+  </nav>
+
+  <div id="stats-bar"></div>
+  <div id="filter-bar"></div>
+  <div id="main-content"></div>
+  <div id="modal-area"></div>
+</div>
+
+<script>
+// ── Supabase init ──────────────────────────────────────────────────────────
+const SUPA_URL = 'https://mixubqomqdfcrgfovnwy.supabase.co';
+const SUPA_KEY = 'sb_publishable_btz05uH2n90XYfkGIooLog_CY71YUW3';
+const { createClient } = supabase;
+const sb = createClient(SUPA_URL, SUPA_KEY);
+
+// ── App state ──────────────────────────────────────────────────────────────
+var vendors = [], tents = [], approvedDates = {}, waitlistDates = {};
+var tab = 'vendors', cY = new Date().getFullYear(), cM = new Date().getMonth();
+var eId = null, vsFilter = 'all', currentUser = null;
+window._ep = [];
+
+var VSC = {
+  active:   { label:'Active',   dot:'#22c55e', bg:'#dcfce7', text:'#15803d', tagCls:'tag-vs-active'  },
+  inwork:   { label:'In-Work',  dot:'#eab308', bg:'#fef9c3', text:'#a16207', tagCls:'tag-vs-inwork'  },
+  inactive: { label:'Inactive', dot:'#9ca3af', bg:'#f3f4f6', text:'#6b7280', tagCls:'tag-vs-inactive' }
+};
+
+function vsTag(vs) {
+  var c = VSC[vs||'active'] || VSC.active;
+  return '<span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span>';
+}
+function uid() { return '_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function csvCell(v) { return '"'+String(v||'').replace(/"/g,'""')+'"'; }
+function today() { return new Date().toISOString().slice(0,10); }
+function closeMod() { document.getElementById('modal-area').innerHTML = ''; }
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+var authMode = 'signin';
+
+document.getElementById('auth-toggle').addEventListener('click', function() {
+  authMode = authMode === 'signin' ? 'signup' : 'signin';
+  document.getElementById('auth-title').textContent = authMode === 'signin' ? 'Sign in to your account' : 'Create your account';
+  document.getElementById('auth-btn').textContent = authMode === 'signin' ? 'Sign in' : 'Sign up';
+  document.getElementById('auth-toggle-text').textContent = authMode === 'signin' ? "Don't have an account?" : 'Already have an account?';
+  document.getElementById('auth-toggle').textContent = authMode === 'signin' ? 'Sign up' : 'Sign in';
+  document.getElementById('auth-confirm-wrap').style.display = authMode === 'signup' ? '' : 'none';
+  document.getElementById('auth-err').style.display = 'none';
+});
+
+document.getElementById('auth-email').addEventListener('keydown', function(e){ if(e.key==='Enter') doAuth(); });
+document.getElementById('auth-password').addEventListener('keydown', function(e){ if(e.key==='Enter') doAuth(); });
+document.getElementById('auth-btn').addEventListener('click', doAuth);
+
+async function doAuth() {
+  var email = document.getElementById('auth-email').value.trim();
+  var password = document.getElementById('auth-password').value;
+  var confirm = document.getElementById('auth-confirm').value;
+  var errEl = document.getElementById('auth-err');
+  var btn = document.getElementById('auth-btn');
+
+  if (!email || !password) { showAuthErr('Please enter your email and password.'); return; }
+  if (authMode === 'signup' && password !== confirm) { showAuthErr('Passwords do not match.'); return; }
+  if (authMode === 'signup' && password.length < 8) { showAuthErr('Password must be at least 8 characters.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = authMode === 'signin' ? 'Signing in…' : 'Creating account…';
+  errEl.style.display = 'none';
+
+  var result;
+  if (authMode === 'signin') {
+    result = await sb.auth.signInWithPassword({ email: email, password: password });
+  } else {
+    result = await sb.auth.signUp({ email: email, password: password });
+  }
+
+  if (result.error) {
+    showAuthErr(result.error.message);
+    btn.disabled = false;
+    btn.textContent = authMode === 'signin' ? 'Sign in' : 'Sign up';
+  } else {
+    if (authMode === 'signup' && !result.data.session) {
+      showAuthErr('✅ Check your email to confirm your account, then sign in.');
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+      authMode = 'signin';
+    } else {
+      currentUser = result.data.user;
+      enterApp();
+    }
+  }
+}
+
+function showAuthErr(msg) {
+  var el = document.getElementById('auth-err');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+document.getElementById('signout-btn').addEventListener('click', async function() {
+  await sb.auth.signOut();
+  currentUser = null;
+  vendors = []; tents = []; approvedDates = {}; waitlistDates = {};
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('auth-email').value = '';
+  document.getElementById('auth-password').value = '';
+});
+
+async function checkSession() {
+  var { data } = await sb.auth.getSession();
+  if (data.session) {
+    currentUser = data.session.user;
+    enterApp();
+  }
+}
+
+function enterApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-email').textContent = currentUser.email;
+  loadData();
+}
+
+// ── Supabase data ──────────────────────────────────────────────────────────
+async function loadData() {
+  document.getElementById('main-content').innerHTML = '<div class="loading">Loading vendor data…</div>';
+  try {
+    // Load vendors
+    var { data: vData, error: vErr } = await sb.from('vendors').select('*').order('created_at', { ascending: false });
+    if (vErr) throw vErr;
+    vendors = vData || [];
+
+    // Load tents
+    var { data: tData, error: tErr } = await sb.from('tents').select('*').order('num');
+    if (tErr) throw tErr;
+    tents = tData || [];
+    if (!tents.length) await initTentsDB();
+
+    // Load calendar
+    var { data: cData, error: cErr } = await sb.from('calendar').select('*');
+    if (cErr) throw cErr;
+    approvedDates = {}; waitlistDates = {};
+    (cData||[]).forEach(function(r) {
+      if (r.approved_vendors) approvedDates[r.date] = r.approved_vendors;
+      if (r.waitlist_vendors) waitlistDates[r.date] = r.waitlist_vendors;
+    });
+  } catch(e) {
+    // Tables may not exist yet — set up schema
+    await setupSchema();
+    return;
+  }
+  render();
+}
+
+async function setupSchema() {
+  document.getElementById('main-content').innerHTML = '<div class="loading">Setting up your database for the first time…</div>';
+  // Create tables via RPC if they don't exist
+  // We'll use direct REST calls to create tables
+  var sql = `
+    CREATE TABLE IF NOT EXISTS vendors (
+      id TEXT PRIMARY KEY,
+      vendor_status TEXT DEFAULT 'active',
+      status TEXT DEFAULT 'pending',
+      business_name TEXT,
+      contact_name TEXT,
+      email TEXT,
+      phone TEXT,
+      website TEXT,
+      social TEXT,
+      category TEXT,
+      category_comment TEXT,
+      products TEXT,
+      product_desc TEXT,
+      local_produced TEXT,
+      local_comment TEXT,
+      price_range TEXT[],
+      licenses TEXT,
+      licenses_comment TEXT,
+      food_docs TEXT[],
+      liability TEXT,
+      booth_size TEXT,
+      own_setup TEXT,
+      setup_comment TEXT,
+      electricity TEXT,
+      attendance TEXT,
+      months TEXT,
+      why_join TEXT,
+      values TEXT,
+      additional_info TEXT,
+      photos TEXT[],
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS tents (
+      id TEXT PRIMARY KEY,
+      num INTEGER,
+      size TEXT,
+      vendor_id TEXT,
+      tent_status TEXT DEFAULT 'empty'
+    );
+    CREATE TABLE IF NOT EXISTS calendar (
+      date TEXT PRIMARY KEY,
+      approved_vendors TEXT[],
+      waitlist_vendors TEXT[]
+    );
+  `;
+  var { error } = await sb.rpc('exec_sql', { sql: sql });
+  // If RPC fails, tables may already exist or we need to guide user
+  await initTentsDB();
+  render();
+}
+
+async function initTentsDB() {
+  var defaultTents = [];
+  for (var i=1;i<=6;i++) defaultTents.push({id:'t'+i,num:i,size:"10x10",vendor_id:null,tent_status:'empty'});
+  defaultTents.push({id:'t7',num:7,size:"20x20",vendor_id:null,tent_status:'empty'});
+  defaultTents.push({id:'t8',num:8,size:"20x20",vendor_id:null,tent_status:'empty'});
+  defaultTents.push({id:'t9',num:9,size:'Food truck',vendor_id:null,tent_status:'empty'});
+  var { data, error } = await sb.from('tents').upsert(defaultTents);
+  tents = defaultTents;
+}
+
+async function saveVendorDB(data, id) {
+  var row = {
+    id: id || uid(),
+    vendor_status: data.vendorStatus || 'active',
+    status: data.status || 'pending',
+    business_name: data.businessName || '',
+    contact_name: data.contactName || '',
+    email: data.email || '',
+    phone: data.phone || '',
+    website: data.website || '',
+    social: data.social || '',
+    category: data.category || '',
+    category_comment: data.categoryComment || '',
+    products: data.products || '',
+    product_desc: data.productDesc || '',
+    local_produced: data.local || '',
+    local_comment: data.localComment || '',
+    price_range: data.priceRange || [],
+    licenses: data.licenses || '',
+    licenses_comment: data.licensesComment || '',
+    food_docs: data.foodDocs || [],
+    liability: data.liability || '',
+    booth_size: data.boothSize || '',
+    own_setup: data.ownSetup || '',
+    setup_comment: data.ownSetupComment || '',
+    electricity: data.electricity || '',
+    attendance: data.attendance || '',
+    months: data.months || '',
+    why_join: data.whyJoin || '',
+    values: data.values || '',
+    additional_info: data.additionalInfo || '',
+    photos: data.photos || []
+  };
+  var { error } = await sb.from('vendors').upsert(row);
+  if (error) { alert('Error saving: '+error.message); return false; }
+  return true;
+}
+
+function dbToVendor(r) {
+  return {
+    id: r.id, vendorStatus: r.vendor_status, status: r.status,
+    businessName: r.business_name, contactName: r.contact_name,
+    email: r.email, phone: r.phone, website: r.website, social: r.social,
+    category: r.category, categoryComment: r.category_comment,
+    products: r.products, productDesc: r.product_desc,
+    local: r.local_produced, localComment: r.local_comment,
+    priceRange: r.price_range || [], licenses: r.licenses, licensesComment: r.licenses_comment,
+    foodDocs: r.food_docs || [], liability: r.liability, boothSize: r.booth_size,
+    ownSetup: r.own_setup, ownSetupComment: r.setup_comment, electricity: r.electricity,
+    attendance: r.attendance, months: r.months, whyJoin: r.why_join,
+    values: r.values, additionalInfo: r.additional_info, photos: r.photos || [],
+    submittedAt: r.created_at
+  };
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+document.querySelectorAll('.nb').forEach(function(b) {
+  b.addEventListener('click', function() {
+    tab = b.getAttribute('data-tab'); vsFilter = 'all';
+    document.querySelectorAll('.nb').forEach(function(x){ x.classList.remove('active'); });
+    b.classList.add('active');
+    closeMod(); render();
+  });
+});
+document.getElementById('newBtn').addEventListener('click', function(){ openForm(null); });
+document.getElementById('exportBtn').addEventListener('click', openExportModal);
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render() {
+  renderStats();
+  renderFilterBar();
+  if (tab==='vendors') renderVendors();
+  else if (tab==='calendar') renderCalendar();
+  else if (tab==='tents') renderTents();
+  else if (tab==='waitlist') renderWaitlist();
+}
+
+function renderStats() {
+  var vv = vendors.map(dbToVendor);
+  var tot=vv.length, app=vv.filter(function(v){return v.status==='approved';}).length;
+  var wl=vv.filter(function(v){return v.status==='waitlist';}).length;
+  var actv=vv.filter(function(v){return(v.vendorStatus||'active')==='active';}).length;
+  var inw=vv.filter(function(v){return v.vendorStatus==='inwork';}).length;
+  var inact=vv.filter(function(v){return v.vendorStatus==='inactive';}).length;
+  document.getElementById('stats-bar').innerHTML='<div class="stats">'+
+    '<div class="stat"><div class="sl">Total</div><div class="sv">'+tot+'</div></div>'+
+    '<div class="stat"><div class="sl">Approved</div><div class="sv" style="color:#27500A">'+app+'</div></div>'+
+    '<div class="stat"><div class="sl"><span class="vs-dot" style="background:#22c55e;display:inline-block"></span>Active</div><div class="sv" style="color:#15803d">'+actv+'</div></div>'+
+    '<div class="stat"><div class="sl"><span class="vs-dot" style="background:#eab308;display:inline-block"></span>In-Work</div><div class="sv" style="color:#a16207">'+inw+'</div></div>'+
+    '<div class="stat"><div class="sl"><span class="vs-dot" style="background:#9ca3af;display:inline-block"></span>Inactive</div><div class="sv" style="color:#6b7280">'+inact+'</div></div>'+
+    '<div class="stat"><div class="sl">Waitlist</div><div class="sv" style="color:#633806">'+wl+'</div></div>'+
+    '</div>';
+}
+
+function renderFilterBar() {
+  if (tab!=='vendors') { document.getElementById('filter-bar').innerHTML=''; return; }
+  var filters=[['all','All'],['active','Active'],['inwork','In-Work'],['inactive','Inactive']];
+  document.getElementById('filter-bar').innerHTML='<div class="filter-bar">'+
+    filters.map(function(f){
+      var dot=f[0]!=='all'?'<span class="vs-dot" style="background:'+VSC[f[0]].dot+';display:inline-block"></span>':'';
+      return '<button class="fchip'+(vsFilter===f[0]?' on':'')+'" onclick="setVsFilter(\''+f[0]+'\')">'+dot+f[1]+'</button>';
+    }).join('')+'</div>';
+}
+function setVsFilter(f){ vsFilter=f; render(); }
+
+function renderVendors() {
+  var el = document.getElementById('main-content');
+  var vv = vendors.map(dbToVendor).filter(function(v){ return vsFilter==='all'||(v.vendorStatus||'active')===vsFilter; });
+  if (!vv.length) { el.innerHTML='<div class="empty">'+(vendors.length?'No vendors match this filter.':'No vendors yet. Tap + New to add one.')+'</div>'; return; }
+  var html='';
+  [['approved','Approved'],['pending','Pending'],['waitlist','Waitlist']].forEach(function(g){
+    var list=vv.filter(function(v){return(v.status||'pending')===g[0];});
+    if(!list.length)return;
+    html+='<div class="glabel">'+g[1]+' ('+list.length+')</div>';
+    list.forEach(function(v){
+      var vs=v.vendorStatus||'active';
+      var sta=g[0]==='approved'?'<span class="tag tg">Approved</span>':g[0]==='waitlist'?'<span class="tag tw">Waitlist</span>':'<span class="tag tgr">Pending</span>';
+      var ins=(v.liability&&v.liability.indexOf('No')===0)?'<span class="tag tr">No ins.</span>':'';
+      html+='<div class="vrow vstatus-'+vs+'">'+
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">'+
+          '<div><div class="vname">'+esc(v.businessName||'Unnamed')+'</div><div class="vmeta">'+esc(v.contactName||'')+(v.category?' · '+esc(v.category):'')+'</div></div>'+
+          vsTag(vs)+
+        '</div>'+
+        '<div class="vtags" style="margin-top:5px">'+sta+'<span class="tag tb">'+esc(v.boothSize||'—')+'</span>'+ins+'</div>'+
+        '<div class="vactions">'+
+          '<select onchange="setSt(\''+v.id+'\',this.value)">'+
+            '<option value="pending"'+(!v.status||v.status==='pending'?' selected':'')+'>Pending</option>'+
+            '<option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option>'+
+            '<option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option>'+
+          '</select>'+
+          '<select onchange="setVs(\''+v.id+'\',this.value)">'+
+            '<option value="active"'+(vs==='active'?' selected':'')+'>🟢 Active</option>'+
+            '<option value="inwork"'+(vs==='inwork'?' selected':'')+'>🟡 In-Work</option>'+
+            '<option value="inactive"'+(vs==='inactive'?' selected':'')+'>⚫ Inactive</option>'+
+          '</select>'+
+          '<button class="iBtn" onclick="openForm(\''+v.id+'\')">✏️</button>'+
+          '<button class="iBtn" onclick="delV(\''+v.id+'\')">🗑️</button>'+
+        '</div></div>';
+    });
+  });
+  el.innerHTML=html;
+}
+
+async function setSt(id,val){
+  await sb.from('vendors').update({status:val}).eq('id',id);
+  var v=vendors.find(function(x){return x.id===id;});
+  if(v)v.status=val;
+  render();
+}
+async function setVs(id,val){
+  await sb.from('vendors').update({vendor_status:val}).eq('id',id);
+  var v=vendors.find(function(x){return x.id===id;});
+  if(v)v.vendor_status=val;
+  render();
+}
+async function delV(id){
+  if(!confirm('Remove this vendor?'))return;
+  await sb.from('vendors').delete().eq('id',id);
+  vendors=vendors.filter(function(v){return v.id!==id;});
+  for(var i=0;i<tents.length;i++){if(tents[i].vendor_id===id){tents[i].vendor_id=null;tents[i].tent_status='empty';await sb.from('tents').update({vendor_id:null,tent_status:'empty'}).eq('id',tents[i].id);}}
+  render();
+}
+
+function renderCalendar(){
+  var el=document.getElementById('main-content');
+  var full=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var ds2=['Su','Mo','Tu','We','Th','Fr','Sa'];
+  var first=new Date(cY,cM,1),last=new Date(cY,cM+1,0),tod=new Date().toISOString().slice(0,10);
+  var cells='';
+  for(var i=0;i<first.getDay();i++){var d2=new Date(cY,cM,-(first.getDay()-i-1));cells+='<div class="cday cother">'+d2.getDate()+'</div>';}
+  for(var d=1;d<=last.getDate();d++){
+    var ds=cY+'-'+String(cM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var ia=(approvedDates[ds]||[]).length>0,iw=(waitlistDates[ds]||[]).length>0;
+    var cls='cday'+(ia?' capproved':iw?' cwait':'')+(ds===tod?' ctoday':'');
+    var cnt=(approvedDates[ds]||[]).length;
+    cells+='<div class="'+cls+'" onclick="openDay(\''+ds+'\')">'+d+(cnt?'<br><span style="font-size:8px">'+cnt+'v</span>':'')+'</div>';
+  }
+  el.innerHTML='<div style="display:flex;gap:8px;margin-bottom:.5rem;font-size:10px;color:#888;flex-wrap:wrap">'+
+    '<span style="display:inline-flex;align-items:center;gap:3px"><span style="width:9px;height:9px;background:#EAF3DE;border:1px solid #639922;border-radius:2px;display:inline-block"></span>Approved</span>'+
+    '<span style="display:inline-flex;align-items:center;gap:3px"><span style="width:9px;height:9px;background:#FAEEDA;border:1px solid #BA7517;border-radius:2px;display:inline-block"></span>Waitlist</span></div>'+
+    '<div style="background:#fff;border:0.5px solid #e5e3de;border-radius:12px;padding:1rem">'+
+    '<div class="cal-nav">'+
+      '<button class="btn-s" style="padding:5px 12px" onclick="cM--;if(cM<0){cM=11;cY--;}renderCalendar()">‹</button>'+
+      '<span>'+full[cM]+' '+cY+'</span>'+
+      '<button class="btn-s" style="padding:5px 12px" onclick="cM++;if(cM>11){cM=0;cY++;}renderCalendar()">›</button>'+
+    '</div>'+
+    '<div class="cal-grid">'+ds2.map(function(d){return'<div class="chd">'+d+'</div>';}).join('')+cells+'</div></div>';
+}
+
+function openDay(ds){
+  var vv=vendors.map(dbToVendor);
+  var appV=vv.filter(function(v){return v.status==='approved';});
+  var wlV=vv.filter(function(v){return v.status==='waitlist';});
+  var da=approvedDates[ds]||[],dw=waitlistDates[ds]||[];
+  document.getElementById('modal-area').innerHTML=
+    '<div class="overlay" onclick="if(event.target===this)closeMod()"><div class="modal">'+
+    '<div class="mtitle">📅 Market date — '+ds+'</div>'+
+    '<div class="q">Approved vendors attending</div>'+
+    '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:.75rem" id="da">'+
+      (appV.length?appV.map(function(v){return'<label class="copt"><input type="checkbox" value="'+v.id+'"'+(da.indexOf(v.id)>-1?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+esc(v.businessName)+' '+vsTag(v.vendorStatus||'active')+'</span></label>';}).join(''):'<p style="font-size:11px;color:#aaa">No approved vendors.</p>')+
+    '</div>'+
+    '<div class="q">Waitlisted for this date</div>'+
+    '<div style="display:flex;flex-direction:column;gap:4px" id="dw">'+
+      (wlV.length?wlV.map(function(v){return'<label class="copt"><input type="checkbox" value="'+v.id+'"'+(dw.indexOf(v.id)>-1?' checked':'')+' style="margin-top:2px;flex-shrink:0"><span>'+esc(v.businessName)+'</span></label>';}).join(''):'<p style="font-size:11px;color:#aaa">No waitlisted vendors.</p>')+
+    '</div>'+
+    '<div class="mfoot"><button class="btn-s" onclick="clearDay(\''+ds+'\')">Clear</button><button class="btn-s" onclick="closeMod()">Cancel</button><button class="btn-p" onclick="saveDay(\''+ds+'\')">Save</button></div>'+
+    '</div></div>';
+}
+async function saveDay(ds){
+  var a=Array.from(document.querySelectorAll('#da input:checked')).map(function(c){return c.value;});
+  var w=Array.from(document.querySelectorAll('#dw input:checked')).map(function(c){return c.value;});
+  await sb.from('calendar').upsert({date:ds,approved_vendors:a,waitlist_vendors:w});
+  if(a.length)approvedDates[ds]=a;else delete approvedDates[ds];
+  if(w.length)waitlistDates[ds]=w;else delete waitlistDates[ds];
+  closeMod();renderCalendar();
+}
+async function clearDay(ds){
+  await sb.from('calendar').delete().eq('date',ds);
+  delete approvedDates[ds];delete waitlistDates[ds];
+  closeMod();renderCalendar();
+}
+
+function renderTents(){
+  var el=document.getElementById('main-content');
+  var occ=tents.filter(function(t){return t.vendor_id;}).length;
+  var vv=vendors.map(dbToVendor);
+  var grid=tents.map(function(t){
+    var v=t.vendor_id?vv.find(function(x){return x.id===t.vendor_id;}):null;
+    var cls='tcell'+(v?(t.tent_status==='waitlisted'?' twait':' tocc'):'');
+    return '<div class="'+cls+'" onclick="openTent(\''+t.id+'\')">'+
+      '<div class="tnum">Spot '+t.num+' · '+esc(t.size)+'</div>'+
+      (v?'<div class="tvname">'+esc(v.businessName)+'</div><div class="tvmeta">'+esc(v.category||'')+'</div>'+
+        '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px"><span class="tag '+(t.tent_status==='waitlisted'?'tw':'tg')+'">'+(t.tent_status==='waitlisted'?'Waitlist':'OK')+'</span>'+vsTag(v.vendorStatus||'active')+'</div>':
+      '<div style="font-size:10px;color:#ccc;margin-top:6px">Available</div>')+
+    '</div>';
+  }).join('');
+  var rows=tents.map(function(t){
+    var v=t.vendor_id?vv.find(function(x){return x.id===t.vendor_id;}):null;
+    return '<tr style="border-bottom:0.5px solid #f0ede6">'+
+      '<td style="padding:5px 7px;color:#888;font-size:11px">'+t.num+'</td>'+
+      '<td style="padding:5px 7px;font-size:11px;font-weight:'+(v?'600':'400')+';color:'+(v?'#1a1a1a':'#ccc')+'">'+( v?esc(v.businessName):'—')+'</td>'+
+      '<td style="padding:5px 7px;font-size:10px;color:#888">'+(v?esc(v.category||'—'):'—')+'</td>'+
+      '<td style="padding:5px 7px;font-size:10px">'+esc(t.size)+'</td>'+
+      '<td style="padding:5px 7px">'+(v?'<span class="tag '+(t.tent_status==='waitlisted'?'tw':'tg')+'">'+(t.tent_status==='waitlisted'?'Wait':'OK')+'</span>':'<span class="tag tgr">—</span>')+'</td>'+
+      '<td style="padding:5px 7px">'+(v?vsTag(v.vendorStatus||'active'):'—')+'</td>'+
+    '</tr>';
+  }).join('');
+  el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem">'+
+    '<span style="font-size:13px;font-weight:600">'+occ+'/'+tents.length+' spots assigned</span>'+
+    '<button class="btn-s" style="font-size:11px" onclick="resetTents()">Reset all</button></div>'+
+    '<div class="tent-grid">'+grid+'</div>'+
+    '<div style="margin-top:1.25rem;background:#fff;border:0.5px solid #e5e3de;border-radius:12px;padding:1rem;overflow-x:auto">'+
+    '<div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.65rem">Allocation Summary</div>'+
+    '<table class="sum-table"><thead><tr><th>#</th><th>Vendor Name</th><th>Business Type</th><th>Size</th><th>App.</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+function openTent(tid){
+  var t=tents.find(function(x){return x.id===tid;});
+  var vv=vendors.map(dbToVendor);
+  var avail=vv.filter(function(v){return v.status==='approved'||v.status==='waitlist';});
+  document.getElementById('modal-area').innerHTML=
+    '<div class="overlay" onclick="if(event.target===this)closeMod()"><div class="modal">'+
+    '<div class="mtitle">Spot '+t.num+' — '+esc(t.size)+'</div>'+
+    '<div class="fg"><label>Assign vendor</label><select id="tv">'+
+      '<option value="">— unassigned —</option>'+
+      avail.map(function(v){return'<option value="'+v.id+'"'+(t.vendor_id===v.id?' selected':'')+'>'+esc(v.businessName)+' ('+v.status+')</option>';}).join('')+
+    '</select></div>'+
+    '<div class="fg"><label>Spot status</label><select id="ts">'+
+      '<option value="occupied"'+(t.tent_status==='occupied'?' selected':'')+'>Approved</option>'+
+      '<option value="waitlisted"'+(t.tent_status==='waitlisted'?' selected':'')+'>Waitlisted</option>'+
+    '</select></div>'+
+    '<div class="mfoot"><button class="btn-s" onclick="unassignTent(\''+tid+'\')">Unassign</button><button class="btn-s" onclick="closeMod()">Cancel</button><button class="btn-p" onclick="saveTent(\''+tid+'\')">Save</button></div>'+
+    '</div></div>';
+}
+async function saveTent(id){
+  var vId=document.getElementById('tv').value||null;
+  var st=vId?document.getElementById('ts').value:'empty';
+  await sb.from('tents').update({vendor_id:vId,tent_status:st}).eq('id',id);
+  var t=tents.find(function(x){return x.id===id;});
+  if(t){t.vendor_id=vId;t.tent_status=st;}
+  closeMod();renderTents();
+}
+async function unassignTent(id){
+  await sb.from('tents').update({vendor_id:null,tent_status:'empty'}).eq('id',id);
+  var t=tents.find(function(x){return x.id===id;});
+  if(t){t.vendor_id=null;t.tent_status='empty';}
+  closeMod();renderTents();
+}
+async function resetTents(){
+  if(!confirm('Clear all tent assignments?'))return;
+  await sb.from('tents').update({vendor_id:null,tent_status:'empty'}).neq('id','');
+  tents.forEach(function(t){t.vendor_id=null;t.tent_status='empty';});
+  renderTents();
+}
+
+function renderWaitlist(){
+  var el=document.getElementById('main-content');
+  var vv=vendors.map(dbToVendor).filter(function(v){return v.status==='waitlist';});
+  if(!vv.length){el.innerHTML='<div class="empty">No vendors on the waitlist.</div>';return;}
+  el.innerHTML='<div style="font-size:13px;font-weight:600;margin-bottom:.65rem">Waitlist ('+vv.length+')</div>'+
+    vv.map(function(v){
+      return '<div class="vrow vstatus-'+(v.vendorStatus||'active')+'">'+
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between">'+
+          '<div><div class="vname">'+esc(v.businessName)+'</div><div class="vmeta">'+esc(v.contactName||'')+' · '+esc(v.category||'')+' · '+esc(v.boothSize||'')+'</div></div>'+
+          vsTag(v.vendorStatus||'active')+
+        '</div>'+
+        '<div style="display:flex;gap:6px;margin-top:7px">'+
+          '<button class="btn-p" style="font-size:11px;padding:5px 10px" onclick="setSt(\''+v.id+'\',\'approved\')">Approve</button>'+
+          '<button class="btn-s" style="font-size:11px;padding:5px 10px" onclick="openForm(\''+v.id+'\')">Edit</button>'+
+        '</div></div>';
+    }).join('');
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────
+function openExportModal(){
+  var vv=vendors.map(dbToVendor);
+  if(!vv.length){alert('No vendor data to export.');return;}
+  document.getElementById('modal-area').innerHTML=
+    '<div class="overlay" onclick="if(event.target===this)closeMod()"><div class="modal">'+
+    '<div class="mtitle">↓ Export data ('+vv.length+' vendors)</div>'+
+    '<div class="export-opt" onclick="exportVendorsCSV()"><div class="export-icon" style="background:#EAF3DE">👥</div><div><div style="font-size:12px;font-weight:600">All vendors — full details</div><div style="font-size:10px;color:#888">Every field including vendor status</div></div></div>'+
+    '<div class="export-opt" onclick="exportApprovedCSV()"><div class="export-icon" style="background:#E6F1FB">✅</div><div><div style="font-size:12px;font-weight:600">Approved vendors only</div><div style="font-size:10px;color:#888">Name, contact, category, booth, status</div></div></div>'+
+    '<div class="export-opt" onclick="exportWaitlistCSV()"><div class="export-icon" style="background:#FAEEDA">⏳</div><div><div style="font-size:12px;font-weight:600">Waitlist only</div><div style="font-size:10px;color:#888">Contact details and vendor status</div></div></div>'+
+    '<div class="export-opt" onclick="exportTentsCSV()"><div class="export-icon" style="background:#EEEDFE">⛺</div><div><div style="font-size:12px;font-weight:600">Tent allocation</div><div style="font-size:10px;color:#888">Spot, vendor, type, size, status</div></div></div>'+
+    '<div class="export-opt" onclick="exportCalendarCSV()"><div class="export-icon" style="background:#FAECE7">📅</div><div><div style="font-size:12px;font-weight:600">Market dates</div><div style="font-size:10px;color:#888">Scheduled dates with vendor names</div></div></div>'+
+    '<div class="mfoot"><button class="btn-s" onclick="closeMod()">Close</button></div>'+
+    '</div></div>';
+}
+function downloadCSV(filename,rows){
+  var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=filename;a.style.display='none';
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);
+}
+function exportVendorsCSV(){
+  var vv=vendors.map(dbToVendor);
+  var h=['Vendor Status','App. Status','Business Name','Contact','Email','Phone','Website','Social','Category','Products','Locally Produced','Price Range','Licenses','Food Docs','Liability','Booth Size','Electricity','Attendance','Why Join','Values','Additional Info','Photos'];
+  var rows=[h];
+  vv.forEach(function(v){rows.push([v.vendorStatus||'active',v.status||'pending',v.businessName||'',v.contactName||'',v.email||'',v.phone||'',v.website||'',v.social||'',v.category||'',v.products||'',v.local||'',(v.priceRange||[]).join('; '),v.licenses||'',(v.foodDocs||[]).join('; '),v.liability||'',v.boothSize||'',v.electricity||'',v.attendance||'',v.whyJoin||'',v.values||'',v.additionalInfo||'',(v.photos||[]).length]);});
+  downloadCSV('eb-vendors-'+today()+'.csv',rows);closeMod();
+}
+function exportApprovedCSV(){
+  var list=vendors.map(dbToVendor).filter(function(v){return v.status==='approved';});
+  if(!list.length){alert('No approved vendors.');return;}
+  var rows=[['Vendor Status','Business Name','Contact','Email','Phone','Category','Booth Size','Electricity','Attendance']];
+  list.forEach(function(v){rows.push([v.vendorStatus||'active',v.businessName||'',v.contactName||'',v.email||'',v.phone||'',v.category||'',v.boothSize||'',v.electricity||'',v.attendance||'']);});
+  downloadCSV('eb-approved-'+today()+'.csv',rows);closeMod();
+}
+function exportWaitlistCSV(){
+  var list=vendors.map(dbToVendor).filter(function(v){return v.status==='waitlist';});
+  if(!list.length){alert('No waitlisted vendors.');return;}
+  var rows=[['Vendor Status','Business Name','Contact','Email','Phone','Category','Booth Size']];
+  list.forEach(function(v){rows.push([v.vendorStatus||'active',v.businessName||'',v.contactName||'',v.email||'',v.phone||'',v.category||'',v.boothSize||'']);});
+  downloadCSV('eb-waitlist-'+today()+'.csv',rows);closeMod();
+}
+function exportTentsCSV(){
+  var vv=vendors.map(dbToVendor);
+  var rows=[['Spot','Size','Vendor Name','Business Type','App. Status','Vendor Status']];
+  tents.forEach(function(t){var v=t.vendor_id?vv.find(function(x){return x.id===t.vendor_id;}):null;rows.push([t.num,t.size,v?v.businessName:'',v?v.category||'':'',t.tent_status==='empty'?'Available':t.tent_status==='waitlisted'?'Waitlisted':'Approved',v?v.vendorStatus||'active':'']);});
+  downloadCSV('eb-tents-'+today()+'.csv',rows);closeMod();
+}
+function exportCalendarCSV(){
+  var vv=vendors.map(dbToVendor);
+  var allDates=Object.keys(approvedDates).concat(Object.keys(waitlistDates)).filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
+  if(!allDates.length){alert('No market dates scheduled.');return;}
+  var rows=[['Date','Approved Vendors','Waitlisted Vendors']];
+  allDates.forEach(function(ds){
+    var av=(approvedDates[ds]||[]).map(function(id){var v=vv.find(function(x){return x.id===id;});return v?v.businessName:'';}).filter(Boolean).join('; ');
+    var wv=(waitlistDates[ds]||[]).map(function(id){var v=vv.find(function(x){return x.id===id;});return v?v.businessName:'';}).filter(Boolean).join('; ');
+    rows.push([ds,av,wv]);
+  });
+  downloadCSV('eb-calendar-'+today()+'.csv',rows);closeMod();
+}
+
+// ── Vendor form ────────────────────────────────────────────────────────────
+function openForm(id){
+  eId=id||null;
+  var vv=vendors.map(dbToVendor);
+  var v=id?vv.find(function(x){return x.id===id;}):{};
+  if(!v)v={};
+  window._ep=(v.photos||[]).slice();
+  var vs=v.vendorStatus||'active';
+  var cats=['Farm / Produce Grower','Rancher / Eggs / Meat / Dairy','Baked Goods','Specialty Food / Packaged Goods','Prepared Food Vendor','Artisan / Maker','Flowers / Plants / Herbal Goods','Other'];
+
+  function rads(name,opts,val,ck,cv){
+    return opts.map(function(o){
+      return '<label class="ropt'+(val===o?' sel':'')+'" onclick="selR(this,\''+name+'\')">' +
+        '<input type="radio" name="'+name+'" value="'+esc(o)+'"'+(val===o?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+esc(o)+'</span></label>'+
+        (ck&&o===ck?'<div class="sub" id="sub_'+name+'" style="'+(val===ck?'':'display:none')+'"><textarea id="cmt_'+name+'" style="width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:7px;font-size:12px;font-family:inherit" placeholder="Describe…">'+esc(cv||'')+'</textarea></div>':'');
+    }).join('');
+  }
+
+  var vsHtml='<div class="q">Vendor status</div><div class="vs-selector">'+
+    ['active','inwork','inactive'].map(function(k){
+      var c=VSC[k];
+      return '<div class="vs-card'+(vs===k?' sel-'+k:'')+'" id="vsc-'+k+'" onclick="selectVS(\''+k+'\')">'+
+        '<div class="vs-card-dot" style="background:'+c.dot+'"></div>'+
+        '<div class="vs-card-label" style="color:'+(vs===k?c.text:'#aaa')+'">'+c.label+'</div>'+
+        '<input type="radio" name="vendorStatus" value="'+k+'"'+(vs===k?' checked':'')+' style="display:none">'+
+      '</div>';
+    }).join('')+'</div>';
+
+  var html=
+    '<div class="sec"><div class="stitle">Vendor status</div>'+vsHtml+'</div>'+
+    '<div class="sec"><div class="stitle">Business info</div>'+
+    '<div class="g2"><div class="fg"><label>Business / farm name *</label><input id="f_biz" value="'+esc(v.businessName||'')+'"></div>'+
+    '<div class="fg"><label>Primary contact *</label><input id="f_contact" value="'+esc(v.contactName||'')+'"></div>'+
+    '<div class="fg"><label>Email</label><input id="f_email" type="email" value="'+esc(v.email||'')+'"></div>'+
+    '<div class="fg"><label>Phone</label><input id="f_phone" type="tel" value="'+esc(v.phone||'')+'"></div></div>'+
+    '<div class="fg"><label>Website</label><input id="f_web" value="'+esc(v.website||'')+'" placeholder="https://"></div>'+
+    '<div class="fg"><label>Social media</label><input id="f_social" value="'+esc(v.social||'')+'" placeholder="Instagram, Facebook…"></div></div>'+
+    '<div class="sec"><div class="stitle">Vendor category</div><div class="rg" id="rg_category">'+rads('category',cats,v.category,'Other',v.categoryComment)+'</div></div>'+
+    '<div class="sec"><div class="stitle">Products</div>'+
+    '<div class="fg"><label>Products sold</label><textarea id="f_products">'+esc(v.products||'')+'</textarea></div>'+
+    '<div class="fg"><label>Product description</label><textarea id="f_prodDesc">'+esc(v.productDesc||'')+'</textarea></div>'+
+    '<div class="q">Locally grown / made / produced?</div><div class="rg" id="rg_local">'+rads('local',['Yes','Mostly','Some (describe below)'],v.local,'Some (describe below)',v.localComment)+'</div>'+
+    '<div class="fg" style="margin-top:.6rem"><label>Price range</label><div id="priceChecks" style="display:flex;flex-direction:column;gap:4px">'+
+    ['$5–$8','$10–$25','$40+'].map(function(p){return'<label class="copt"><input type="checkbox" value="'+p+'"'+((v.priceRange||[]).indexOf(p)>-1?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+p+'</span></label>';}).join('')+
+    '</div></div></div>'+
+    '<div class="sec"><div class="stitle">Licensing & requirements</div>'+
+    '<div class="q">Hold all required licenses & permits?</div><div class="rg" id="rg_licenses">'+rads('licenses',['Yes','In Process','Not Yet (describe below)'],v.licenses,'Not Yet (describe below)',v.licensesComment)+'</div>'+
+    '<div style="margin-top:.65rem"><div class="q">Prepared food documentation</div><div id="fdChecks" style="display:flex;flex-direction:column;gap:4px">'+
+    ['Temporary Restaurant License','Food Handler Certification','Commissary Kitchen (if applicable)','Not a prepared food vendor'].map(function(o){return'<label class="copt"><input type="checkbox" value="'+esc(o)+'"'+((v.foodDocs||[]).indexOf(o)>-1?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+esc(o)+'</span></label>';}).join('')+
+    '</div></div>'+
+    '<div style="margin-top:.65rem"><div class="q">General liability insurance?</div><div class="rg" id="rg_liability">'+rads('liability',['Yes','No (required prior to first market)'],v.liability,null,null)+'</div></div></div>'+
+    '<div class="sec"><div class="stitle">Booth & setup</div>'+
+    '<div class="q">Booth size</div><div class="rg" id="rg_boothSize">'+rads('boothSize',["10'x10'","20'x20'",'Food truck / trailer'],v.boothSize,null,null)+'</div>'+
+    '<div style="margin-top:.65rem"><div class="q">Bring own tent, tables & display?</div><div class="rg" id="rg_ownSetup">'+rads('ownSetup',['Yes','No','Partial (describe below)'],v.ownSetup,'Partial (describe below)',v.ownSetupComment)+'</div></div>'+
+    '<div style="margin-top:.65rem"><div class="q">Electricity needed?</div><div class="rg" id="rg_electricity">'+rads('electricity',['Yes','No'],v.electricity,null,null)+'</div></div></div>'+
+    '<div class="sec"><div class="stitle">Attendance</div>'+
+    '<div class="q">How often to attend?</div><div class="rg" id="rg_attendance">'+rads('attendance',['Full Season','Monthly','Select dates only'],v.attendance,null,null)+'</div>'+
+    '<div class="fg" style="margin-top:.6rem"><label>Preferred months (if not full season)</label><textarea id="f_months">'+esc(v.months||'')+'</textarea></div></div>'+
+    '<div class="sec"><div class="stitle">Brand & market fit</div>'+
+    '<div class="fg"><label>Why join Elevation Farmers Market?</label><textarea id="f_whyJoin" style="height:68px">'+esc(v.whyJoin||'')+'</textarea></div>'+
+    '<div class="fg"><label>What values guide your business?</label><textarea id="f_values" style="height:68px">'+esc(v.values||'')+'</textarea></div>'+
+    '<div class="fg"><label>Anything else we should know?</label><textarea id="f_addl" style="height:68px">'+esc(v.additionalInfo||'')+'</textarea></div></div>'+
+    '<div class="sec"><div class="stitle">Photos</div>'+
+    '<label class="upload-zone">📷 Tap to upload photos (JPG, PNG)<input type="file" accept="image/*" multiple style="display:none" id="photoInput"></label>'+
+    '<div class="pgrid" id="photoGrid">'+pgHtml()+'</div></div>';
+
+  document.getElementById('modal-area').innerHTML=
+    '<div class="overlay" onclick="if(event.target===this)closeMod()"><div class="modal" style="max-width:580px">'+
+    '<div class="mtitle">'+(id?'Edit vendor application':'New vendor application')+'</div>'+
+    html+
+    '<div class="mfoot"><button class="btn-s" onclick="closeMod()">Cancel</button><button class="btn-p" id="saveVBtn">Save application</button></div>'+
+    '</div></div>';
+
+  document.getElementById('saveVBtn').addEventListener('click', saveV);
+  document.getElementById('photoInput').addEventListener('change',function(evt){
+    Array.from(evt.target.files).forEach(function(f){var r=new FileReader();r.onload=function(e){window._ep.push(e.target.result);refreshPG();};r.readAsDataURL(f);});
+  });
+}
+
+function selectVS(k){
+  ['active','inwork','inactive'].forEach(function(x){
+    var el=document.getElementById('vsc-'+x);if(!el)return;
+    el.className='vs-card'+(x===k?' sel-'+x:'');
+    el.querySelector('.vs-card-label').style.color=x===k?VSC[x].text:'#aaa';
+    el.querySelector('input').checked=x===k;
+  });
+}
+function pgHtml(){return window._ep.map(function(p,i){return'<div style="position:relative"><img src="'+p+'" class="pthumb" alt="Photo '+(i+1)+'"><button onclick="rmPh('+i+')" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);border:none;border-radius:50%;width:18px;height:18px;cursor:pointer;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center" aria-label="Remove">×</button></div>';}).join('');}
+function rmPh(i){window._ep.splice(i,1);refreshPG();}
+function refreshPG(){var g=document.getElementById('photoGrid');if(g)g.innerHTML=pgHtml();}
+function selR(label,name){
+  label.closest('.rg').querySelectorAll('.ropt').forEach(function(l){l.classList.remove('sel');});label.classList.add('sel');
+  var val=label.querySelector('input').value;
+  var sm={category:'Other',local:'Some (describe below)',licenses:'Not Yet (describe below)',ownSetup:'Partial (describe below)'};
+  if(sm[name]){var s=document.getElementById('sub_'+name);if(s)s.style.display=val===sm[name]?'':'none';}
+}
+function getR(name){var el=document.querySelector('input[name="'+name+'"]:checked');return el?el.value:'';}
+
+async function saveV(){
+  var biz=document.getElementById('f_biz').value.trim();
+  var contact=document.getElementById('f_contact').value.trim();
+  if(!biz||!contact){alert('Business name and contact name are required.');return;}
+  var btn=document.getElementById('saveVBtn');
+  btn.disabled=true;btn.textContent='Saving…';
+  var cat=getR('category');
+  var data={
+    vendorStatus:getR('vendorStatus')||'active',
+    status:eId?(vendors.find(function(x){return x.id===eId;})||{}).status||'pending':'pending',
+    businessName:biz,contactName:contact,
+    email:document.getElementById('f_email').value.trim(),
+    phone:document.getElementById('f_phone').value.trim(),
+    website:document.getElementById('f_web').value.trim(),
+    social:document.getElementById('f_social').value.trim(),
+    category:cat,categoryComment:cat==='Other'?(document.getElementById('cmt_category')||{}).value||'':'',
+    products:document.getElementById('f_products').value.trim(),
+    productDesc:document.getElementById('f_prodDesc').value.trim(),
+    local:getR('local'),localComment:(document.getElementById('cmt_local')||{}).value||'',
+    priceRange:Array.from(document.querySelectorAll('#priceChecks input:checked')).map(function(c){return c.value;}),
+    licenses:getR('licenses'),licensesComment:(document.getElementById('cmt_licenses')||{}).value||'',
+    foodDocs:Array.from(document.querySelectorAll('#fdChecks input:checked')).map(function(c){return c.value;}),
+    liability:getR('liability'),boothSize:getR('boothSize'),
+    ownSetup:getR('ownSetup'),ownSetupComment:(document.getElementById('cmt_ownSetup')||{}).value||'',
+    electricity:getR('electricity'),attendance:getR('attendance'),
+    months:document.getElementById('f_months').value.trim(),
+    whyJoin:document.getElementById('f_whyJoin').value.trim(),
+    values:document.getElementById('f_values').value.trim(),
+    additionalInfo:document.getElementById('f_addl').value.trim(),
+    photos:window._ep.slice()
+  };
+  var ok=await saveVendorDB(data,eId);
+  if(ok){
+    await loadData();
+    closeMod();
+  } else {
+    btn.disabled=false;btn.textContent='Save application';
+  }
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+checkSession();
+</script>
+</body>
+</html>
