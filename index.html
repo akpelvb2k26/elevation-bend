@@ -8,6 +8,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f8f7f4;color:#1a1a1a;min-height:100vh}
+/* AUTH */
 #auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem}
 .auth-card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,0.1)}
 .auth-logo{font-size:22px;font-weight:700;margin-bottom:4px}
@@ -22,6 +23,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .auth-err{background:#FCEBEB;color:#791F1F;border-radius:8px;padding:.75rem 1rem;font-size:12px;margin-bottom:.85rem;display:none}
 .auth-footer{text-align:center;font-size:12px;color:#888;margin-top:1rem}
 .auth-link{color:#1a1a1a;font-weight:500;cursor:pointer;text-decoration:underline}
+/* APP */
 #app-screen{display:none;padding:.75rem;max-width:960px;margin:0 auto}
 .env-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;margin-bottom:.75rem;border:0.5px solid #22c55e;background:#dcfce7}
 .env-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0}
@@ -31,7 +33,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px}
 .hdr-title{font-size:16px;font-weight:700}
 .hdr-sub{font-size:11px;color:#888;margin-top:1px}
-.hdr-btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 nav{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:.85rem;background:#f0ede6;border-radius:8px;padding:3px}
 .nb{background:none;border:none;padding:7px 3px;font-size:10px;font-weight:500;color:#888;cursor:pointer;border-radius:6px;text-align:center;font-family:inherit}
 .nb.active{background:#fff;color:#1a1a1a;border:0.5px solid #e5e3de;box-shadow:0 1px 3px rgba(0,0,0,.06)}
@@ -50,11 +51,8 @@ nav{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:.85re
 .tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500}
 .tg{background:#EAF3DE;color:#27500A}.tb{background:#E6F1FB;color:#0C447C}
 .tw{background:#FAEEDA;color:#633806}.tr{background:#FCEBEB;color:#791F1F}.tgr{background:#f0ede6;color:#555}
-.tag-vs-active{background:#dcfce7;color:#15803d}
-.tag-vs-inwork{background:#fef9c3;color:#a16207}
-.tag-vs-inactive{background:#f3f4f6;color:#6b7280}
-.tag-contract{background:#E6F1FB;color:#0C447C}
-.tag-payment{background:#EAF3DE;color:#27500A}
+.tag-vs-active{background:#dcfce7;color:#15803d}.tag-vs-inwork{background:#fef9c3;color:#a16207}.tag-vs-inactive{background:#f3f4f6;color:#6b7280}
+.tag-contract{background:#E6F1FB;color:#0C447C}.tag-payment{background:#EAF3DE;color:#27500A}
 .vs-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle}
 .vactions{display:flex;align-items:center;gap:4px;margin-top:7px;flex-wrap:wrap}
 .vactions select{font-size:10px;padding:3px 5px;border-radius:5px;border:0.5px solid #d0cec7;background:#f8f7f4;color:#1a1a1a;font-family:inherit}
@@ -62,23 +60,38 @@ nav{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:.85re
 .iBtn:hover{background:#f0ede6}
 .empty{text-align:center;padding:2rem .5rem;color:#aaa;font-size:12px;background:#fff;border:0.5px solid #e5e3de;border-radius:10px}
 .glabel{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin:.65rem 0 .3rem;padding-left:2px}
-.btn-p{background:#1a1a1a;color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600}
+.btn-p{background:#1a1a1a;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap}
 .btn-p:hover{background:#333}
-.btn-s{background:#fff;border:0.5px solid #d0cec7;color:#555;padding:6px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit}
+.btn-s{background:#fff;border:0.5px solid #d0cec7;color:#555;padding:7px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap}
 .btn-s:hover{background:#f0ede6}
-.btn-g{background:#dcfce7;border:0.5px solid #22c55e;color:#15803d;padding:6px 10px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit}
-.btn-blue{background:#E6F1FB;border:0.5px solid #378ADD;color:#0C447C;padding:6px 10px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit}
-.btn-danger{background:#FCEBEB;border:0.5px solid #f09595;color:#791F1F;padding:5px 10px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit}
-.toprow{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:6px}
+.btn-g{background:#dcfce7;border:0.5px solid #22c55e;color:#15803d;padding:7px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-blue{background:#E6F1FB;border:0.5px solid #378ADD;color:#0C447C;padding:7px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-danger{background:#FCEBEB;border:0.5px solid #f09595;color:#791F1F;padding:6px 10px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap}
+/* TENTS */
+.tent-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;background:#fff;border:0.5px solid #e5e3de;border-radius:10px;padding:.85rem 1rem}
+.tent-date-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tent-date-label{font-size:11px;font-weight:600;color:#555}
+.tent-date-select{font-size:12px;padding:6px 10px;border-radius:8px;border:0.5px solid #d0cec7;background:#fff;color:#1a1a1a;font-family:inherit;min-width:140px}
+.tent-action-btns{display:flex;gap:6px;flex-wrap:wrap}
+.tent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px;margin-top:.5rem}
+.tcell{border:0.5px solid #e5e3de;border-radius:10px;padding:.75rem;min-height:100px;background:#fff;position:relative}
+.tcell.tocc{background:#EAF3DE;border-color:#639922}
+.tdel{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:5px;border:0.5px solid #f09595;background:rgba(220,50,50,.08);color:#791F1F;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;line-height:1}
+.tdel:hover{background:#FCEBEB}
+.tnum{font-size:9px;font-weight:700;color:#aaa;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;padding-right:26px}
+.tvname{font-size:12px;font-weight:600;margin-top:4px;color:#1a1a1a}
+.tvmeta{font-size:10px;color:#888;margin-top:2px}
+.tassign{width:100%;margin-top:8px;background:#f8f7f4;border:0.5px solid #d0cec7;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;color:#888;font-family:inherit;text-align:left}
+.tassign:hover{background:#f0ede6;color:#1a1a1a}
+/* CALENDAR */
 .cal-wrap{background:#fff;border:0.5px solid #e5e3de;border-radius:12px;padding:.85rem}
 .cal-nav{display:flex;align-items:center;gap:8px;margin-bottom:.65rem}
 .cal-nav span{font-size:13px;font-weight:600;flex:1;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .chd{text-align:center;font-size:10px;color:#888;padding:3px 0;font-weight:600}
-.cday{text-align:center;font-size:11px;padding:8px 2px;border-radius:8px;border:0.5px solid transparent;cursor:pointer;font-weight:500;min-height:38px}
+.cday{text-align:center;font-size:11px;padding:8px 2px;border-radius:8px;border:0.5px solid transparent;cursor:pointer;font-weight:500;min-height:38px;color:#1a1a1a}
 .cday:hover{background:#f0ede6}
 .cday.has-vendors{background:#EAF3DE;border-color:#639922;color:#27500A}
-.cday.has-waitlist{background:#FAEEDA;border-color:#BA7517;color:#633806}
 .cday.cother{color:#ccc}
 .cday.ctoday{box-shadow:0 0 0 2px #378ADD}
 .cday.selected-day{box-shadow:0 0 0 2.5px #1a1a1a}
@@ -89,20 +102,11 @@ nav{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:.85re
 .day-vendor-card:hover{background:#f8f7f4}
 .day-vendor-card:last-child{border-bottom:none}
 .dvc-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
-.tent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:.5rem}
-.tcell{border:0.5px solid #e5e3de;border-radius:10px;padding:.65rem .75rem;min-height:96px;background:#fff;position:relative}
-.tcell.tocc{background:#EAF3DE;border-color:#639922}
-.tdel{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:5px;border:0.5px solid #f09595;background:rgba(220,50,50,.08);color:#791F1F;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit}
-.tdel:hover{background:#FCEBEB}
-.tnum{font-size:9px;font-weight:700;color:#aaa;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;padding-right:24px}
-.tvname{font-size:12px;font-weight:600;margin-top:4px}
-.tvmeta{font-size:10px;color:#888;margin-top:2px}
-.tassign{width:100%;margin-top:8px;background:#f8f7f4;border:0.5px solid #d0cec7;border-radius:6px;padding:5px;font-size:11px;cursor:pointer;color:#888;font-family:inherit}
-.tassign:hover{background:#f0ede6;color:#1a1a1a}
+/* MODAL */
 .overlay{background:rgba(0,0,0,.4);position:fixed;inset:0;z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto}
 .modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:520px;margin:auto}
 .mtitle{font-size:14px;font-weight:700;margin-bottom:1rem;padding-bottom:.65rem;border-bottom:0.5px solid #e5e3de}
-.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:1rem;padding-top:.75rem;border-top:0.5px solid #e5e3de}
+.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:1rem;padding-top:.75rem;border-top:0.5px solid #e5e3de;flex-wrap:wrap}
 .sec{background:#f8f7f4;border:0.5px solid #e5e3de;border-radius:10px;padding:.85rem;margin-bottom:.65rem}
 .stitle{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem}
 .fg{margin-bottom:.6rem}
@@ -155,7 +159,7 @@ nav{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:.85re
 .size-option.sel{border-color:#378ADD;background:#E6F1FB}
 .size-option input[type=radio]{accent-color:#378ADD;flex-shrink:0}
 .notice{background:#fef9c3;border:0.5px solid #eab308;border-radius:8px;padding:.65rem .85rem;font-size:11px;color:#a16207;margin-bottom:.75rem;line-height:1.6}
-.vendor-search{width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:#1a1a1a;font-family:inherit;margin-bottom:.65rem;outline:none}
+.vendor-search{width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;font-family:inherit;margin-bottom:.65rem;outline:none}
 .vendor-list{max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
 </style>
 </head>
@@ -170,7 +174,7 @@ nav{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:.85re
     <div class="auth-err" id="auth-err"></div>
     <div class="auth-fg"><label>Email address</label><input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email"></div>
     <div class="auth-fg"><label>Password</label><input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password"></div>
-    <div class="auth-fg" id="auth-confirm-wrap" style="display:none"><label>Confirm password</label><input type="password" id="auth-confirm" placeholder="••••••••"></div>
+    <div class="auth-fg" id="auth-confirm-wrap" style="display:none"><label>Confirm password</label><input type="password" id="auth-confirm"></div>
     <button class="auth-btn" id="auth-btn">Sign in</button>
     <div class="auth-footer"><span id="auth-toggle-text">Don't have an account?</span> <span class="auth-link" id="auth-toggle">Sign up</span></div>
   </div>
@@ -180,12 +184,12 @@ nav{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:.85re
 <div id="app-screen">
   <div class="env-bar">
     <div class="env-dot"></div>
-    <div style="flex:1"><div class="env-label">Elevation Bend — Live</div><div class="env-user" id="user-email"></div></div>
+    <div style="flex:1"><div class="env-label">Elevation Bend — Live (Supabase)</div><div class="env-user" id="user-email"></div></div>
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
     <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors</div></div>
-    <div class="hdr-btns">
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
     </div>
@@ -204,17 +208,17 @@ nav{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:.85re
 </div>
 
 <script>
-// ── Supabase ────────────────────────────────────────────────────────────────
 const SUPA_URL='https://mixubqomqdfcrgfovnwy.supabase.co';
 const SUPA_KEY='sb_publishable_btz05uH2n90XYfkGIooLog_CY71YUW3';
 const {createClient}=supabase;
 const sb=createClient(SUPA_URL,SUPA_KEY);
 
 // ── State ───────────────────────────────────────────────────────────────────
-var vendors=[],tents=[],marketDays={},tentAssignments={};
+var vendors=[],tents=[],calRows={},currentUser=null;
+// calRows[date] = {approved:[ids], waitlist:[ids], tent_assignments:{tentId:vendorId}}
 var tab='vendors',cY=new Date().getFullYear(),cM=new Date().getMonth();
 var eId=null,vsFilter='all',reportDate='',reportType='summary';
-var selectedCalDay='',tentViewDate='',currentUser=null;
+var selectedCalDay='',tentViewDate='';
 window._ep=[];
 
 var VSC={
@@ -237,15 +241,18 @@ function fmtDate(iso){if(!iso)return'—';return new Date(iso).toLocaleDateStrin
 function fmtDT(iso){if(!iso)return'—';var d=new Date(iso);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
 function today(){return new Date().toISOString().slice(0,10);}
 function closeMod(){document.getElementById('modal-area').innerHTML='';}
-function getMarketDates(){return Object.keys(marketDays).sort();}
-function getApproved(ds){return(marketDays[ds]&&marketDays[ds].approved)||[];}
-function getWaitlist(ds){return(marketDays[ds]&&marketDays[ds].waitlist)||[];}
+
+// Helpers for calRows
+function getMarketDates(){return Object.keys(calRows).sort();}
+function getApproved(ds){return(calRows[ds]&&calRows[ds].approved)||[];}
+function getWaitlist(ds){return(calRows[ds]&&calRows[ds].waitlist)||[];}
+function getTentAssignments(ds){return(calRows[ds]&&calRows[ds].tent_assignments)||{};}
 function eligibleVendors(){
   return vendors.filter(function(v){return v.status==='approved'&&(v.vendorStatus||'active')==='active';})
     .sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
 }
 
-// ── Auth ────────────────────────────────────────────────────────────────────
+// ── Auth ─────────────────────────────────────────────────────────────────────
 var authMode='signin';
 document.getElementById('auth-toggle').addEventListener('click',function(){
   authMode=authMode==='signin'?'signup':'signin';
@@ -265,11 +272,10 @@ async function doAuth(){
   var password=document.getElementById('auth-password').value;
   var confirm=document.getElementById('auth-confirm').value;
   var btn=document.getElementById('auth-btn');
-  var errEl=document.getElementById('auth-err');
   if(!email||!password){showAuthErr('Please enter your email and password.');return;}
   if(authMode==='signup'&&password!==confirm){showAuthErr('Passwords do not match.');return;}
   btn.disabled=true;btn.textContent=authMode==='signin'?'Signing in…':'Creating account…';
-  errEl.style.display='none';
+  document.getElementById('auth-err').style.display='none';
   var result=authMode==='signin'
     ?await sb.auth.signInWithPassword({email,password})
     :await sb.auth.signUp({email,password});
@@ -278,8 +284,9 @@ async function doAuth(){
   else{currentUser=result.data.user;enterApp();}
 }
 function showAuthErr(msg){var el=document.getElementById('auth-err');el.textContent=msg;el.style.display='block';}
+
 document.getElementById('signout-btn').addEventListener('click',async function(){
-  await sb.auth.signOut();currentUser=null;vendors=[];tents=[];marketDays={};tentAssignments={};
+  await sb.auth.signOut();currentUser=null;vendors=[];tents=[];calRows={};
   document.getElementById('app-screen').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('auth-email').value='';document.getElementById('auth-password').value='';
@@ -296,26 +303,30 @@ function enterApp(){
   loadData();
 }
 
-// ── Supabase data ────────────────────────────────────────────────────────────
+// ── Supabase data ─────────────────────────────────────────────────────────────
 async function loadData(){
   document.getElementById('main-content').innerHTML='<div style="text-align:center;padding:2rem;color:#888">Loading…</div>';
   try{
     var{data:vd,error:ve}=await sb.from('vendors').select('*').order('created_at',{ascending:false});
     if(ve)throw ve;
     vendors=(vd||[]).map(dbToV);
+
     var{data:td,error:te}=await sb.from('tents').select('*').order('num');
     if(te)throw te;
     tents=td||[];
     if(!tents.length)await initTentsDB();
+
     var{data:cd,error:ce}=await sb.from('calendar').select('*');
     if(ce)throw ce;
-    marketDays={};tentAssignments={};
+    calRows={};
     (cd||[]).forEach(function(r){
-      if(r.approved_vendors||r.waitlist_vendors)
-        marketDays[r.date]={approved:r.approved_vendors||[],waitlist:r.waitlist_vendors||[]};
-      if(r.tent_assignments)tentAssignments[r.date]=r.tent_assignments;
+      calRows[r.date]={
+        approved:r.approved_vendors||[],
+        waitlist:r.waitlist_vendors||[],
+        tent_assignments:r.tent_assignments||{}
+      };
     });
-  }catch(e){console.error(e);}
+  }catch(e){console.error('loadData error',e);}
   render();
 }
 
@@ -333,12 +344,13 @@ function dbToV(r){
     attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',
     values:r.values||'',additionalInfo:r.additional_info||'',photos:r.photos||[],
     selectedDates:r.selected_dates||[],
-    contractReceived:r.contract_received||false,paymentReceived:r.payment_received||false,
+    contractReceived:!!r.contract_received,paymentReceived:!!r.payment_received,
     createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''
   };
 }
 
 async function saveVendorDB(data,id){
+  var isNew=!id;
   var row={
     id:id||uid(),vendor_status:data.vendorStatus||'active',status:data.status||'pending',
     business_name:data.businessName||'',contact_name:data.contactName||'',
@@ -352,26 +364,36 @@ async function saveVendorDB(data,id){
     attendance:data.attendance||'',months:data.months||'',why_join:data.whyJoin||'',
     values:data.values||'',additional_info:data.additionalInfo||'',photos:[],
     selected_dates:data.selectedDates||[],
-    contract_received:data.contractReceived||false,payment_received:data.paymentReceived||false,
+    contract_received:!!data.contractReceived,payment_received:!!data.paymentReceived,
     modified_at:nowISO()
   };
-  if(!id)row.created_at=nowISO();
+  if(isNew)row.created_at=nowISO();
   var{error}=await sb.from('vendors').upsert(row);
-  if(error){alert('Error saving: '+error.message);return null;}
+  if(error){alert('Error saving vendor: '+error.message);return null;}
   return row.id;
 }
 
-async function saveCalendarDB(ds,approved,waitlist,ta){
-  var row={date:ds,approved_vendors:approved||[],waitlist_vendors:waitlist||[],tent_assignments:ta||{}};
-  if(!approved.length&&!waitlist.length){await sb.from('calendar').delete().eq('date',ds);}
-  else{await sb.from('calendar').upsert(row);}
+async function saveCalRow(ds){
+  var row=calRows[ds];
+  if(!row||(!row.approved.length&&!row.waitlist.length&&!Object.keys(row.tent_assignments||{}).length)){
+    await sb.from('calendar').delete().eq('date',ds);
+    delete calRows[ds];
+  } else {
+    await sb.from('calendar').upsert({
+      date:ds,
+      approved_vendors:row.approved||[],
+      waitlist_vendors:row.waitlist||[],
+      tent_assignments:row.tent_assignments||{}
+    });
+  }
 }
 
 async function initTentsDB(){
   var rows=[];
   for(var i=1;i<=6;i++)rows.push({id:'t'+i,num:i,size:"10'x10'"});
   rows.push({id:'t7',num:7,size:"20'x20'"},{id:'t8',num:8,size:"20'x20'"},{id:'t9',num:9,size:'Food truck'});
-  await sb.from('tents').upsert(rows);tents=rows;
+  await sb.from('tents').upsert(rows);
+  tents=rows;
 }
 
 // ── Nav ──────────────────────────────────────────────────────────────────────
@@ -408,7 +430,7 @@ function renderStats(){
     '<div class="stat"><div class="sl">Waitlist</div><div class="sv" style="color:#633806">'+wl+'</div></div>'+
     '<div class="stat"><div class="sl">📄 Contracts</div><div class="sv" style="color:#0C447C">'+con+'</div></div>'+
     '<div class="stat"><div class="sl">💰 Payments</div><div class="sv" style="color:#27500A">'+pay+'</div></div>'+
-    '<div class="stat"><div class="sl">Dates</div><div class="sv">'+getMarketDates().length+'</div></div>'+
+    '<div class="stat"><div class="sl">Market dates</div><div class="sv">'+getMarketDates().length+'</div></div>'+
     '</div>';
 }
 
@@ -443,7 +465,7 @@ function renderVendors(){
           vsTag(vs)+
         '</div>'+
         '<div class="vtags" style="margin-top:5px">'+schedTag(v.status)+'<span class="tag tb">'+esc(v.boothSize||'—')+'</span>'+sch+
-          (calEligible?'<span class="tag tg">📅 Eligible</span>':'')+
+          (calEligible?'<span class="tag tg">📅 Calendar eligible</span>':'')+
           (v.contractReceived?'<span class="tag tag-contract">📄</span>':'')+
           (v.paymentReceived?'<span class="tag tag-payment">💰</span>':'')+
         '</div>'+
@@ -485,7 +507,7 @@ async function delV(id){
   render();
 }
 
-// ── Calendar ─────────────────────────────────────────────────────────────────
+// ── Calendar ──────────────────────────────────────────────────────────────────
 function renderCalendar(){
   var el=document.getElementById('main-content');
   var full=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -495,15 +517,15 @@ function renderCalendar(){
   for(var i=0;i<first.getDay();i++)cells+='<div class="cday cother">&nbsp;</div>';
   for(var d=1;d<=last.getDate();d++){
     var ds=cY+'-'+String(cM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    var ac=getApproved(ds).length,wc=getWaitlist(ds).length;
-    var cls='cday'+(ac?' has-vendors':wc?' has-waitlist':'')+(ds===tod?' ctoday':'')+(ds===selectedCalDay?' selected-day':'');
-    cells+='<div class="'+cls+'" data-date="'+ds+'">'+d+(ac?'<span class="day-count">'+ac+'v</span>':wc?'<span class="day-count" style="color:#633806">'+wc+'w</span>':'')+'</div>';
+    var ac=getApproved(ds).length;
+    var cls='cday'+(ac?' has-vendors':'')+(ds===tod?' ctoday':'')+(ds===selectedCalDay?' selected-day':'');
+    cells+='<div class="'+cls+'" data-date="'+ds+'">'+d+(ac?'<span class="day-count">'+ac+'v</span>':'')+'</div>';
   }
   var eli=eligibleVendors().length;
   el.innerHTML=
     '<div style="display:flex;gap:10px;margin-bottom:.65rem;font-size:10px;color:#888;flex-wrap:wrap">'+
     '<span><span style="width:9px;height:9px;background:#EAF3DE;border:1px solid #639922;border-radius:2px;display:inline-block;margin-right:3px;vertical-align:middle"></span>Vendors scheduled</span>'+
-    '<span style="color:#ccc">Click a date · '+eli+' eligible vendor'+(eli!==1?'s':'')+' (Approved + Active)</span></div>'+
+    '<span style="color:#ccc">Click a date to manage · '+eli+' eligible (Approved + Active)</span></div>'+
     '<div class="cal-wrap">'+
       '<div class="cal-nav">'+
         '<button class="btn-s" style="padding:5px 10px" id="calPrev">‹</button>'+
@@ -524,7 +546,7 @@ function renderCalendar(){
 function buildDayPanel(ds){
   var appV=getApproved(ds).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
   var wlV=getWaitlist(ds).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
-  var ta=tentAssignments[ds]||{};
+  var ta=getTentAssignments(ds);
   var vendorTent={};Object.keys(ta).forEach(function(tid){var t=tents.find(function(x){return x.id===tid;});if(t)vendorTent[ta[tid]]='Spot '+t.num+' ('+t.size+')';});
   var total=appV.length+wlV.length;
   var header='<div class="day-report-header">'+
@@ -536,7 +558,7 @@ function buildDayPanel(ds){
     '</div></div>';
   function vcard(v,isWL){
     var av=avc(v.businessName||'?');
-    return'<div class="day-vendor-card" data-vid="'+v.id+'" title="Click to edit">'+
+    return'<div class="day-vendor-card" data-vid="'+v.id+'">'+
       '<div class="dvc-avatar" style="background:'+av.bg+';color:'+av.text+'">'+ini(v.businessName||'?')+'</div>'+
       '<div style="flex:1;min-width:0">'+
         '<div style="font-size:13px;font-weight:600">'+esc(v.businessName||'Unnamed')+'</div>'+
@@ -551,11 +573,11 @@ function buildDayPanel(ds){
           (v.paymentReceived?'<span class="tag tag-payment">💰</span>':'')+
         '</div>'+
       '</div>'+
-      '<div style="font-size:11px;color:#aaa;flex-shrink:0">✏️</div>'+
+      '<div style="font-size:11px;color:#aaa;flex-shrink:0">✏️ Edit</div>'+
     '</div>';
   }
   var cards='';
-  if(!total){cards='<div style="padding:1.25rem;text-align:center;color:#aaa;font-size:12px">No vendors yet.<br><button class="btn-p" style="margin-top:.75rem;font-size:11px" id="addVendorDayBtn">+ Add vendors</button></div>';}
+  if(!total)cards='<div style="padding:1.25rem;text-align:center;color:#aaa;font-size:12px">No vendors yet.<br><button class="btn-p" style="margin-top:.75rem;font-size:11px" id="addVendorDayBtn">+ Add vendors</button></div>';
   else{
     if(appV.length)cards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-bottom:0.5px solid #e5e3de">Approved ('+appV.length+')</div>'+appV.map(function(v){return vcard(v,false);}).join('');
     if(wlV.length)cards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-top:0.5px solid #e5e3de">Waitlist ('+wlV.length+')</div>'+wlV.map(function(v){return vcard(v,true);}).join('');
@@ -577,9 +599,9 @@ function openDayManage(ds){
     '<div class="overlay" id="dayManageOverlay"><div class="modal">'+
     '<div class="mtitle">📅 '+ds+' — Schedule vendors</div>'+
     (eligible.length===0?
-      '<div class="notice">⚠️ <strong>No eligible vendors.</strong><br>Vendors must be <strong>Approved</strong> + <strong>🟢 Active</strong> to appear here.<br>Update vendor status from the Vendors tab.</div>':
-      '<div style="font-size:11px;color:#888;margin-bottom:.75rem;padding:.5rem .75rem;background:#f8f7f4;border-radius:8px">'+eligible.length+' eligible vendors (Approved + Active). Check those attending this date.</div>'+
-      '<input class="vendor-search" id="vendorSearch" placeholder="🔍 Search…" type="text">'+
+      '<div class="notice">⚠️ <strong>No eligible vendors found.</strong><br>Vendors must have Application Status = <strong>Approved</strong> AND Vendor Status = <strong>🟢 Active</strong> to appear here.<br><br>Go to the <strong>Vendors</strong> tab and use the dropdowns on each vendor card to update their status.</div>':
+      '<div style="font-size:11px;color:#888;margin-bottom:.75rem;padding:.5rem .75rem;background:#f8f7f4;border-radius:8px">'+eligible.length+' eligible vendor'+(eligible.length!==1?'s':'')+' (Approved + Active). Check those attending this date.</div>'+
+      '<input class="vendor-search" id="vendorSearch" placeholder="🔍 Search by name or category…" type="text">'+
       '<div class="vendor-list" id="vendorList">'+
         eligible.map(function(v){
           var av=avc(v.businessName||'?');
@@ -599,54 +621,67 @@ function openDayManage(ds){
   if(search){search.addEventListener('input',function(){var q=this.value.toLowerCase();document.querySelectorAll('[data-vendor-row]').forEach(function(row){row.style.display=(row.dataset.name.indexOf(q)>-1||row.dataset.cat.indexOf(q)>-1)?'':'none';});});setTimeout(function(){search.focus();},100);}
   var foot=document.getElementById('dayManageFoot');
   var clrBtn=document.createElement('button');clrBtn.className='btn-danger';clrBtn.textContent='Clear day';
-  clrBtn.addEventListener('click',async function(){
-    delete marketDays[ds];delete tentAssignments[ds];
-    await sb.from('calendar').delete().eq('date',ds);
-    closeMod();renderCalendar();
-  });
+  clrBtn.addEventListener('click',async function(){delete calRows[ds];await sb.from('calendar').delete().eq('date',ds);closeMod();renderCalendar();});
   var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='Cancel';canBtn.addEventListener('click',closeMod);
   var savBtn=document.createElement('button');savBtn.className='btn-p';savBtn.textContent='Save';
   savBtn.addEventListener('click',async function(){
     var a=Array.from(document.querySelectorAll('.day-check:checked')).map(function(c){return c.value;});
-    if(a.length){marketDays[ds]={approved:a,waitlist:[]};}else{delete marketDays[ds];}
-    await saveCalendarDB(ds,a,[],tentAssignments[ds]||{});
+    if(a.length){
+      if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};
+      calRows[ds].approved=a;calRows[ds].waitlist=[];
+      await saveCalRow(ds);
+    } else {delete calRows[ds];await sb.from('calendar').delete().eq('date',ds);}
     closeMod();renderCalendar();
   });
   foot.appendChild(clrBtn);foot.appendChild(canBtn);foot.appendChild(savBtn);
 }
 
-// ── Tents ────────────────────────────────────────────────────────────────────
+// ── TENTS ─────────────────────────────────────────────────────────────────────
+// NOTE: Market dates come from calRows — any date with at least one approved vendor counts
 function renderTents(){
   var el=document.getElementById('main-content');
   var dates=getMarketDates();
-  if(!tentViewDate&&dates.length)tentViewDate=dates[0];
-  el.innerHTML=
-    '<div class="toprow">'+
-      '<div style="display:flex;align-items:center;gap:8px">'+
-        '<label style="font-size:11px;color:#888">Market date:</label>'+
-        '<select id="tentDateSel" style="font-size:12px;padding:5px 8px;border-radius:6px;border:0.5px solid #d0cec7;background:#fff;color:#1a1a1a;font-family:inherit">'+
-          (dates.length?dates.map(function(ds){return'<option value="'+ds+'"'+(ds===tentViewDate?' selected':'')+'>'+ds+'</option>';}).join(''):'<option value="">No market dates</option>')+
-        '</select>'+
-      '</div>'+
-      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-        '<button class="btn-blue" id="autoAssignBtn">⚡ Auto-assign</button>'+
-        '<button class="btn-g" id="addSpotBtn">+ Add spot</button>'+
-        '<button class="btn-s" id="clearDateBtn">Clear date</button>'+
-      '</div>'+
+  // Set default date if needed
+  if(!tentViewDate||dates.indexOf(tentViewDate)===-1){
+    tentViewDate=dates.length?dates[0]:'';
+  }
+
+  // ── Top bar: always visible ──
+  var topBar='<div class="tent-topbar">'+
+    '<div class="tent-date-row">'+
+      '<span class="tent-date-label">Market date:</span>'+
+      (dates.length?
+        '<select class="tent-date-select" id="tentDateSel">'+
+          dates.map(function(ds){return'<option value="'+ds+'"'+(ds===tentViewDate?' selected':'')+'>'+ds+'</option>';}).join('')+
+        '</select>':
+        '<span style="font-size:12px;color:#aaa;font-style:italic">No market dates yet — go to Calendar and schedule some vendors first</span>'
+      )+
     '</div>'+
-    (dates.length?buildTentContent():'<div class="empty">No market dates yet. Go to Calendar and schedule vendors for a date first.</div>');
-  document.getElementById('tentDateSel').addEventListener('change',function(){tentViewDate=this.value;renderTents();});
+    '<div class="tent-action-btns">'+
+      '<button class="btn-blue" id="autoAssignBtn">⚡ Auto-assign</button>'+
+      '<button class="btn-g" id="addSpotBtn">+ Add spot</button>'+
+      '<button class="btn-s" id="clearDateBtn">Clear date</button>'+
+    '</div>'+
+  '</div>';
+
+  el.innerHTML=topBar+(dates.length&&tentViewDate?buildTentContent():'<div class="empty" style="margin-top:.5rem">No market dates scheduled yet.<br>Go to the <strong>Calendar</strong> tab, click a date, and use <strong>Manage vendors</strong> to add approved vendors. Then come back here to assign tents.</div>');
+
+  // Attach top bar events
+  var sel=document.getElementById('tentDateSel');
+  if(sel)sel.addEventListener('change',function(){tentViewDate=this.value;renderTents();});
   document.getElementById('autoAssignBtn').addEventListener('click',autoAssign);
   document.getElementById('addSpotBtn').addEventListener('click',openAddTentModal);
   document.getElementById('clearDateBtn').addEventListener('click',async function(){
-    if(!tentViewDate||!confirm('Clear all tent assignments for '+tentViewDate+'?'))return;
-    delete tentAssignments[tentViewDate];
-    var a=getApproved(tentViewDate),w=getWaitlist(tentViewDate);
-    await saveCalendarDB(tentViewDate,a,w,{});
+    if(!tentViewDate)return;
+    if(!confirm('Clear all tent assignments for '+tentViewDate+'?'))return;
+    if(calRows[tentViewDate])calRows[tentViewDate].tent_assignments={};
+    await saveCalRow(tentViewDate);
     renderTents();
   });
-  if(!dates.length)return;
-  // Event delegation for tent grid
+
+  if(!dates.length||!tentViewDate)return;
+
+  // ── Event delegation on tent grid (THE KEY FIX for delete) ──
   var grid=document.getElementById('tentGridContainer');
   if(grid){
     grid.addEventListener('click',function(e){
@@ -666,38 +701,66 @@ function renderTents(){
 }
 
 function buildTentContent(){
-  var ta=tentAssignments[tentViewDate]||{};
+  var ta=getTentAssignments(tentViewDate);
   var occ=Object.keys(ta).filter(function(k){return ta[k];}).length;
+
   var grid=tents.map(function(t){
-    var vid=ta[t.id]||null;var v=vid?vendors.find(function(x){return x.id===vid;}):null;
+    var vid=ta[t.id]||null;
+    var v=vid?vendors.find(function(x){return x.id===vid;}):null;
     return'<div class="tcell'+(v?' tocc':'')+'">'+
-      '<button class="tdel" data-tent-del="'+t.id+'" title="Delete spot">✕</button>'+
+      '<button class="tdel" data-tent-del="'+t.id+'" title="Delete this spot">✕</button>'+
       '<div class="tnum">Spot '+t.num+' · '+esc(t.size)+'</div>'+
-      (v?'<div class="tvname">'+esc(v.businessName)+'</div><div class="tvmeta">'+esc(v.category||'')+'</div>'+vsTag(v.vendorStatus||'active')+'<button class="tassign" data-tent-assign="'+t.id+'">✏️ Change</button>':
-        '<div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center">Available</div><button class="tassign" data-tent-assign="'+t.id+'">+ Assign vendor</button>')+
+      (v?
+        '<div class="tvname">'+esc(v.businessName)+'</div>'+
+        '<div class="tvmeta">'+esc(v.category||'')+'</div>'+
+        vsTag(v.vendorStatus||'active')+
+        '<button class="tassign" data-tent-assign="'+t.id+'">✏️ Change vendor</button>':
+        '<div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center">Available</div>'+
+        '<button class="tassign" data-tent-assign="'+t.id+'">+ Assign vendor</button>'
+      )+
     '</div>';
   }).join('');
+
   var tableRows=tents.map(function(t){
     var vid=ta[t.id]||null;var v=vid?vendors.find(function(x){return x.id===vid;}):null;
-    return'<tr><td style="color:#888;font-size:11px">'+t.num+'</td><td>'+esc(t.size)+'</td>'+
+    return'<tr>'+
+      '<td style="color:#888;font-size:11px">'+t.num+'</td>'+
+      '<td>'+esc(t.size)+'</td>'+
       '<td style="font-weight:'+(v?'600':'400')+';color:'+(v?'#1a1a1a':'#ccc')+'">'+( v?esc(v.businessName):'—')+'</td>'+
       '<td style="color:#888">'+(v?esc(v.category||'—'):'—')+'</td>'+
       '<td>'+(v?vsTag(v.vendorStatus||'active'):'—')+'</td>'+
-      '<td><button class="btn-danger" style="padding:3px 8px;font-size:11px" data-tent-del="'+t.id+'">🗑️ Delete</button></td></tr>';
+      '<td><button class="btn-danger" style="padding:3px 8px;font-size:11px" data-tent-del="'+t.id+'">🗑️ Delete</button></td>'+
+    '</tr>';
   }).join('');
-  return'<div style="font-size:11px;color:#888;margin-bottom:.65rem">'+occ+'/'+tents.length+' spots assigned for '+tentViewDate+
-    ' · <span style="color:#791F1F;font-size:10px">Click ✕ on a card or 🗑️ in the table to delete</span></div>'+
+
+  return'<div style="font-size:12px;color:#888;margin-bottom:.75rem">'+
+      '<strong style="color:#1a1a1a">'+occ+'/'+tents.length+'</strong> spots assigned for '+tentViewDate+
+      ' &nbsp;·&nbsp; <span style="color:#791F1F;font-size:11px">Click ✕ on a card or 🗑️ Delete in the table to remove a spot</span>'+
+    '</div>'+
     '<div id="tentGridContainer" class="tent-grid">'+grid+'</div>'+
-    '<div style="margin-top:1rem;background:#fff;border:0.5px solid #e5e3de;border-radius:12px;overflow:hidden">'+
-    '<div style="padding:.6rem .85rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;background:#f8f7f4;border-bottom:0.5px solid #e5e3de">Allocation Summary — '+tentViewDate+'</div>'+
-    '<div style="overflow-x:auto"><table id="tentSumTable" class="report-table"><thead><tr><th>#</th><th>Size</th><th>Vendor</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div></div>';
+    '<div style="margin-top:1.25rem;background:#fff;border:0.5px solid #e5e3de;border-radius:12px;overflow:hidden">'+
+      '<div style="padding:.65rem .85rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;background:#f8f7f4;border-bottom:0.5px solid #e5e3de">'+
+        'Allocation Summary — '+tentViewDate+
+      '</div>'+
+      '<div style="overflow-x:auto"><table id="tentSumTable" class="report-table">'+
+        '<thead><tr><th>#</th><th>Size</th><th>Vendor Name</th><th>Category</th><th>Status</th><th>Action</th></tr></thead>'+
+        '<tbody>'+tableRows+'</tbody>'+
+      '</table></div>'+
+    '</div>';
 }
 
 async function doDeleteTent(id){
-  if(!confirm('Delete this spot?'))return;
+  if(!confirm('Delete this spot? It will be removed from all dates.'))return;
   await sb.from('tents').delete().eq('id',id);
   tents=tents.filter(function(t){return t.id!==id;});
-  Object.keys(tentAssignments).forEach(function(ds){if(tentAssignments[ds])delete tentAssignments[ds][id];});
+  // Remove from all tent assignments
+  var dirty=[];
+  Object.keys(calRows).forEach(function(ds){
+    if(calRows[ds].tent_assignments&&calRows[ds].tent_assignments[id]){
+      delete calRows[ds].tent_assignments[id];dirty.push(ds);
+    }
+  });
+  await Promise.all(dirty.map(function(ds){return saveCalRow(ds);}));
   renderTents();
 }
 
@@ -705,16 +768,27 @@ function openAddTentModal(){
   var nextNum=tents.length?Math.max.apply(null,tents.map(function(t){return t.num;}))+1:1;
   document.getElementById('modal-area').innerHTML=
     '<div class="overlay" id="addTentOverlay"><div class="modal"><div class="mtitle">Add new spot</div>'+
-    '<div class="fg"><label>Spot number</label><input type="number" id="new-num" value="'+nextNum+'" min="1"></div>'+
-    '<div class="fg"><label>Size</label><div style="display:flex;flex-direction:column;gap:5px;margin-top:4px" id="sizeOpts">'+
-      ["10'x10'","20'x20'",'Food truck','Custom'].map(function(s,i){
-        return'<label class="size-option'+(i===0?' sel':'')+'" data-size="'+s+'"><input type="radio" name="newsize" value="'+s+'"'+(i===0?' checked':'')+' style="accent-color:#378ADD;flex-shrink:0"><span>'+s+'</span></label>';
-      }).join('')+
-    '</div><div id="csw" style="display:none;margin-top:6px"><input id="custom-size" placeholder="e.g. 15\'x15\'" style="width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:7px 9px;font-size:13px;background:#fff;font-family:inherit"></div></div>'+
+    '<div class="fg"><label>Spot number</label><input type="number" id="new-num" value="'+nextNum+'" min="1" style="max-width:120px"></div>'+
+    '<div class="fg"><label>Tent / spot size</label>'+
+      '<div style="display:flex;flex-direction:column;gap:5px;margin-top:4px" id="sizeOpts">'+
+        ["10'x10'","20'x20'",'Food truck','Custom'].map(function(s,i){
+          return'<label class="size-option'+(i===0?' sel':'')+'" data-size="'+s+'">'+
+            '<input type="radio" name="newsize" value="'+s+'"'+(i===0?' checked':'')+' style="accent-color:#378ADD;flex-shrink:0">'+
+            '<span style="font-size:13px">'+s+'</span></label>';
+        }).join('')+
+      '</div>'+
+      '<div id="csw" style="display:none;margin-top:8px">'+
+        '<input id="custom-size" placeholder="e.g. 15\'x15\' or 30\'x30\'" style="width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:7px 9px;font-size:13px;background:#fff;font-family:inherit">'+
+      '</div>'+
+    '</div>'+
     '<div class="mfoot" id="addTentFoot"></div></div></div>';
   document.getElementById('addTentOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
   document.querySelectorAll('#sizeOpts .size-option').forEach(function(lbl){
-    lbl.addEventListener('click',function(){document.querySelectorAll('#sizeOpts .size-option').forEach(function(l){l.classList.remove('sel');});lbl.classList.add('sel');lbl.querySelector('input').checked=true;document.getElementById('csw').style.display=lbl.dataset.size==='Custom'?'block':'none';});
+    lbl.addEventListener('click',function(){
+      document.querySelectorAll('#sizeOpts .size-option').forEach(function(l){l.classList.remove('sel');});
+      lbl.classList.add('sel');lbl.querySelector('input').checked=true;
+      document.getElementById('csw').style.display=lbl.dataset.size==='Custom'?'block':'none';
+    });
   });
   var foot=document.getElementById('addTentFoot');
   var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='Cancel';canBtn.addEventListener('click',closeMod);
@@ -723,10 +797,11 @@ function openAddTentModal(){
     var num=parseInt(document.getElementById('new-num').value)||1;
     var sizeRadio=document.querySelector('input[name="newsize"]:checked');
     var size=sizeRadio?sizeRadio.value:"10'x10'";
-    if(size==='Custom'){var c=document.getElementById('custom-size').value.trim();if(!c){alert('Enter a custom size.');return;}size=c;}
-    if(tents.find(function(t){return t.num===num;})){alert('Spot '+num+' already exists.');return;}
+    if(size==='Custom'){var c=document.getElementById('custom-size').value.trim();if(!c){alert('Please enter a custom size.');return;}size=c;}
+    if(tents.find(function(t){return t.num===num;})){alert('Spot number '+num+' already exists. Choose a different number.');return;}
     var newTent={id:'t'+uid(),num:num,size:size};
-    await sb.from('tents').upsert(newTent);
+    var{error}=await sb.from('tents').upsert(newTent);
+    if(error){alert('Error saving spot: '+error.message);return;}
     tents.push(newTent);tents.sort(function(a,b){return a.num-b.num;});
     closeMod();renderTents();
   });
@@ -735,44 +810,61 @@ function openAddTentModal(){
 
 function openTentModal(tentId,ds){
   var t=tents.find(function(x){return x.id===tentId;});if(!t)return;
-  var ta=tentAssignments[ds]||{};var currentVid=ta[tentId]||'';
+  var ta=getTentAssignments(ds);var currentVid=ta[tentId]||'';
   var avail=getApproved(ds).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
   if(!avail.length)avail=eligibleVendors();
   var presetSizes=["10'x10'","20'x20'",'Food truck'];var isCustom=presetSizes.indexOf(t.size)===-1;
   document.getElementById('modal-area').innerHTML=
-    '<div class="overlay" id="tentModalOverlay"><div class="modal"><div class="mtitle">Spot '+t.num+' — '+ds+'</div>'+
-    '<div class="fg"><label>Size</label><div style="display:flex;flex-direction:column;gap:5px;margin-top:4px" id="editSizeOpts">'+
-      presetSizes.concat(['Custom']).map(function(s){var checked=isCustom?(s==='Custom'):(t.size===s);
-        return'<label class="size-option'+(checked?' sel':'')+'" data-size="'+s+'"><input type="radio" name="editsize" value="'+s+'"'+(checked?' checked':'')+' style="accent-color:#378ADD;flex-shrink:0"><span>'+s+'</span></label>';
-      }).join('')+
-    '</div><div id="ecsw" style="display:'+(isCustom?'block':'none')+';margin-top:6px"><input id="edit-custom-size" value="'+(isCustom?esc(t.size):'')+'" placeholder="e.g. 15\'x15\'" style="width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:7px 9px;font-size:13px;background:#fff;font-family:inherit"></div></div>'+
-    '<div class="fg"><label>Assign vendor (Approved + Active)</label>'+
-    '<select id="tv" style="width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:7px 9px;font-size:13px;background:#fff;font-family:inherit">'+
-      '<option value="">— unassigned —</option>'+avail.map(function(v){return'<option value="'+v.id+'"'+(currentVid===v.id?' selected':'')+'>'+esc(v.businessName||'Unnamed')+' ('+esc(v.category||'—')+')</option>';}).join('')+
-    '</select></div>'+
+    '<div class="overlay" id="tentModalOverlay"><div class="modal">'+
+    '<div class="mtitle">Spot '+t.num+' — '+ds+'</div>'+
+    '<div class="fg"><label>Tent size</label>'+
+      '<div style="display:flex;flex-direction:column;gap:5px;margin-top:4px" id="editSizeOpts">'+
+        presetSizes.concat(['Custom']).map(function(s){var checked=isCustom?(s==='Custom'):(t.size===s);
+          return'<label class="size-option'+(checked?' sel':'')+'" data-size="'+s+'">'+
+            '<input type="radio" name="editsize" value="'+s+'"'+(checked?' checked':'')+' style="accent-color:#378ADD;flex-shrink:0">'+
+            '<span style="font-size:13px">'+s+'</span></label>';
+        }).join('')+
+      '</div>'+
+      '<div id="ecsw" style="display:'+(isCustom?'block':'none')+';margin-top:8px">'+
+        '<input id="edit-custom-size" value="'+(isCustom?esc(t.size):'')+'" placeholder="e.g. 15\'x15\'" style="width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:7px 9px;font-size:13px;background:#fff;font-family:inherit">'+
+      '</div>'+
+    '</div>'+
+    '<div class="fg"><label>Assign vendor <span style="font-size:10px;color:#888;font-weight:400">(Approved + Active)</span></label>'+
+      '<select id="tv" style="width:100%;border:0.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;font-family:inherit">'+
+        '<option value="">— unassigned —</option>'+
+        avail.map(function(v){return'<option value="'+v.id+'"'+(currentVid===v.id?' selected':'')+'>'+esc(v.businessName||'Unnamed')+' ('+esc(v.category||'—')+')</option>';}).join('')+
+      '</select>'+
+    '</div>'+
     '<div class="mfoot" id="tentModalFoot"></div></div></div>';
   document.getElementById('tentModalOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
-  document.querySelectorAll('#editSizeOpts .size-option').forEach(function(lbl){lbl.addEventListener('click',function(){document.querySelectorAll('#editSizeOpts .size-option').forEach(function(l){l.classList.remove('sel');});lbl.classList.add('sel');lbl.querySelector('input').checked=true;document.getElementById('ecsw').style.display=lbl.dataset.size==='Custom'?'block':'none';});});
+  document.querySelectorAll('#editSizeOpts .size-option').forEach(function(lbl){
+    lbl.addEventListener('click',function(){
+      document.querySelectorAll('#editSizeOpts .size-option').forEach(function(l){l.classList.remove('sel');});
+      lbl.classList.add('sel');lbl.querySelector('input').checked=true;
+      document.getElementById('ecsw').style.display=lbl.dataset.size==='Custom'?'block':'none';
+    });
+  });
   var foot=document.getElementById('tentModalFoot');
   var delBtn=document.createElement('button');delBtn.className='btn-danger';delBtn.textContent='🗑️ Delete spot';
   delBtn.addEventListener('click',function(){closeMod();doDeleteTent(tentId);});
   var unBtn=document.createElement('button');unBtn.className='btn-s';unBtn.textContent='Unassign';
   unBtn.addEventListener('click',async function(){
-    if(!tentAssignments[ds])tentAssignments[ds]={};delete tentAssignments[ds][tentId];
-    var a=getApproved(ds),w=getWaitlist(ds);await saveCalendarDB(ds,a,w,tentAssignments[ds]);
-    closeMod();renderTents();
+    if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};
+    delete calRows[ds].tent_assignments[tentId];
+    await saveCalRow(ds);closeMod();renderTents();
   });
   var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='Cancel';canBtn.addEventListener('click',closeMod);
   var savBtn=document.createElement('button');savBtn.className='btn-p';savBtn.textContent='Save';
   savBtn.addEventListener('click',async function(){
-    var sizeRadio=document.querySelector('input[name="editsize"]:checked');var size=sizeRadio?sizeRadio.value:t.size;
+    var sizeRadio=document.querySelector('input[name="editsize"]:checked');
+    var size=sizeRadio?sizeRadio.value:t.size;
     if(size==='Custom'){var c=document.getElementById('edit-custom-size').value.trim();if(c)size=c;}
-    t.size=size;await sb.from('tents').update({size:size}).eq('id',tentId);
+    if(size!==t.size){t.size=size;await sb.from('tents').update({size:size}).eq('id',tentId);}
     var vid=document.getElementById('tv').value||null;
-    if(!tentAssignments[ds])tentAssignments[ds]={};
-    if(vid)tentAssignments[ds][tentId]=vid;else delete tentAssignments[ds][tentId];
-    var a=getApproved(ds),w=getWaitlist(ds);await saveCalendarDB(ds,a,w,tentAssignments[ds]);
-    closeMod();renderTents();
+    if(!calRows[ds])calRows[ds]={approved:getApproved(ds),waitlist:getWaitlist(ds),tent_assignments:{}};
+    if(vid)calRows[ds].tent_assignments[tentId]=vid;
+    else delete calRows[ds].tent_assignments[tentId];
+    await saveCalRow(ds);closeMod();renderTents();
   });
   foot.appendChild(delBtn);foot.appendChild(unBtn);foot.appendChild(canBtn);foot.appendChild(savBtn);
 }
@@ -780,34 +872,56 @@ function openTentModal(tentId,ds){
 async function autoAssign(){
   if(!tentViewDate){alert('Select a market date first.');return;}
   var v4d=getApproved(tentViewDate).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
-  if(!v4d.length){alert('No approved vendors for '+tentViewDate+'. Schedule them in the Calendar tab first.');return;}
+  if(!v4d.length){alert('No approved vendors for '+tentViewDate+'.\nGo to Calendar → click this date → Manage vendors to add some first.');return;}
+  if(!tents.length){alert('No tent spots defined. Click "+ Add spot" to add some first.');return;}
   var spots=tents.slice(),assignment={},lastSpot={};
-  var allDates=Object.keys(tentAssignments).filter(function(d){return d!==tentViewDate;}).sort();
-  v4d.forEach(function(v){for(var i=allDates.length-1;i>=0;i--){var ta=tentAssignments[allDates[i]]||{};var f=Object.keys(ta).find(function(tid){return ta[tid]===v.id;});if(f){lastSpot[v.id]=f;break;}}});
+  // Find where each vendor was last time
+  var allDates=getMarketDates().filter(function(d){return d!==tentViewDate;}).sort();
+  v4d.forEach(function(v){
+    for(var i=allDates.length-1;i>=0;i--){
+      var ta=getTentAssignments(allDates[i]);
+      var f=Object.keys(ta).find(function(tid){return ta[tid]===v.id;});
+      if(f){lastSpot[v.id]=f;break;}
+    }
+  });
+  // First pass: assign to preferred spots
   var assigned=[];
-  v4d.forEach(function(v){var p=lastSpot[v.id];if(p&&spots.find(function(s){return s.id===p;})&&!assignment[p]){assignment[p]=v.id;assigned.push(v.id);}});
+  v4d.forEach(function(v){
+    var p=lastSpot[v.id];
+    if(p&&spots.find(function(s){return s.id===p;})&&!assignment[p]){
+      assignment[p]=v.id;assigned.push(v.id);
+    }
+  });
   var unasgn=v4d.filter(function(v){return assigned.indexOf(v.id)===-1;});
   var nums=spots.map(function(t){return t.num;}).sort(function(a,b){return a-b;});
+  // Second pass: no same-category adjacent
   unasgn.forEach(function(v){
     var placed=false;
-    for(var i=0;i<spots.length;i++){var s=spots[i];if(assignment[s.id])continue;
+    for(var i=0;i<spots.length;i++){
+      var s=spots[i];if(assignment[s.id])continue;
       var idx=nums.indexOf(s.num),conflict=false;
-      [nums[idx-1],nums[idx+1]].forEach(function(nn){if(!nn)return;var ns=spots.find(function(x){return x.num===nn;});if(ns&&assignment[ns.id]){var nv=vendors.find(function(x){return x.id===assignment[ns.id];});if(nv&&nv.category&&nv.category===v.category)conflict=true;}});
+      [nums[idx-1],nums[idx+1]].forEach(function(nn){
+        if(!nn)return;
+        var ns=spots.find(function(x){return x.num===nn;});
+        if(ns&&assignment[ns.id]){var nv=vendors.find(function(x){return x.id===assignment[ns.id];});if(nv&&nv.category&&nv.category===v.category)conflict=true;}
+      });
       if(!conflict){assignment[s.id]=v.id;placed=true;break;}
     }
     if(!placed){for(var i=0;i<spots.length;i++){if(!assignment[spots[i].id]){assignment[spots[i].id]=v.id;break;}}}
   });
-  tentAssignments[tentViewDate]=assignment;
-  var a=getApproved(tentViewDate),w=getWaitlist(tentViewDate);
-  await saveCalendarDB(tentViewDate,a,w,assignment);
+  if(!calRows[tentViewDate])calRows[tentViewDate]={approved:getApproved(tentViewDate),waitlist:[],tent_assignments:{}};
+  calRows[tentViewDate].tent_assignments=assignment;
+  await saveCalRow(tentViewDate);
   renderTents();
-  alert('✅ Auto-assigned '+Object.values(assignment).filter(Boolean).length+' vendors for '+tentViewDate+'.');
+  var count=Object.values(assignment).filter(Boolean).length;
+  alert('✅ Auto-assigned '+count+' vendor'+(count!==1?'s':'')+' for '+tentViewDate+'.\nVendors returned to their previous spot where possible.');
 }
 
 // ── Reports ───────────────────────────────────────────────────────────────────
 function renderReports(){
-  var el=document.getElementById('main-content');var dates=getMarketDates();
-  el.innerHTML='<div style="display:flex;gap:6px;margin-bottom:.85rem">'+
+  var el=document.getElementById('main-content');
+  var dates=getMarketDates();
+  el.innerHTML='<div style="display:flex;gap:6px;margin-bottom:.85rem;flex-wrap:wrap">'+
     '<button class="'+(reportType==='summary'?'btn-p':'btn-s')+'" id="rptSumBtn">Vendor summary</button>'+
     '<button class="'+(reportType==='schedule'?'btn-p':'btn-s')+'" id="rptSchBtn">Market day schedule</button>'+
     '</div><div id="reportContent">'+(reportType==='summary'?renderSummaryReport():renderScheduleReport(dates))+'</div>';
@@ -818,11 +932,16 @@ function renderReports(){
 }
 function renderSummaryReport(){
   if(!vendors.length)return'<div class="empty">No vendors yet.</div>';
-  return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem"><span style="font-size:12px;font-weight:600">All vendors ('+vendors.length+')</span><span style="font-size:11px;color:#888">Click any row to edit</span></div>'+
-    '<div class="report-wrap"><div style="overflow-x:auto"><table class="report-table"><thead><tr><th>Business</th><th>Phone</th><th>Email</th><th>Status</th><th>Category</th><th>Scheduling</th><th>📄</th><th>💰</th></tr></thead><tbody>'+
+  return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'+
+    '<span style="font-size:12px;font-weight:600">All vendors ('+vendors.length+')</span>'+
+    '<span style="font-size:11px;color:#888">Click any row to edit</span></div>'+
+    '<div class="report-wrap"><div style="overflow-x:auto"><table class="report-table">'+
+    '<thead><tr><th>Business</th><th>Phone</th><th>Email</th><th>Status</th><th>Category</th><th>Scheduling</th><th>📄</th><th>💰</th></tr></thead><tbody>'+
     vendors.map(function(v){var vs=v.vendorStatus||'active';var c=VSC[vs]||VSC.active;var av=avc(v.businessName||'?');
       return'<tr data-edit-vendor="'+v.id+'" style="cursor:pointer">'+
-        '<td><div style="display:flex;align-items:center;gap:7px"><div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div><span style="font-weight:600">'+esc(v.businessName||'—')+'</span></div></td>'+
+        '<td><div style="display:flex;align-items:center;gap:7px">'+
+          '<div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+          '<span style="font-weight:600">'+esc(v.businessName||'—')+'</span></div></td>'+
         '<td>'+esc(v.phone||'—')+'</td><td style="font-size:10px">'+esc(v.email||'—')+'</td>'+
         '<td><span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span></td>'+
         '<td>'+esc(v.category||'—')+'</td><td>'+schedTag(v.status)+'</td>'+
@@ -836,20 +955,28 @@ function renderScheduleReport(dates){
     '<select id="reportDateSel" style="width:100%;font-size:12px;padding:6px 8px;border-radius:8px;border:0.5px solid #d0cec7;background:#fff;font-family:inherit">'+
     dates.map(function(ds){return'<option value="'+ds+'"'+(ds===selDate?' selected':'')+'>'+ds+'</option>';}).join('')+'</select></div>';
   var att=getApproved(selDate).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
-  var ta=tentAssignments[selDate]||{};var vendorTent={};
+  var ta=getTentAssignments(selDate);var vendorTent={};
   Object.keys(ta).forEach(function(tid){var t=tents.find(function(x){return x.id===tid;});if(t)vendorTent[ta[tid]]='Spot '+t.num+' ('+t.size+')';});
   if(!att.length)return dateOpts+'<div class="empty">No vendors scheduled for this date.</div>';
-  return dateOpts+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem"><span style="font-size:12px;font-weight:600">'+att.length+' vendor'+(att.length!==1?'s':'')+' for '+selDate+'</span><span style="font-size:11px;color:#888">Click any row to edit</span></div>'+
-    '<div class="report-wrap"><div style="overflow-x:auto"><table class="report-table"><thead><tr><th>Business</th><th>Category</th><th>Vendor status</th><th>Tent/spot</th><th>Booth size</th><th>Phone</th></tr></thead><tbody>'+
+  return dateOpts+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'+
+      '<span style="font-size:12px;font-weight:600">'+att.length+' vendor'+(att.length!==1?'s':'')+' for '+selDate+'</span>'+
+      '<span style="font-size:11px;color:#888">Click any row to edit</span></div>'+
+    '<div class="report-wrap"><div style="overflow-x:auto"><table class="report-table">'+
+    '<thead><tr><th>Business</th><th>Category</th><th>Vendor status</th><th>Tent/spot</th><th>Booth size</th><th>Phone</th></tr></thead><tbody>'+
     att.map(function(v){var vs=v.vendorStatus||'active';var c=VSC[vs]||VSC.active;var av=avc(v.businessName||'?');
       return'<tr data-edit-vendor="'+v.id+'" style="cursor:pointer">'+
-        '<td><div style="display:flex;align-items:center;gap:7px"><div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div><span style="font-weight:600">'+esc(v.businessName||'—')+'</span></div></td>'+
-        '<td>'+esc(v.category||'—')+'</td><td><span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span></td>'+
-        '<td>'+esc(vendorTent[v.id]||'Not assigned')+'</td><td>'+esc(v.boothSize||'—')+'</td><td>'+esc(v.phone||'—')+'</td></tr>';
+        '<td><div style="display:flex;align-items:center;gap:7px">'+
+          '<div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+          '<span style="font-weight:600">'+esc(v.businessName||'—')+'</span></div></td>'+
+        '<td>'+esc(v.category||'—')+'</td>'+
+        '<td><span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span></td>'+
+        '<td>'+esc(vendorTent[v.id]||'Not assigned')+'</td>'+
+        '<td>'+esc(v.boothSize||'—')+'</td><td>'+esc(v.phone||'—')+'</td></tr>';
     }).join('')+'</tbody></table></div></div>';
 }
 
-// ── Waitlist ──────────────────────────────────────────────────────────────────
+// ── Waitlist ───────────────────────────────────────────────────────────────────
 function renderWaitlist(){
   var el=document.getElementById('main-content');
   var wl=vendors.filter(function(v){return v.status==='waitlist';});
@@ -868,17 +995,17 @@ function renderWaitlist(){
   el.querySelectorAll('[data-edit]').forEach(function(b){b.addEventListener('click',function(){openForm(b.dataset.edit);});});
 }
 
-// ── Export ────────────────────────────────────────────────────────────────────
+// ── Export ─────────────────────────────────────────────────────────────────────
 function openExportModal(){
   if(!vendors.length){alert('No vendor data to export.');return;}
   document.getElementById('modal-area').innerHTML=
-    '<div class="overlay" id="exportOverlay"><div class="modal"><div class="mtitle">↓ Export</div>'+
+    '<div class="overlay" id="exportOverlay"><div class="modal"><div class="mtitle">↓ Export data</div>'+
     '<div style="display:flex;flex-direction:column;gap:8px">'+
-    '<div style="display:flex;align-items:center;gap:10px;padding:.75rem;border:0.5px solid #e5e3de;border-radius:10px;cursor:pointer" id="exportVendorsBtn"><div style="font-size:22px">👥</div><div><div style="font-size:12px;font-weight:600">All vendors — full details</div><div style="font-size:10px;color:#888">Contract, payment, dates, all fields</div></div></div>'+
-    '<div style="display:flex;align-items:center;gap:10px;padding:.75rem;border:0.5px solid #e5e3de;border-radius:10px;cursor:pointer" id="exportApprovedBtn"><div style="font-size:22px">✅</div><div><div style="font-size:12px;font-weight:600">Approved vendors only</div></div></div>'+
-    '<div style="display:flex;align-items:center;gap:10px;padding:.75rem;border:0.5px solid #e5e3de;border-radius:10px;cursor:pointer" id="exportWaitlistBtn"><div style="font-size:22px">⏳</div><div><div style="font-size:12px;font-weight:600">Waitlist only</div></div></div>'+
-    '<div style="display:flex;align-items:center;gap:10px;padding:.75rem;border:0.5px solid #e5e3de;border-radius:10px;cursor:pointer" id="exportTentsBtn"><div style="font-size:22px">⛺</div><div><div style="font-size:12px;font-weight:600">Tent allocations (all dates)</div></div></div>'+
-    '<div style="display:flex;align-items:center;gap:10px;padding:.75rem;border:0.5px solid #e5e3de;border-radius:10px;cursor:pointer" id="exportCalBtn"><div style="font-size:22px">📅</div><div><div style="font-size:12px;font-weight:600">Market dates schedule</div></div></div>'+
+    mkExportRow('exportVendorsBtn','👥','All vendors — full details','Every field including contract, payment & dates')+
+    mkExportRow('exportApprovedBtn','✅','Approved vendors only','Name, contact, category, booth, status')+
+    mkExportRow('exportWaitlistBtn','⏳','Waitlist only','Contact details and vendor status')+
+    mkExportRow('exportTentsBtn','⛺','Tent allocations (all dates)','Spot, vendor, type, size')+
+    mkExportRow('exportCalBtn','📅','Market dates schedule','Dates with vendor names')+
     '</div><div class="mfoot" id="exportFoot"></div></div></div>';
   document.getElementById('exportOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
   document.getElementById('exportVendorsBtn').addEventListener('click',function(){exportVendorsCSV('all');});
@@ -889,17 +1016,32 @@ function openExportModal(){
   var cb=document.createElement('button');cb.className='btn-s';cb.textContent='Close';cb.addEventListener('click',closeMod);
   document.getElementById('exportFoot').appendChild(cb);
 }
-function downloadCSV(fn,rows){var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);}
+function mkExportRow(id,icon,title,sub){
+  return'<div style="display:flex;align-items:center;gap:10px;padding:.75rem;border:0.5px solid #e5e3de;border-radius:10px;cursor:pointer" id="'+id+'">'+
+    '<div style="font-size:22px;flex-shrink:0">'+icon+'</div>'+
+    '<div><div style="font-size:12px;font-weight:600">'+title+'</div>'+
+    (sub?'<div style="font-size:10px;color:#888">'+sub+'</div>':'')+
+    '</div></div>';
+}
+function downloadCSV(fn,rows){
+  var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');
+  var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';
+  document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);
+}
 function exportVendorsCSV(filter){
   var list=filter==='all'?vendors:vendors.filter(function(v){return v.status===filter;});
   if(!list.length){alert('No vendors to export.');return;}
-  var rows=[['Vendor Status','Contract','Payment','App. Status','Business Name','Contact','Email','Phone','Category','Booth Size','Selected Dates','Created','Modified']];
-  list.forEach(function(v){rows.push([v.vendorStatus||'active',v.contractReceived?'Yes':'No',v.paymentReceived?'Yes':'No',v.status||'pending',v.businessName||'',v.contactName||'',v.email||'',v.phone||'',v.category||'',v.boothSize||'',(v.selectedDates||[]).join('; '),fmtDT(v.createdAt),fmtDT(v.modifiedAt)]);});
+  var rows=[['Vendor Status','Contract','Payment','App. Status','Business Name','Contact','Email','Phone','Website','Social','Category','Products','Locally Produced','Price Range','Licenses','Food Docs','Liability','Booth Size','Electricity','Attendance','Why Join','Values','Additional Info','Selected Dates','Created','Modified']];
+  list.forEach(function(v){rows.push([v.vendorStatus||'active',v.contractReceived?'Yes':'No',v.paymentReceived?'Yes':'No',v.status||'pending',v.businessName||'',v.contactName||'',v.email||'',v.phone||'',v.website||'',v.social||'',v.category||'',v.products||'',v.local||'',(v.priceRange||[]).join('; '),v.licenses||'',(v.foodDocs||[]).join('; '),v.liability||'',v.boothSize||'',v.electricity||'',v.attendance||'',v.whyJoin||'',v.values||'',v.additionalInfo||'',(v.selectedDates||[]).join('; '),fmtDT(v.createdAt),fmtDT(v.modifiedAt)]);});
   downloadCSV('eb-vendors-'+filter+'-'+today()+'.csv',rows);closeMod();
 }
 function exportTentsCSV(){
   var rows=[['Date','Spot','Size','Vendor Name','Category','Vendor Status']];
-  getMarketDates().forEach(function(ds){var ta=tentAssignments[ds]||{};tents.forEach(function(t){var vid=ta[t.id];var v=vid?vendors.find(function(x){return x.id===vid;}):null;rows.push([ds,t.num,t.size,v?v.businessName:'',v?v.category||'':'',v?v.vendorStatus||'active':'']);});});
+  getMarketDates().forEach(function(ds){
+    var ta=getTentAssignments(ds);
+    tents.forEach(function(t){var vid=ta[t.id];var v=vid?vendors.find(function(x){return x.id===vid;}):null;rows.push([ds,t.num,t.size,v?v.businessName:'',v?v.category||'':'',v?v.vendorStatus||'active':'']);});
+  });
   downloadCSV('eb-tents-'+today()+'.csv',rows);closeMod();
 }
 function exportCalCSV(){
@@ -914,7 +1056,7 @@ function exportCalCSV(){
   downloadCSV('eb-calendar-'+today()+'.csv',rows);closeMod();
 }
 
-// ── Vendor form ───────────────────────────────────────────────────────────────
+// ── Vendor form ────────────────────────────────────────────────────────────────
 function openForm(id){
   eId=id||null;
   var v=id?vendors.find(function(x){return x.id===id;}):{};if(!v)v={};
@@ -937,22 +1079,30 @@ function openForm(id){
         '<input type="radio" name="vendorStatus" value="'+k+'"'+(vs===k?' checked':'')+' style="display:none"></div>';
     }).join('')+'</div>';
   var toggleHtml='<div class="q" style="margin-top:.75rem">Contract & payment</div><div class="toggle-grid">'+
-    '<label class="toggle-card'+(v.contractReceived?' checked-contract':'')+'" id="tc-contract"><div style="font-size:18px">📄</div><div><div style="font-size:11px;font-weight:600">Contract received</div></div><input type="checkbox" id="cb-contract"'+(v.contractReceived?' checked':'')+'>'+
-    '</label><label class="toggle-card'+(v.paymentReceived?' checked-payment':'')+'" id="tc-payment"><div style="font-size:18px">💰</div><div><div style="font-size:11px;font-weight:600">Payment received</div></div><input type="checkbox" id="cb-payment"'+(v.paymentReceived?' checked':'')+'></label></div>';
+    '<label class="toggle-card'+(v.contractReceived?' checked-contract':'')+'" id="tc-contract">'+
+      '<div style="font-size:18px">📄</div><div><div style="font-size:11px;font-weight:600">Contract received</div></div>'+
+      '<input type="checkbox" id="cb-contract"'+(v.contractReceived?' checked':'')+'></label>'+
+    '<label class="toggle-card'+(v.paymentReceived?' checked-payment':'')+'" id="tc-payment">'+
+      '<div style="font-size:18px">💰</div><div><div style="font-size:11px;font-weight:600">Payment received</div></div>'+
+      '<input type="checkbox" id="cb-payment"'+(v.paymentReceived?' checked':'')+'></label></div>';
   var calEligible=v.status==='approved'&&vs==='active';
-  var dateSelHtml='<div class="q" style="margin-top:.75rem">Desired market dates</div>'+
+  var dateSelHtml='<div class="q" style="margin-top:.75rem">Desired market dates <span style="font-size:10px;font-weight:400;color:#888">— click to select</span></div>'+
     (allDates.length?
-      '<div class="date-chip-grid" id="dateChips">'+allDates.map(function(ds){return'<button type="button" class="date-chip'+(selectedDates.indexOf(ds)>-1?' selected':'')+'" data-ds="'+ds+'">'+ds+'</button>';}).join('')+'</div>'+
+      '<div class="date-chip-grid" id="dateChips">'+
+        allDates.map(function(ds){return'<button type="button" class="date-chip'+(selectedDates.indexOf(ds)>-1?' selected':'')+'" data-ds="'+ds+'">'+ds+'</button>';}).join('')+
+      '</div>'+
       '<div style="font-size:10px;color:#888;margin-top:5px">Selected dates auto-add vendor to that market day</div>'+
-      (!calEligible&&id?'<div style="font-size:10px;color:#a16207;margin-top:3px;background:#fef9c3;padding:5px 8px;border-radius:6px">⚠️ Must be Approved + Active to appear in Calendar scheduling</div>':''):
+      (!calEligible&&id?'<div style="font-size:10px;color:#a16207;margin-top:4px;background:#fef9c3;padding:5px 8px;border-radius:6px">⚠️ Must be Approved + Active to appear in Calendar scheduling</div>':''):
       '<div style="font-size:11px;color:#888;margin-top:4px;padding:.65rem;background:#f8f7f4;border-radius:8px;border:0.5px solid #e5e3de">⚠️ No market dates yet. Go to Calendar → click a date → Manage vendors.</div>'
     );
   var html=
     '<div class="sec"><div class="stitle">Vendor status & scheduling</div>'+vsHtml+toggleHtml+
     '<div class="q" style="margin-top:.75rem">Scheduling status</div><div style="margin-top:4px">'+schedTag(v.status||'pending')+'</div>'+
     dateSelHtml+
-    '<div class="date-strip" style="margin-top:.65rem"><div><div class="date-item-label">Created</div><div class="date-item-val">'+(!id?'Set on save':fmtDate(v.createdAt))+'</div></div>'+
-    '<div><div class="date-item-label">Last modified</div><div class="date-item-val">'+(!id?'Set on save':fmtDT(v.modifiedAt))+'</div></div></div></div>'+
+    '<div class="date-strip" style="margin-top:.65rem">'+
+      '<div><div class="date-item-label">Created</div><div class="date-item-val">'+(!id?'Set on save':fmtDate(v.createdAt))+'</div></div>'+
+      '<div><div class="date-item-label">Last modified</div><div class="date-item-val">'+(!id?'Set on save':fmtDT(v.modifiedAt))+'</div></div>'+
+    '</div></div>'+
     '<div class="sec"><div class="stitle">Business info</div>'+
     '<div class="g2"><div class="fg"><label>Business / farm name *</label><input id="f_biz" value="'+esc(v.businessName||'')+'"></div>'+
     '<div class="fg"><label>Primary contact *</label><input id="f_contact" value="'+esc(v.contactName||'')+'"></div>'+
@@ -966,11 +1116,13 @@ function openForm(id){
     '<div class="fg"><label>Product description</label><textarea id="f_prodDesc">'+esc(v.productDesc||'')+'</textarea></div>'+
     '<div class="q">Locally grown / made / produced?</div><div class="rg" id="rg_local">'+rads('local',['Yes','Mostly','Some (describe below)'],v.local,'Some (describe below)',v.localComment)+'</div>'+
     '<div class="fg" style="margin-top:.6rem"><label>Price range</label><div id="priceChecks" style="display:flex;flex-direction:column;gap:4px">'+
-    ['$5–$8','$10–$25','$40+'].map(function(p){return'<label class="copt"><input type="checkbox" value="'+p+'"'+((v.priceRange||[]).indexOf(p)>-1?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+p+'</span></label>';}).join('')+'</div></div></div>'+
+    ['$5–$8','$10–$25','$40+'].map(function(p){return'<label class="copt"><input type="checkbox" value="'+p+'"'+((v.priceRange||[]).indexOf(p)>-1?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+p+'</span></label>';}).join('')+
+    '</div></div></div>'+
     '<div class="sec"><div class="stitle">Licensing</div>'+
     '<div class="q">Licenses & permits?</div><div class="rg" id="rg_licenses">'+rads('licenses',['Yes','In Process','Not Yet (describe below)'],v.licenses,'Not Yet (describe below)',v.licensesComment)+'</div>'+
-    '<div style="margin-top:.65rem"><div class="q">Prepared food docs</div><div id="fdChecks" style="display:flex;flex-direction:column;gap:4px">'+
-    ['Temporary Restaurant License','Food Handler Certification','Commissary Kitchen (if applicable)','Not a prepared food vendor'].map(function(o){return'<label class="copt"><input type="checkbox" value="'+esc(o)+'"'+((v.foodDocs||[]).indexOf(o)>-1?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+esc(o)+'</span></label>';}).join('')+'</div></div>'+
+    '<div style="margin-top:.65rem"><div class="q">Prepared food documentation</div><div id="fdChecks" style="display:flex;flex-direction:column;gap:4px">'+
+    ['Temporary Restaurant License','Food Handler Certification','Commissary Kitchen (if applicable)','Not a prepared food vendor'].map(function(o){return'<label class="copt"><input type="checkbox" value="'+esc(o)+'"'+((v.foodDocs||[]).indexOf(o)>-1?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+esc(o)+'</span></label>';}).join('')+
+    '</div></div>'+
     '<div style="margin-top:.65rem"><div class="q">Liability insurance?</div><div class="rg" id="rg_liability">'+rads('liability',['Yes','No (required prior to first market)'],v.liability,null,null)+'</div></div></div>'+
     '<div class="sec"><div class="stitle">Booth & setup</div>'+
     '<div class="q">Booth size</div><div class="rg" id="rg_boothSize">'+rads('boothSize',["10'x10'","20'x20'",'Food truck / trailer'],v.boothSize,null,null)+'</div>'+
@@ -1018,8 +1170,7 @@ async function saveV(){
   var existing=eId?vendors.find(function(v){return v.id===eId;}):null;
   var oldDates=existing?existing.selectedDates||[]:[];var newDates=getSelectedDates();
   var data={
-    vendorStatus:getR('vendorStatus')||'active',
-    status:existing?existing.status||'pending':'pending',
+    vendorStatus:getR('vendorStatus')||'active',status:existing?existing.status||'pending':'pending',
     contractReceived:!!(document.getElementById('cb-contract')||{}).checked,
     paymentReceived:!!(document.getElementById('cb-payment')||{}).checked,
     selectedDates:newDates,businessName:biz,contactName:contact,
@@ -1040,24 +1191,24 @@ async function saveV(){
   };
   var savedId=await saveVendorDB(data,eId);
   if(savedId){
-    // Sync market days for selected dates
-    newDates.forEach(async function(ds){
+    // Sync calendar dates
+    for(var i=0;i<newDates.length;i++){
+      var ds=newDates[i];
       if(oldDates.indexOf(ds)===-1){
-        if(!marketDays[ds])marketDays[ds]={approved:[],waitlist:[]};
-        if(marketDays[ds].approved.indexOf(savedId)===-1)marketDays[ds].approved.push(savedId);
-        await saveCalendarDB(ds,marketDays[ds].approved,marketDays[ds].waitlist,tentAssignments[ds]||{});
+        if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};
+        if(calRows[ds].approved.indexOf(savedId)===-1)calRows[ds].approved.push(savedId);
+        await saveCalRow(ds);
       }
-    });
-    oldDates.forEach(async function(ds){
-      if(newDates.indexOf(ds)===-1&&marketDays[ds]){
-        marketDays[ds].approved=marketDays[ds].approved.filter(function(id){return id!==savedId;});
-        if(!marketDays[ds].approved.length&&!marketDays[ds].waitlist.length)delete marketDays[ds];
-        else await saveCalendarDB(ds,marketDays[ds].approved||[],marketDays[ds].waitlist||[],tentAssignments[ds]||{});
+    }
+    for(var i=0;i<oldDates.length;i++){
+      var ds=oldDates[i];
+      if(newDates.indexOf(ds)===-1&&calRows[ds]){
+        calRows[ds].approved=calRows[ds].approved.filter(function(id){return id!==savedId;});
+        await saveCalRow(ds);
       }
-    });
-    await loadData();
-    closeMod();
-  }else{btn.disabled=false;btn.textContent='Save';}
+    }
+    await loadData();closeMod();
+  } else {btn.disabled=false;btn.textContent='Save';}
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
