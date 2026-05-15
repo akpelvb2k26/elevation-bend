@@ -31,7 +31,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px}
 .hdr-title{font-size:16px;font-weight:700}
 .hdr-sub{font-size:11px;color:#888;margin-top:1px}
-nav{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-bottom:.85rem;background:#f0ede6;border-radius:8px;padding:3px}
+nav{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin-bottom:.85rem;background:#f0ede6;border-radius:8px;padding:3px}
 .nb{background:none;border:none;padding:7px 3px;font-size:10px;font-weight:500;color:#888;cursor:pointer;border-radius:6px;text-align:center;font-family:inherit;white-space:nowrap}
 .nb.active{background:#fff;color:#1a1a1a;border:.5px solid #e5e3de;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:5px;margin-bottom:.85rem}
@@ -226,6 +226,8 @@ nav{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-bottom:.85re
     <button class="nb" data-tab="layout">Layout</button>
     <button class="nb" data-tab="reports">Reports</button>
     <button class="nb" data-tab="waitlist">Waitlist</button>
+    <button class="nb" data-tab="payments">Payments</button>
+    <button class="nb" data-tab="comms">Comms</button>
   </nav>
   <div id="stats-bar"></div>
   <div id="filter-bar"></div>
@@ -240,7 +242,7 @@ const SUPA_KEY='sb_publishable_btz05uH2n90XYfkGIooLog_CY71YUW3';
 const {createClient}=supabase;
 const sb=createClient(SUPA_URL,SUPA_KEY);
 
-var vendors=[],tents=[],calRows={},currentUser=null;
+var vendors=[],tents=[],calRows={},vendorGroups=[],currentUser=null;
 var tab='vendors',cY=new Date().getFullYear(),cM=new Date().getMonth();
 var eId=null,vsFilter='all',reportDate='',reportType='summary',selectedCalDay='',tentViewDate='';
 var layoutDate='',layoutSpots=[],layoutUnsaved=false,layoutSelectedIds=new Set(),layoutSnapOn=true,layoutSelectMode=false;
@@ -346,6 +348,8 @@ async function ensureSchema(){
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS contract_received BOOLEAN DEFAULT false",
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS payment_received BOOLEAN DEFAULT false",
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''",
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS booth_fee NUMERIC DEFAULT 0",
+    "CREATE TABLE IF NOT EXISTS vendor_groups (id TEXT PRIMARY KEY, name TEXT, member_ids TEXT[] DEFAULT '{}', created_at TIMESTAMPTZ DEFAULT NOW())",
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS selected_dates TEXT[] DEFAULT '{}'",
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS modified_at TIMESTAMPTZ DEFAULT NOW()"
   ];
@@ -361,13 +365,15 @@ async function loadData(){
     if(ve)throw ve;vendors=(vd||[]).map(dbToV);
     var{data:td,error:te}=await sb.from('tents').select('*').order('num');
     if(te)throw te;tents=td||[];if(!tents.length)await initTentsDB();
+    var{data:gd,error:ge}=await sb.from('vendor_groups').select('*').order('name');
+    if(!ge)vendorGroups=(gd||[]);
     var{data:cd,error:ce}=await sb.from('calendar').select('*');
     if(ce)throw ce;calRows={};
     (cd||[]).forEach(function(r){calRows[r.date]={approved:r.approved_vendors||[],waitlist:r.waitlist_vendors||[],tent_assignments:r.tent_assignments||{}};});
   }catch(e){console.error(e);}
   render();
 }
-function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
+function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',boothFee:r.booth_fee||0,photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
 async function saveVendorDB(data,id){
   var isNew=!id;
   // Core row — only guaranteed base columns
@@ -410,6 +416,8 @@ function render(){
   else if(tab==='layout')renderLayout();
   else if(tab==='reports')renderReports();
   else if(tab==='waitlist')renderWaitlist();
+  else if(tab==='payments')renderPayments();
+  else if(tab==='comms')renderComms();
 }
 function renderStats(){
   var tot=vendors.length,app=vendors.filter(function(v){return v.status==='approved';}).length,wl=vendors.filter(function(v){return v.status==='waitlist';}).length,eli=eligibleVendors().length,con=vendors.filter(function(v){return v.contractReceived;}).length,pay=vendors.filter(function(v){return v.paymentReceived;}).length;
@@ -1427,6 +1435,8 @@ function openForm(id){
     '<div class="fg"><label>Contract &amp; payment</label><div class="toggle-grid"><label class="toggle-card'+(v.contractReceived?' on-contract':'')+'" id="ftc-contract"><div style="font-size:18px">📄</div><div><div class="tc-label">Contract received</div><div class="tc-sub">Signed on file</div></div><input type="checkbox" id="fcb-contract"'+(v.contractReceived?' checked':'')+'></label><label class="toggle-card'+(v.paymentReceived?' on-payment':'')+'" id="ftc-payment"><div style="font-size:18px">💰</div><div><div class="tc-label">Payment received</div><div class="tc-sub">Booth fee collected</div></div><input type="checkbox" id="fcb-payment"'+(v.paymentReceived?' checked':'')+'></label></div></div>'+
     '<div class="fg"><label>Application status</label><select id="fAppStatus"><option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option><option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option><option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option></select></div>'+
     '<div class="fg"><label>Desired market dates — tap to select</label>'+(allDates.length?'<div class="date-chips" id="fDateChips">'+allDates.map(function(ds){return'<span class="dc'+(selectedDates.indexOf(ds)>-1?' on':'')+'" data-ds="'+ds+'">'+ds+'</span>';}).join('')+'</div><div style="font-size:10px;color:#888;margin-top:5px">Selecting adds vendor to that market day</div>':'<div class="notice">No market dates yet. Go to Calendar → click a date → Manage vendors.</div>')+'</div>'+
+    '<div class="fg"><label>Booth fee <span style="font-weight:400;color:#aaa">— amount charged for this vendor</span></label>'+
+    '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:13px;color:#888">$</span><input id="f_boothFee" type="number" min="0" step="1" value="'+esc(String(v.boothFee||0))+'" style="max-width:120px"></div></div>'+
     '<div class="fg"><label>Internal notes / comments <span style="font-weight:400;color:#aaa">— visible to market staff only</span></label><textarea id="f_notes" style="height:64px;font-size:13px" placeholder="e.g. Needs help with setup, prefers corner spot, follow up on contract…">'+esc(v.notes||'')+'</textarea></div>'+
     '<div class="info-strip"><div><div class="isl">Created</div><div class="isv">'+(!id?'Set on save':fmtDate(v.createdAt))+'</div></div><div><div class="isl">Last modified</div><div class="isv">'+(!id?'Set on save':fmtDT(v.modifiedAt))+'</div></div></div></div>'+
     // TAB 1
@@ -1511,13 +1521,634 @@ async function saveV(){
   var newDates=Array.from(document.querySelectorAll('#fDateChips .dc.on')).map(function(c){return c.dataset.ds;});
   var existing=eId?vendors.find(function(v){return v.id===eId;}):null;
   var oldDates=existing?existing.selectedDates||[]:[];
-  var data={vendorStatus:getR('vendorStatus')||'active',status:((document.getElementById('fAppStatus')||{}).value||'pending'),contractReceived:!!((document.getElementById('fcb-contract')||{}).checked),paymentReceived:!!((document.getElementById('fcb-payment')||{}).checked),selectedDates:newDates,businessName:biz,contactName:contact,email:((document.getElementById('f_email')||{}).value||'').trim(),phone:((document.getElementById('f_phone')||{}).value||'').trim(),website:((document.getElementById('f_web')||{}).value||'').trim(),social:((document.getElementById('f_social')||{}).value||'').trim(),category:cat,categoryComment:cat==='Other'?((document.getElementById('cmt_category')||{}).value||''):'',products:((document.getElementById('f_products')||{}).value||'').trim(),productDesc:((document.getElementById('f_prodDesc')||{}).value||'').trim(),local:getR('local'),localComment:((document.getElementById('cmt_local')||{}).value||''),priceRange:Array.from(document.querySelectorAll('#priceChecks input:checked')).map(function(c){return c.value;}),licenses:getR('licenses'),licensesComment:((document.getElementById('cmt_licenses')||{}).value||''),foodDocs:Array.from(document.querySelectorAll('#fdChecks input:checked')).map(function(c){return c.value;}),liability:getR('liability'),boothSize:getR('boothSize'),ownSetup:getR('ownSetup'),ownSetupComment:((document.getElementById('cmt_ownSetup')||{}).value||''),electricity:getR('electricity'),attendance:getR('attendance'),months:((document.getElementById('f_months')||{}).value||'').trim(),whyJoin:((document.getElementById('f_whyJoin')||{}).value||'').trim(),values:((document.getElementById('f_values')||{}).value||'').trim(),additionalInfo:((document.getElementById('f_addl')||{}).value||'').trim(),notes:((document.getElementById('f_notes')||{}).value||'').trim(),photos:[]};
+  var data={vendorStatus:getR('vendorStatus')||'active',status:((document.getElementById('fAppStatus')||{}).value||'pending'),contractReceived:!!((document.getElementById('fcb-contract')||{}).checked),paymentReceived:!!((document.getElementById('fcb-payment')||{}).checked),selectedDates:newDates,businessName:biz,contactName:contact,email:((document.getElementById('f_email')||{}).value||'').trim(),phone:((document.getElementById('f_phone')||{}).value||'').trim(),website:((document.getElementById('f_web')||{}).value||'').trim(),social:((document.getElementById('f_social')||{}).value||'').trim(),category:cat,categoryComment:cat==='Other'?((document.getElementById('cmt_category')||{}).value||''):'',products:((document.getElementById('f_products')||{}).value||'').trim(),productDesc:((document.getElementById('f_prodDesc')||{}).value||'').trim(),local:getR('local'),localComment:((document.getElementById('cmt_local')||{}).value||''),priceRange:Array.from(document.querySelectorAll('#priceChecks input:checked')).map(function(c){return c.value;}),licenses:getR('licenses'),licensesComment:((document.getElementById('cmt_licenses')||{}).value||''),foodDocs:Array.from(document.querySelectorAll('#fdChecks input:checked')).map(function(c){return c.value;}),liability:getR('liability'),boothSize:getR('boothSize'),ownSetup:getR('ownSetup'),ownSetupComment:((document.getElementById('cmt_ownSetup')||{}).value||''),electricity:getR('electricity'),attendance:getR('attendance'),months:((document.getElementById('f_months')||{}).value||'').trim(),whyJoin:((document.getElementById('f_whyJoin')||{}).value||'').trim(),values:((document.getElementById('f_values')||{}).value||'').trim(),additionalInfo:((document.getElementById('f_addl')||{}).value||'').trim(),notes:((document.getElementById('f_notes')||{}).value||'').trim(),boothFee:parseFloat((document.getElementById('f_boothFee')||{}).value||0)||0,photos:[]};
   var savedId=await saveVendorDB(data,eId);
   if(savedId){
     for(var i=0;i<newDates.length;i++){var ds=newDates[i];if(oldDates.indexOf(ds)===-1){if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};if(calRows[ds].approved.indexOf(savedId)===-1)calRows[ds].approved.push(savedId);await saveCalRow(ds);}}
     for(var i=0;i<oldDates.length;i++){var ds=oldDates[i];if(newDates.indexOf(ds)===-1&&calRows[ds]){calRows[ds].approved=calRows[ds].approved.filter(function(x){return x!==savedId;});await saveCalRow(ds);}}
     await loadData();closeMod();
   }else{if(btn){btn.disabled=false;btn.textContent='✓ Save vendor';}}
+}
+
+
+// ── PAYMENTS TAB ──────────────────────────────────────────────────────────
+// Stripe embedded dashboard + per-vendor payment tracking.
+// mailto: send is used now; swap sendEmail() for Gmail API later.
+
+var STRIPE_PK='';// Set your Stripe publishable key here when ready
+var STRIPE_PRICE_ID='';// Optional: your Stripe Price ID for booth fee product
+
+// ── Stripe config — fill these in after creating your account ────────────
+// STRIPE_PK: your publishable key from stripe.com/dashboard → API keys
+// SUPABASE_FUNCTIONS_URL: your Supabase project functions endpoint
+var STRIPE_PK='';  // e.g. 'pk_live_...' or 'pk_test_...'
+var SUPABASE_FN_URL='https://mixubqomqdfcrgfovnwy.supabase.co/functions/v1';
+// Supabase anon key (JWT) — needed to call Edge Functions.
+// Get this from: Supabase Dashboard → Settings → API → anon public key (starts with eyJ...)
+var SUPA_ANON_KEY='';  // paste your anon key here
+
+var stripeLoaded=false;
+var stripeInstance=null;
+
+// Load Stripe.js and Connect.js once
+function loadStripeScripts(cb){
+  if(stripeLoaded){cb();return;}
+  var s1=document.createElement('script');
+  s1.src='https://js.stripe.com/v3/';
+  s1.onload=function(){
+    var s2=document.createElement('script');
+    s2.src='https://connect-js.stripe.com/v1.0/connect.js';
+    s2.onload=function(){stripeLoaded=true;cb();};
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
+}
+
+// Fetch a session token from our Edge Function
+async function fetchStripeSession(){
+  var res=await fetch(SUPABASE_FN_URL+'/stripe-session',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SUPA_ANON_KEY||SUPA_KEY,'Authorization':'Bearer '+(SUPA_ANON_KEY||SUPA_KEY)},
+    body:JSON.stringify({action:'dashboard_session'})
+  });
+  var data=await res.json();
+  if(data.error)throw new Error(data.error);
+  return data.client_secret;
+}
+
+// Generate a Stripe payment link for a vendor via Edge Function
+async function generatePaymentLink(v){
+  if(!v.boothFee||v.boothFee<=0){alert('Set a booth fee for this vendor first.');return null;}
+  var res=await fetch(SUPABASE_FN_URL+'/stripe-session',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SUPA_ANON_KEY||SUPA_KEY,'Authorization':'Bearer '+(SUPA_ANON_KEY||SUPA_KEY)},
+    body:JSON.stringify({action:'create_payment_link',vendorId:v.id,vendorName:v.businessName,amount:v.boothFee})
+  });
+  var data=await res.json();
+  if(data.error){alert('Error creating payment link: '+data.error);return null;}
+  return data.url;
+}
+
+// Mount the embedded Stripe dashboard inside #stripeContainer
+function mountStripeDashboard(){
+  var container=document.getElementById('stripeContainer');
+  if(!container||!STRIPE_PK)return;
+  container.innerHTML='<div style="font-size:12px;color:#888;text-align:center;padding:2rem">Connecting to Stripe…</div>';
+  loadStripeScripts(async function(){
+    try{
+      var clientSecret=await fetchStripeSession();
+      stripeInstance=window.Stripe(STRIPE_PK);
+      var instance=stripeInstance.initEmbeddedCheckout?
+        window.StripeConnect.init({publishableKey:STRIPE_PK,fetchClientSecret:function(){return Promise.resolve(clientSecret);}})
+        :null;
+      // Use Connect.js embedded components
+      if(window.StripeConnect){
+        var connect=window.StripeConnect.init({
+          publishableKey:STRIPE_PK,
+          fetchClientSecret:function(){return Promise.resolve(clientSecret);}
+        });
+        container.innerHTML='';
+        // Mount payments component
+        var paymentsEl=connect.create('payments');
+        container.appendChild(paymentsEl);
+      } else {
+        container.innerHTML='<div style="font-size:12px;color:#791F1F;padding:1rem">Stripe Connect JS failed to load. Check your publishable key and try again.</div>';
+      }
+    }catch(err){
+      container.innerHTML='<div style="padding:1rem;font-size:12px;color:#791F1F">'+
+        '<strong>Could not connect to Stripe:</strong> '+esc(err.message)+'<br><br>'+
+        'Make sure you have:<br>'+
+        '1. Set STRIPE_PK in the app script<br>'+
+        '2. Deployed the stripe-session Edge Function<br>'+
+        '3. Set STRIPE_SECRET_KEY and STRIPE_ACCOUNT_ID in Supabase Edge Function secrets'+
+      '</div>';
+    }
+  });
+}
+
+function renderPayments(){
+  var el=document.getElementById('main-content');
+  var approved=vendors.filter(function(v){return v.status==='approved';});
+  var paid=approved.filter(function(v){return v.paymentReceived;});
+  var unpaid=approved.filter(function(v){return !v.paymentReceived;});
+  var paidAmt=paid.reduce(function(s,v){return s+(v.boothFee||0);},0);
+  var unpaidAmt=unpaid.reduce(function(s,v){return s+(v.boothFee||0);},0);
+  var totalAmt=approved.reduce(function(s,v){return s+(v.boothFee||0);},0);
+
+  el.innerHTML=
+    // Summary
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:1rem">'+
+      mkPayCard('Total expected','$'+totalAmt.toFixed(2),'#1a1a1a')+
+      mkPayCard('Collected','$'+paidAmt.toFixed(2),'#27500A')+
+      mkPayCard('Outstanding','$'+unpaidAmt.toFixed(2),'#791F1F')+
+      mkPayCard('Paid vendors',paid.length+' / '+approved.length,'#0C447C')+
+    '</div>'+
+
+    // Stripe embedded dashboard or setup notice
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<div style="font-size:28px">💳</div>'+
+        '<div><div style="font-size:13px;font-weight:600">Stripe Dashboard</div>'+
+        '<div style="font-size:11px;color:#888;margin-top:2px">View transactions, payouts and disputes in Stripe</div></div>'+
+      '</div>'+
+      '<button class="btn-p" id="openStripeDashBtn" style="display:flex;align-items:center;gap:6px">Open Stripe Dashboard ↗</button>'+
+    '</div>'+
+    (false? '<div></div>'
+      : '<div style="background:#f8f7f4;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem;margin-bottom:1rem">'+
+          '<div style="display:flex;align-items:flex-start;gap:12px">'+
+            '<div style="font-size:28px;flex-shrink:0">💳</div>'+
+            '<div>'+
+              '<div style="font-size:13px;font-weight:600;margin-bottom:6px">Stripe embedded dashboard</div>'+
+              '<div style="font-size:11px;color:#888;line-height:1.7">'+
+                'Once your Stripe account is set up, the full Stripe dashboard will appear here — '+
+                'transactions, payouts, disputes, all without a separate login.<br><br>'+
+                '<strong>Setup steps:</strong><br>'+
+                '1. Create your Stripe account at <a href="https://stripe.com" target="_blank" style="color:#378ADD">stripe.com</a><br>'+
+                '2. Copy your publishable key from Stripe → Developers → API keys<br>'+
+                '3. Set <code style="background:#f0ede6;padding:1px 5px;border-radius:4px">STRIPE_PK</code> in this app's script<br>'+
+                '4. Deploy the Edge Functions (instructions below)'+
+              '</div>'+
+              '<div style="margin-top:.85rem;background:#fff;border:.5px solid #d0cec7;border-radius:8px;padding:.75rem;font-size:11px">'+
+                '<div style="font-weight:600;margin-bottom:4px">Deploy Edge Functions (run in Terminal):</div>'+
+                '<code style="font-size:10px;color:#555;display:block;line-height:2">'+
+                  'cd ~/elevation-bend-functions<br>'+
+                  'supabase functions deploy stripe-session<br>'+
+                  'supabase functions deploy stripe-webhook<br><br>'+
+                  '# Then set secrets in Supabase dashboard:<br>'+
+                  '# Settings → Edge Functions → Environment variables<br>'+
+                  '# STRIPE_SECRET_KEY = sk_live_...<br>'+
+                  '# STRIPE_ACCOUNT_ID = acct_... (Stripe dashboard → Settings → Account ID)<br>'+
+                  '# STRIPE_WEBHOOK_SECRET = whsec_... (after adding webhook endpoint)'+
+                '</code>'+
+              '</div>'+
+            '</div>'+
+          '</div>'+
+        '</div>')+
+
+    // Vendor payment table
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem;flex-wrap:wrap;gap:8px">'+
+      '<div style="font-size:12px;font-weight:600">Vendor booth fees</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+        '<button class="btn-g" id="payBulkEmailBtn">📧 Email all unpaid</button>'+
+        '<button class="btn-blue" id="payBulkLinksBtn">💳 Generate all payment links</button>'+
+        '<button class="btn-s" id="payExportBtn">↓ Export CSV</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="report-wrap"><div style="overflow-x:auto"><table class="report-table">'+
+      '<thead><tr><th>Vendor</th><th>Category</th><th>Booth fee</th><th>Payment status</th><th>Actions</th></tr></thead>'+
+      '<tbody>'+
+      approved.map(function(v){
+        var isPaid=v.paymentReceived;
+        var fee=v.boothFee||0;
+        return'<tr>'+
+          '<td><div style="display:flex;align-items:center;gap:7px">'+
+            '<div style="width:28px;height:28px;border-radius:50%;background:'+catColor(v.category).bg+';color:'+catColor(v.category).text+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+            '<div><div style="font-size:12px;font-weight:600">'+esc(v.businessName||'—')+'</div>'+
+            '<div style="font-size:10px;color:#888">'+esc(v.email||'No email')+'</div></div>'+
+          '</div></td>'+
+          '<td>'+catBadge(v.category)+'</td>'+
+          '<td>'+
+            '<div style="display:flex;align-items:center;gap:4px">'+
+              '<span style="color:#888">$</span>'+
+              '<input type="number" value="'+fee+'" min="0" step="0.01" data-fee-vid="'+v.id+'" style="width:72px;border:.5px solid #d0cec7;border-radius:6px;padding:3px 6px;font-size:12px;font-family:inherit">'+
+              '<button class="btn-s" data-save-fee="'+v.id+'" style="padding:3px 8px;font-size:10px">Save</button>'+
+            '</div>'+
+          '</td>'+
+          '<td>'+
+            (isPaid
+              ?'<span style="background:#EAF3DE;color:#27500A;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:600">✓ Paid</span>'
+              :fee>0
+                ?'<span style="background:#FCEBEB;color:#791F1F;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:600">Unpaid — $'+fee.toFixed(2)+'</span>'
+                :'<span style="background:#f0ede6;color:#888;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:600">No fee set</span>')+
+          '</td>'+
+          '<td>'+
+            '<div style="display:flex;gap:4px;flex-wrap:wrap">'+
+              '<button class="'+(isPaid?'btn-s':'btn-p')+'" data-mark-paid="'+v.id+'" style="font-size:10px;padding:4px 8px">'+(isPaid?'↩ Unmark':'✓ Mark paid')+'</button>'+
+              (v.email?'<button class="btn-blue" data-send-pay-req="'+v.id+'" style="font-size:10px;padding:4px 8px" title="Email payment request">📧 Invoice</button>':'')+
+              (STRIPE_PK&&fee>0&&!isPaid?'<button class="btn-g" data-gen-stripe="'+v.id+'" style="font-size:10px;padding:4px 8px">💳 Pay link</button>':'')+
+            '</div>'+
+          '</td>'+
+        '</tr>';
+      }).join('')+
+      (!approved.length?'<tr><td colspan="5" style="text-align:center;color:#aaa;padding:2rem;font-size:12px">No approved vendors yet.</td></tr>':'')+
+      '</tbody>'+
+    '</table></div></div>';
+
+  // Mount Stripe embedded dashboard if key is set
+  if(STRIPE_PK)setTimeout(function(){mountStripeDashboard();},100);
+
+  // Save booth fee
+  el.querySelectorAll('[data-save-fee]').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var vid=btn.dataset.saveFee;
+      var inp=el.querySelector('[data-fee-vid="'+vid+'"]');
+      var fee=parseFloat(inp?inp.value:0)||0;
+      await sb.from('vendors').update({booth_fee:fee,modified_at:nowISO()}).eq('id',vid);
+      var v=vendors.find(function(x){return x.id===vid;});if(v)v.boothFee=fee;
+      renderPayments();
+    });
+  });
+
+  // Mark paid / unpaid
+  el.querySelectorAll('[data-mark-paid]').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var v=vendors.find(function(x){return x.id===btn.dataset.markPaid;});if(!v)return;
+      var newVal=!v.paymentReceived;
+      await sb.from('vendors').update({payment_received:newVal,modified_at:nowISO()}).eq('id',v.id);
+      v.paymentReceived=newVal;renderPayments();
+    });
+  });
+
+  // Email invoice (payment request)
+  el.querySelectorAll('[data-send-pay-req]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var v=vendors.find(function(x){return x.id===btn.dataset.sendPayReq;});
+      if(!v||!v.email){alert('No email address on file for this vendor.');return;}
+      var fee=(v.boothFee||0).toFixed(2);
+      sendEmail(
+        v.email,
+        'Booth fee invoice — Elevation Bend Farmers Market',
+        'Hi '+(v.contactName||v.businessName)+',
+
+'+
+        'Your booth fee for the Elevation Bend Farmers Market is $'+fee+'.
+
+'+
+        'Please arrange payment at your earliest convenience.
+
+'+
+        'Thank you,
+Elevation Bend Farmers Market'
+      );
+    });
+  });
+
+  // Generate Stripe payment link
+  el.querySelectorAll('[data-gen-stripe]').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var v=vendors.find(function(x){return x.id===btn.dataset.genStripe;});if(!v)return;
+      btn.disabled=true;btn.textContent='Generating…';
+      var url=await generatePaymentLink(v);
+      btn.disabled=false;btn.textContent='💳 Pay link';
+      if(url){
+        // Copy link and offer to email it
+        navigator.clipboard.writeText(url).catch(function(){});
+        if(confirm('Payment link generated and copied to clipboard!\n\nLink: '+url+'\n\nSend this link to '+v.businessName+' by email now?')){
+          sendEmail(
+            v.email||'',
+            'Pay your booth fee — Elevation Bend Farmers Market',
+            'Hi '+(v.contactName||v.businessName)+',
+
+'+
+            'Click the link below to pay your booth fee of $'+(v.boothFee||0).toFixed(2)+':
+
+'+
+            url+'
+
+'+
+            'No account needed — just enter your card details and you're done.
+
+'+
+            'Thank you,
+Elevation Bend Farmers Market'
+          );
+        }
+      }
+    });
+  });
+
+  // Bulk email unpaid
+  document.getElementById('payBulkEmailBtn').addEventListener('click',function(){
+    var unpaidVendors=approved.filter(function(v){return!v.paymentReceived&&v.email;});
+    if(!unpaidVendors.length){alert('No unpaid vendors with email addresses.');return;}
+    sendEmail(
+      unpaidVendors.map(function(v){return v.email;}).join(','),
+      'Booth fee reminder — Elevation Bend Farmers Market',
+      'Hi,
+
+This is a friendly reminder that your booth fee for the Elevation Bend Farmers Market is outstanding.
+
+Please contact us to arrange payment.
+
+Thank you,
+Elevation Bend Farmers Market'
+    );
+  });
+
+  // Bulk generate Stripe links
+  document.getElementById('payBulkLinksBtn').addEventListener('click',async function(){
+    if(!STRIPE_PK){alert('Set STRIPE_PK in the script to generate payment links.');return;}
+    var btn=this;btn.disabled=true;btn.textContent='Generating…';
+    var unpaidWithFee=approved.filter(function(v){return!v.paymentReceived&&v.boothFee>0&&v.email;});
+    if(!unpaidWithFee.length){btn.disabled=false;btn.textContent='💳 Generate all payment links';alert('No unpaid vendors with a booth fee and email address.');return;}
+    var links=[];
+    for(var i=0;i<unpaidWithFee.length;i++){
+      var v=unpaidWithFee[i];
+      var url=await generatePaymentLink(v);
+      if(url)links.push(v.businessName+': '+url);
+    }
+    btn.disabled=false;btn.textContent='💳 Generate all payment links';
+    if(links.length){
+      var all=links.join('
+');
+      navigator.clipboard.writeText(all).catch(function(){});
+      alert('Generated '+links.length+' payment link'+(links.length!==1?'s':'')+' (copied to clipboard):
+
+'+all);
+    }
+  });
+
+  // Export CSV
+  document.getElementById('payExportBtn').addEventListener('click',function(){
+    var rows=[['Vendor','Email','Category','Booth Fee ($)','Payment Status','Contract']];
+    approved.forEach(function(v){
+      rows.push([v.businessName||'',v.email||'',v.category||'',(v.boothFee||0).toFixed(2),v.paymentReceived?'Paid':'Unpaid',v.contractReceived?'Received':'Pending']);
+    });
+    downloadCSV('eb-payments-'+today()+'.csv',rows);
+  });
+}
+
+function mkPayCard(label,val,color){
+  return'<div style="background:#fff;border:.5px solid #e5e3de;border-radius:10px;padding:.75rem 1rem">'+
+    '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">'+label+'</div>'+
+    '<div style="font-size:22px;font-weight:700;color:'+color+'">'+val+'</div>'+
+  '</div>';
+}
+
+// ── COMMS TAB ─────────────────────────────────────────────────────────────
+// Email vendors individually, by group, by date, or send the market layout.
+// Currently uses mailto: — swap sendEmail() body for Gmail API when ready.
+
+var commsView='compose'; // 'compose' | 'groups' | 'layout'
+
+function renderComms(){
+  var el=document.getElementById('main-content');
+  el.innerHTML=
+    '<div style="display:flex;gap:6px;margin-bottom:.85rem;flex-wrap:wrap">'+
+      '<button class="'+(commsView==='compose'?'btn-p':'btn-s')+'" id="cTabCompose">✉️ Compose</button>'+
+      '<button class="'+(commsView==='layout'?'btn-p':'btn-s')+'" id="cTabLayout">🗺 Send layout</button>'+
+      '<button class="'+(commsView==='groups'?'btn-p':'btn-s')+'" id="cTabGroups">👥 Manage groups</button>'+
+    '</div>'+
+    '<div id="commsContent"></div>';
+
+  document.getElementById('cTabCompose').addEventListener('click',function(){commsView='compose';renderComms();});
+  document.getElementById('cTabLayout').addEventListener('click',function(){commsView='layout';renderComms();});
+  document.getElementById('cTabGroups').addEventListener('click',function(){commsView='groups';renderComms();});
+
+  if(commsView==='compose')renderCommsCompose();
+  else if(commsView==='layout')renderCommsLayout();
+  else renderCommsGroups();
+}
+
+function renderCommsCompose(){
+  var el=document.getElementById('commsContent');
+  var dates=getMarketDates();
+  var allEmails=vendors.filter(function(v){return v.email;});
+
+  el.innerHTML=
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
+    '<div style="font-size:13px;font-weight:600;margin-bottom:1rem">Compose email</div>'+
+
+    // Recipient selector
+    '<div class="fg"><label>Send to</label>'+
+    '<select id="cRecipType" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit">'+
+      '<option value="all">All vendors with email ('+allEmails.length+')</option>'+
+      '<option value="approved">Approved vendors only</option>'+
+      '<option value="unpaid">Unpaid approved vendors</option>'+
+      '<option value="nocontract">Missing contract</option>'+
+      (dates.length?'<optgroup label="By market date">'+dates.map(function(ds){return'<option value="date:'+ds+'">Vendors for '+ds+'</option>';}).join('')+'</optgroup>':'')+
+      (vendorGroups.length?'<optgroup label="By group">'+vendorGroups.map(function(g){return'<option value="group:'+g.id+'">Group: '+esc(g.name)+'</option>';}).join('')+'</optgroup>':'')+
+      Object.keys(CAT_COLORS).map(function(cat){return'<option value="cat:'+cat+'">Category: '+cat.split(' / ')[0]+'</option>';}).join('')+
+    '</select></div>'+
+
+    '<div class="fg" id="cRecipPreview" style="font-size:11px;color:#888;padding:.4rem .6rem;background:#f8f7f4;border-radius:6px;margin-top:-8px"></div>'+
+
+    '<div class="fg"><label>Subject</label><input id="cSubject" value="Elevation Bend Farmers Market" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit"></div>'+
+    '<div class="fg"><label>Message</label><textarea id="cBody" style="width:100%;height:160px;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical" placeholder="Type your message here…"></textarea></div>'+
+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'+
+      '<button class="btn-s" id="cCopyEmails">📋 Copy addresses</button>'+
+      '<button class="btn-p" id="cSendBtn">📧 Open in mail app</button>'+
+    '</div></div>';
+
+  function getRecipients(){
+    var type=document.getElementById('cRecipType').value;
+    var list=vendors.filter(function(v){return v.email;});
+    if(type==='approved')list=list.filter(function(v){return v.status==='approved';});
+    else if(type==='unpaid')list=list.filter(function(v){return v.status==='approved'&&!v.paymentReceived;});
+    else if(type==='nocontract')list=list.filter(function(v){return v.status==='approved'&&!v.contractReceived;});
+    else if(type.startsWith('date:')){var ds=type.slice(5);var ids=getApproved(ds);list=list.filter(function(v){return ids.indexOf(v.id)>-1;});}
+    else if(type.startsWith('group:')){var gid=type.slice(6);var g=vendorGroups.find(function(x){return x.id===gid;});var mids=g?g.member_ids||[]:[];list=list.filter(function(v){return mids.indexOf(v.id)>-1;});}
+    else if(type.startsWith('cat:')){var cat=type.slice(4);list=list.filter(function(v){return v.category===cat;});}
+    return list;
+  }
+
+  function updatePreview(){
+    var r=getRecipients();
+    var prev=document.getElementById('cRecipPreview');
+    if(prev)prev.textContent=r.length+' recipient'+(r.length!==1?'s':'')+': '+r.slice(0,3).map(function(v){return v.businessName;}).join(', ')+(r.length>3?' + '+(r.length-3)+' more':'');
+  }
+
+  document.getElementById('cRecipType').addEventListener('change',updatePreview);
+  updatePreview();
+
+  document.getElementById('cCopyEmails').addEventListener('click',function(){
+    var r=getRecipients();
+    var emails=r.map(function(v){return v.email;}).join(', ');
+    navigator.clipboard.writeText(emails).then(function(){alert('Copied '+r.length+' email address'+(r.length!==1?'es':'')+' to clipboard.');}).catch(function(){alert(emails);});
+  });
+
+  document.getElementById('cSendBtn').addEventListener('click',function(){
+    var r=getRecipients();
+    if(!r.length){alert('No recipients with email addresses in this selection.');return;}
+    var emails=r.map(function(v){return v.email;}).join(',');
+    var subj=(document.getElementById('cSubject').value||'').trim();
+    var body=(document.getElementById('cBody').value||'').trim();
+    sendEmail(emails,subj,body);
+  });
+}
+
+function renderCommsLayout(){
+  var el=document.getElementById('commsContent');
+  var dates=getMarketDates();
+  el.innerHTML=
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
+    '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Send market layout to vendors</div>'+
+    '<div style="font-size:11px;color:#888;margin-bottom:1rem">Sends the layout image and spot assignments for a specific market date to all vendors scheduled for that day.</div>'+
+
+    (!dates.length?'<div class="empty">No market dates scheduled yet.</div>':
+      '<div class="fg"><label>Select market date</label>'+
+      '<select id="layoutEmailDate" style="width:100%;max-width:220px;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit">'+
+        dates.map(function(ds){return'<option value="'+ds+'">'+ds+'</option>';}).join('')+
+      '</select></div>'+
+      '<div class="fg"><label>Additional message (optional)</label>'+
+      '<textarea id="layoutEmailMsg" style="width:100%;height:80px;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical" placeholder="e.g. Please arrive by 7am for setup. Your spot number is in the layout below."></textarea></div>'+
+      '<div id="layoutEmailPreview" style="margin:.75rem 0;padding:.75rem;background:#f8f7f4;border-radius:8px;border:.5px solid #e5e3de;font-size:11px;color:#888"></div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn-blue" id="previewLayoutEmail">👁 Preview email</button>'+
+        '<button class="btn-p" id="sendLayoutEmail">📧 Send to all vendors for this date</button>'+
+      '</div>')+
+    '</div>';
+
+  if(!dates.length)return;
+
+  function getLayoutRecips(ds){
+    var ids=getApproved(ds);
+    return vendors.filter(function(v){return ids.indexOf(v.id)>-1&&v.email;});
+  }
+
+  function buildLayoutEmailBody(ds){
+    var ta=getTentAssignments(ds);
+    // Find spot number for each vendor from layout cache
+    var lspots=window._layoutCache&&window._layoutCache[ds]?window._layoutCache[ds]:[];
+    var spotByVid={};
+    lspots.forEach(function(sp){var vid=ta[sp.id];if(vid)spotByVid[vid]='Spot '+sp.num+(sp.size?' ('+sp.size+')':'');});
+    var recips=getLayoutRecips(ds);
+    var lines=['Market Layout — '+ds,'','Your spot assignment:'];
+    recips.forEach(function(v){lines.push('  '+esc(v.businessName||v.contactName)+': '+(spotByVid[v.id]||'TBD'));});
+    lines.push('','Please arrive by your scheduled setup time. Contact us with any questions.');
+    var msg=(document.getElementById('layoutEmailMsg')||{}).value||'';
+    if(msg.trim())lines.splice(1,0,'',msg.trim());
+    return lines.join('\n');
+  }
+
+  var dateEl=document.getElementById('layoutEmailDate');
+  if(dateEl){
+    dateEl.addEventListener('change',function(){
+      var ds=this.value;
+      var r=getLayoutRecips(ds);
+      var prev=document.getElementById('layoutEmailPreview');
+      if(prev)prev.textContent=r.length+' vendor'+(r.length!==1?'s':'')+' with email for '+ds+': '+r.slice(0,4).map(function(v){return v.businessName;}).join(', ')+(r.length>4?' + '+(r.length-4)+' more':'');
+    });
+    dateEl.dispatchEvent(new Event('change'));
+  }
+
+  document.getElementById('previewLayoutEmail').addEventListener('click',function(){
+    var ds=(document.getElementById('layoutEmailDate')||{}).value;
+    if(!ds)return;
+    alert('Subject: Market Layout for '+ds+'\n\n'+buildLayoutEmailBody(ds));
+  });
+
+  document.getElementById('sendLayoutEmail').addEventListener('click',async function(){
+    var ds=(document.getElementById('layoutEmailDate')||{}).value;if(!ds)return;
+    var recips=getLayoutRecips(ds);
+    if(!recips.length){alert('No vendors with email addresses for '+ds+'.');return;}
+    // Load layout cache if needed
+    await ensureLayoutCache(ds);
+    var emails=recips.map(function(v){return v.email;}).join(',');
+    sendEmail(emails,'Market Layout for '+ds,buildLayoutEmailBody(ds));
+  });
+}
+
+function renderCommsGroups(){
+  var el=document.getElementById('commsContent');
+  el.innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'+
+      '<div style="font-size:12px;font-weight:600">Vendor groups</div>'+
+      '<button class="btn-p" id="newGroupBtn">+ New group</button>'+
+    '</div>'+
+    (!vendorGroups.length?'<div class="empty">No groups yet. Create a group to email a custom set of vendors together.</div>':
+      vendorGroups.map(function(g){
+        var members=vendors.filter(function(v){return(g.member_ids||[]).indexOf(v.id)>-1;});
+        var withEmail=members.filter(function(v){return v.email;});
+        return'<div style="background:#fff;border:.5px solid #e5e3de;border-radius:10px;padding:.85rem 1rem;margin-bottom:8px">'+
+          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
+            '<div>'+
+              '<div style="font-size:13px;font-weight:600">'+esc(g.name)+'</div>'+
+              '<div style="font-size:11px;color:#888;margin-top:3px">'+members.length+' member'+(members.length!==1?'s':'')+' · '+withEmail.length+' with email</div>'+
+              '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'+
+                members.slice(0,5).map(function(v){return catBadge(v.category)+'<span style="font-size:10px;margin-left:2px;margin-right:6px">'+esc(v.businessName)+'</span>';}).join('')+
+                (members.length>5?'<span style="font-size:10px;color:#aaa">+'+( members.length-5)+' more</span>':'')+
+              '</div>'+
+            '</div>'+
+            '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+              '<button class="btn-blue" data-email-group="'+g.id+'" style="font-size:11px">📧 Email group</button>'+
+              '<button class="btn-s" data-edit-group="'+g.id+'" style="font-size:11px">✏️ Edit</button>'+
+              '<button class="btn-danger" data-del-group="'+g.id+'" style="font-size:11px">🗑</button>'+
+            '</div>'+
+          '</div></div>';
+      }).join(''))+
+    '</div>';
+
+  document.getElementById('newGroupBtn').addEventListener('click',function(){openGroupModal(null);});
+  el.querySelectorAll('[data-edit-group]').forEach(function(b){b.addEventListener('click',function(){openGroupModal(b.dataset.editGroup);});});
+  el.querySelectorAll('[data-del-group]').forEach(function(b){b.addEventListener('click',async function(){
+    if(!confirm('Delete this group?'))return;
+    await sb.from('vendor_groups').delete().eq('id',b.dataset.delGroup);
+    vendorGroups=vendorGroups.filter(function(g){return g.id!==b.dataset.delGroup;});
+    renderComms();
+  });});
+  el.querySelectorAll('[data-email-group]').forEach(function(b){b.addEventListener('click',function(){
+    var g=vendorGroups.find(function(x){return x.id===b.dataset.emailGroup;});if(!g)return;
+    var members=vendors.filter(function(v){return(g.member_ids||[]).indexOf(v.id)>-1&&v.email;});
+    if(!members.length){alert('No members with email addresses in this group.');return;}
+    sendEmail(members.map(function(v){return v.email;}).join(','),'Message from Elevation Bend Farmers Market','');
+  });});
+}
+
+function openGroupModal(groupId){
+  var g=groupId?vendorGroups.find(function(x){return x.id===groupId;}):null;
+  var memberIds=g?g.member_ids||[]:[];
+  document.getElementById('modal-area').innerHTML=
+    '<div class="overlay" id="groupModalOverlay"><div class="modal md">'+
+    '<div class="mtitle">'+(g?'Edit group: '+esc(g.name):'New vendor group')+'</div>'+
+    '<div class="fg"><label>Group name</label><input id="gName" value="'+esc(g?g.name:'')+'" placeholder="e.g. Food vendors, Regular vendors…" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit"></div>'+
+    '<div class="fg"><label>Members <span style="font-weight:400;color:#aaa">— select vendors to include</span></label>'+
+      '<input id="gSearch" placeholder="🔍 Search vendors…" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;margin-bottom:.5rem">'+
+      '<div style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:4px" id="gMemberList">'+
+        vendors.map(function(v){
+          var av=avc(v.businessName||'?');
+          return'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:.5px solid #e5e3de;border-radius:8px;cursor:pointer;background:#fff" class="g-member-opt" data-name="'+esc((v.businessName||'').toLowerCase())+'" data-cat="'+esc((v.category||'').toLowerCase())+'">'+
+            '<input type="checkbox" value="'+v.id+'" class="g-member-cb"'+(memberIds.indexOf(v.id)>-1?' checked':'')+' style="width:15px;height:15px;accent-color:#22c55e;flex-shrink:0">'+
+            '<div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+            '<div><div style="font-size:12px;font-weight:600">'+esc(v.businessName||'Unnamed')+'</div>'+
+            '<div style="font-size:10px;color:#888">'+esc(v.category||'—')+'</div></div>'+
+          '</label>';
+        }).join('')+
+      '</div>'+
+    '</div>'+
+    '<div class="mfoot" id="groupModalFoot"></div>'+
+    '</div></div>';
+
+  document.getElementById('groupModalOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
+  document.getElementById('gSearch').addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    document.querySelectorAll('.g-member-opt').forEach(function(row){
+      row.style.display=(row.dataset.name.indexOf(q)>-1||row.dataset.cat.indexOf(q)>-1)?'':'none';
+    });
+  });
+
+  var foot=document.getElementById('groupModalFoot');
+  var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='Cancel';canBtn.addEventListener('click',closeMod);
+  var savBtn=document.createElement('button');savBtn.className='btn-p';savBtn.textContent='Save group';
+  savBtn.addEventListener('click',async function(){
+    var name=(document.getElementById('gName').value||'').trim();
+    if(!name){alert('Please enter a group name.');return;}
+    var ids=Array.from(document.querySelectorAll('.g-member-cb:checked')).map(function(c){return c.value;});
+    var row={name:name,member_ids:ids};
+    if(g){
+      await sb.from('vendor_groups').update(row).eq('id',g.id);
+      var idx=vendorGroups.findIndex(function(x){return x.id===g.id;});
+      if(idx>-1)vendorGroups[idx]=Object.assign({},g,row);
+    } else {
+      row.id=uid();
+      await sb.from('vendor_groups').upsert(row);
+      vendorGroups.push(row);
+    }
+    closeMod();renderComms();
+  });
+  foot.appendChild(canBtn);foot.appendChild(savBtn);
+}
+
+// ── sendEmail — swap this body for Gmail API when ready ───────────────────
+// TO SWITCH TO GMAIL API: replace the window.open line with a fetch() call
+// to your Gmail API endpoint with the same to/subject/body parameters.
+function sendEmail(to,subject,body){
+  // mailto: version — opens the user's default mail app
+  var url='mailto:'+encodeURIComponent(to)+
+    '?subject='+encodeURIComponent(subject)+
+    '&body='+encodeURIComponent(body);
+  window.open(url,'_blank');
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────
