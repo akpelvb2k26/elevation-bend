@@ -97,10 +97,10 @@ nav{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-bottom:.85re
 .badge-unsaved{background:#FAEEDA;color:#633806;border:.5px solid #BA7517}
 .badge-empty{background:#f0ede6;color:#888;border:.5px solid #d0cec7}
 .layout-toolbar{display:flex;align-items:center;gap:6px;padding:.6rem .85rem;background:#fff;border:.5px solid #e5e3de;border-radius:10px;margin-bottom:.75rem;flex-wrap:wrap}
-.canvas-outer{overflow:auto;background:#f0ede6;border:.5px solid #e5e3de;border-radius:10px}
-#layoutCanvas{position:relative;width:1200px;height:700px}
+.canvas-outer{overflow:auto;background:#f0ede6;border:.5px solid #e5e3de;border-radius:10px;cursor:default}
+#layoutCanvas{position:relative;width:1400px;height:900px}
 .grid-dot{position:absolute;width:2px;height:2px;border-radius:50%;background:#d0cec7;pointer-events:none}
-.lspot{position:absolute;border:1.5px solid #d0cec7;border-radius:8px;background:#fff;cursor:grab;user-select:none;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:5px 4px}
+.lspot{position:absolute;border:1.5px solid #d0cec7;border-radius:8px;background:#fff;cursor:grab;user-select:none;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:5px 4px;touch-action:none}
 .lspot:hover{border-color:#378ADD;z-index:10}
 .lspot.dragging{cursor:grabbing;z-index:100;opacity:.88;border-color:#378ADD;box-shadow:0 4px 16px rgba(0,0,0,.12)}
 .lspot.lsel{border-color:#639922;box-shadow:0 0 0 2.5px #c0dd97;z-index:20}
@@ -222,7 +222,7 @@ nav{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-bottom:.85re
   <nav>
     <button class="nb active" data-tab="vendors">Vendors</button>
     <button class="nb" data-tab="calendar">Calendar</button>
-    <button class="nb" data-tab="tents">Tents</button>
+    <button class="nb" data-tab="tents">Assignments</button>
     <button class="nb" data-tab="layout">Layout</button>
     <button class="nb" data-tab="reports">Reports</button>
     <button class="nb" data-tab="waitlist">Waitlist</button>
@@ -243,7 +243,7 @@ const sb=createClient(SUPA_URL,SUPA_KEY);
 var vendors=[],tents=[],calRows={},currentUser=null;
 var tab='vendors',cY=new Date().getFullYear(),cM=new Date().getMonth();
 var eId=null,vsFilter='all',reportDate='',reportType='summary',selectedCalDay='',tentViewDate='';
-var layoutDate='',layoutSpots=[],layoutUnsaved=false,layoutSelectedIds=new Set(),layoutSnapOn=true;
+var layoutDate='',layoutSpots=[],layoutUnsaved=false,layoutSelectedIds=new Set(),layoutSnapOn=true,layoutSelectMode=false;
 var formTab=0,formTotalTabs=6,formCompletedTabs=new Set();
 window._ep=[];
 
@@ -340,8 +340,22 @@ async function checkSession(){var{data}=await sb.auth.getSession();if(data.sessi
 function enterApp(){document.getElementById('auth-screen').style.display='none';document.getElementById('app-screen').style.display='block';document.getElementById('user-email').textContent=currentUser.email;loadData();}
 
 // ── DATA ──────────────────────────────────────────────────────────────────
+async function ensureSchema(){
+  // Add optional columns if they don't exist — safe to run multiple times
+  var sqls=[
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS contract_received BOOLEAN DEFAULT false",
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS payment_received BOOLEAN DEFAULT false",
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''",
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS selected_dates TEXT[] DEFAULT '{}'",
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS modified_at TIMESTAMPTZ DEFAULT NOW()"
+  ];
+  for(var i=0;i<sqls.length;i++){
+    try{await sb.rpc('exec_sql',{sql:sqls[i]});}catch(e){/* rpc may not exist, ignore */}
+  }
+}
 async function loadData(){
   document.getElementById('main-content').innerHTML='<div style="text-align:center;padding:2rem;color:#888">Loading…</div>';
+  await ensureSchema();
   try{
     var{data:vd,error:ve}=await sb.from('vendors').select('*').order('created_at',{ascending:false});
     if(ve)throw ve;vendors=(vd||[]).map(dbToV);
@@ -355,10 +369,20 @@ async function loadData(){
 }
 function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
 async function saveVendorDB(data,id){
-  var row={id:id||uid(),vendor_status:data.vendorStatus||'active',status:data.status||'pending',business_name:data.businessName||'',contact_name:data.contactName||'',email:data.email||'',phone:data.phone||'',website:data.website||'',social:data.social||'',category:data.category||'',category_comment:data.categoryComment||'',products:data.products||'',product_desc:data.productDesc||'',local_produced:data.local||'',local_comment:data.localComment||'',price_range:data.priceRange||[],licenses:data.licenses||'',licenses_comment:data.licensesComment||'',food_docs:data.foodDocs||[],liability:data.liability||'',booth_size:data.boothSize||'',own_setup:data.ownSetup||'',setup_comment:data.ownSetupComment||'',electricity:data.electricity||'',attendance:data.attendance||'',months:data.months||'',why_join:data.whyJoin||'',values:data.values||'',additional_info:data.additionalInfo||'',notes:data.notes||'',photos:[],selected_dates:data.selectedDates||[],contract_received:!!data.contractReceived,payment_received:!!data.paymentReceived,modified_at:nowISO()};
-  if(!id)row.created_at=nowISO();
+  var isNew=!id;
+  // Core row — only guaranteed base columns
+  var row={id:id||uid(),vendor_status:data.vendorStatus||'active',status:data.status||'pending',business_name:data.businessName||'',contact_name:data.contactName||'',email:data.email||'',phone:data.phone||'',website:data.website||'',social:data.social||'',category:data.category||'',category_comment:data.categoryComment||'',products:data.products||'',product_desc:data.productDesc||'',local_produced:data.local||'',local_comment:data.localComment||'',price_range:data.priceRange||[],licenses:data.licenses||'',licenses_comment:data.licensesComment||'',food_docs:data.foodDocs||[],liability:data.liability||'',booth_size:data.boothSize||'',own_setup:data.ownSetup||'',setup_comment:data.ownSetupComment||'',electricity:data.electricity||'',attendance:data.attendance||'',months:data.months||'',why_join:data.whyJoin||'',values:data.values||'',additional_info:data.additionalInfo||'',photos:[],selected_dates:data.selectedDates||[],modified_at:nowISO()};
+  if(isNew)row.created_at=nowISO();
   var{error}=await sb.from('vendors').upsert(row);
   if(error){alert('Error saving vendor: '+error.message);return null;}
+  // Optional columns (contract_received, payment_received, notes) — added via ALTER TABLE
+  // If missing from schema they fail silently — run SQL below to add them
+  var optRow={modified_at:nowISO()};
+  optRow.contract_received=!!data.contractReceived;
+  optRow.payment_received=!!data.paymentReceived;
+  optRow.notes=data.notes||'';
+  var{error:e2}=await sb.from('vendors').update(optRow).eq('id',row.id);
+  if(e2)console.warn('Some columns missing — run in Supabase SQL editor:\nALTER TABLE vendors ADD COLUMN IF NOT EXISTS contract_received BOOLEAN DEFAULT false;\nALTER TABLE vendors ADD COLUMN IF NOT EXISTS payment_received BOOLEAN DEFAULT false;\nALTER TABLE vendors ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT \\'\\';');
   return row.id;
 }
 async function saveCalRow(ds){
@@ -495,105 +519,288 @@ function openDayManage(ds){
 }
 
 // ── TENTS ─────────────────────────────────────────────────────────────────
+// ── ASSIGNMENTS TAB ───────────────────────────────────────────────────────
+// Spots come from the Layout tab for the selected date.
+// Tents (vendor canopies) get assigned to those spots here.
+// Auto-assign uses real XY proximity from the layout for adjacency checks.
+
+function getSpotsForDate(ds){
+  // Primary source: layout spots saved for this date (from window.storage)
+  // These are the physical spots on the canvas.
+  // Returns an array of {id, num, size, x, y, w, h} objects.
+  return window._layoutCache&&window._layoutCache[ds]?window._layoutCache[ds]:[];
+}
+
+// Load layout spots for date into cache so Assignments tab can use them
+async function ensureLayoutCache(ds){
+  if(!ds)return[];
+  if(window._layoutCache&&window._layoutCache[ds])return window._layoutCache[ds];
+  try{
+    var r=await window.storage.get(lKey(ds));
+    if(r&&r.value){
+      var spots=JSON.parse(r.value);
+      window._layoutCache=window._layoutCache||{};
+      window._layoutCache[ds]=spots;
+      return spots;
+    }
+  }catch(e){}
+  // Fallback: use tents array (old behaviour)
+  window._layoutCache=window._layoutCache||{};
+  window._layoutCache[ds]=tents.map(function(t){return{id:t.id,num:t.num,size:t.size,x:0,y:0,w:80,h:80};});
+  return window._layoutCache[ds];
+}
+
+function clearLayoutCache(ds){if(window._layoutCache&&ds)delete window._layoutCache[ds];}
+
 function renderTents(){
   var el=document.getElementById('main-content');
   var dates=getMarketDates();
   if(!tentViewDate||dates.indexOf(tentViewDate)===-1)tentViewDate=dates.length?dates[0]:'';
-  el.innerHTML='<div class="tent-topbar"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:11px;font-weight:600;color:#555">Market date:</span>'+
-    (dates.length?'<select id="tentDateSel" style="font-size:12px;padding:5px 8px;border-radius:8px;border:.5px solid #d0cec7;background:#fff;font-family:inherit;min-width:140px">'+dates.map(function(ds){return'<option value="'+ds+'"'+(ds===tentViewDate?' selected':'')+'>'+ds+'</option>';}).join('')+'</select>':'<span style="font-size:12px;color:#aaa;font-style:italic">No market dates yet</span>')+
-    '</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-blue" id="autoAssignBtn">⚡ Auto-assign</button><button class="btn-g" id="addSpotBtn">+ Add spot</button><button class="btn-s" id="clearTentDateBtn">Clear date</button></div></div>'+
-    (dates.length&&tentViewDate?buildTentContent():'<div class="empty">No market dates yet. Go to Calendar and schedule vendors first.</div>');
-  var sel=document.getElementById('tentDateSel');if(sel)sel.addEventListener('change',function(){tentViewDate=this.value;renderTents();});
+  el.innerHTML='<div class="tent-topbar"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+    '<span style="font-size:11px;font-weight:600;color:#555">Market date:</span>'+
+    (dates.length
+      ?'<select id="tentDateSel" style="font-size:12px;padding:5px 8px;border-radius:8px;border:.5px solid #d0cec7;background:#fff;font-family:inherit;min-width:140px">'+
+        dates.map(function(ds){return'<option value="'+ds+'"'+(ds===tentViewDate?' selected':'')+'>'+ds+'</option>';}).join('')+
+       '</select>'
+      :'<span style="font-size:12px;color:#aaa;font-style:italic">No market dates yet</span>')+
+    '</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button class="btn-blue" id="autoAssignBtn">⚡ Auto-assign</button>'+
+      '<button class="btn-s" id="clearTentDateBtn">Clear assignments</button>'+
+    '</div></div>'+
+    '<div class="notice" style="margin-bottom:.75rem">'+
+      'Spots are defined in the <strong>Layout</strong> tab. Assign vendors to spots here, or use <strong>⚡ Auto-assign</strong> to fill them automatically — adjacent spots will never share the same vendor category.'+
+    '</div>'+
+    (dates.length&&tentViewDate?'<div id="assignContent">Loading spots…</div>':'<div class="empty">No market dates yet. Go to Calendar and schedule vendors, then define spots in the Layout tab.</div>');
+
+  var sel=document.getElementById('tentDateSel');
+  if(sel)sel.addEventListener('change',function(){tentViewDate=this.value;renderTents();});
   document.getElementById('autoAssignBtn').addEventListener('click',autoAssign);
-  document.getElementById('addSpotBtn').addEventListener('click',openAddTentModal);
-  document.getElementById('clearTentDateBtn').addEventListener('click',async function(){if(!tentViewDate||!confirm('Clear all tent assignments for '+tentViewDate+'?'))return;if(calRows[tentViewDate])calRows[tentViewDate].tent_assignments={};await saveCalRow(tentViewDate);renderTents();});
-  if(!dates.length||!tentViewDate)return;
-  var grid=document.getElementById('tentGridContainer');
-  if(grid){grid.addEventListener('click',function(e){
-    var d=e.target.closest('[data-tent-del]');if(d){e.stopPropagation();removeSpotFromDate(d.getAttribute('data-tent-del'));return;}
-    var a=e.target.closest('[data-tent-assign]');if(a){e.stopPropagation();openTentModal(a.getAttribute('data-tent-assign'),tentViewDate);}
-  });}
-  var st=document.getElementById('tentSumTable');if(st){st.addEventListener('click',function(e){var d=e.target.closest('[data-tent-del]');if(d){e.stopPropagation();removeSpotFromDate(d.getAttribute('data-tent-del'));}});}
+  document.getElementById('clearTentDateBtn').addEventListener('click',async function(){
+    if(!tentViewDate||!confirm('Clear all vendor assignments for '+tentViewDate+'?'))return;
+    if(calRows[tentViewDate])calRows[tentViewDate].tent_assignments={};
+    await saveCalRow(tentViewDate);renderTents();
+  });
+
+  if(dates.length&&tentViewDate){
+    ensureLayoutCache(tentViewDate).then(function(spots){
+      var ac=document.getElementById('assignContent');
+      if(!ac)return;
+      if(!spots.length){
+        ac.innerHTML='<div class="empty">No spots defined for this date yet.<br>Go to the <strong>Layout</strong> tab, select this date, and arrange your spots. Then come back here to assign vendors.</div>';
+        return;
+      }
+      ac.innerHTML=buildAssignContent(spots);
+      // Event delegation
+      var grid=document.getElementById('assignGridContainer');
+      if(grid){
+        grid.addEventListener('click',function(e){
+          var a=e.target.closest('[data-assign-spot]');
+          if(a){e.stopPropagation();openAssignModal(a.getAttribute('data-assign-spot'),tentViewDate,spots);}
+          var u=e.target.closest('[data-unassign-spot]');
+          if(u){e.stopPropagation();unassignSpot(u.getAttribute('data-unassign-spot'),tentViewDate);}
+        });
+      }
+      var st=document.getElementById('assignSumTable');
+      if(st){
+        st.addEventListener('click',function(e){
+          var a=e.target.closest('[data-assign-spot]');
+          if(a){e.stopPropagation();openAssignModal(a.getAttribute('data-assign-spot'),tentViewDate,spots);}
+        });
+      }
+    });
+  }
 }
-// KEY: removes spot from this date's layout only, not globally
-async function removeSpotFromDate(id){
-  if(!confirm('Remove Spot from the '+tentViewDate+' layout?\n\nThis only affects this date — other dates are unaffected.'))return;
-  tents=tents.filter(function(t){return t.id!==id;});
-  if(calRows[tentViewDate]&&calRows[tentViewDate].tent_assignments)delete calRows[tentViewDate].tent_assignments[id];
-  await sb.from('tents').delete().eq('id',id);
-  await saveCalRow(tentViewDate);
-  renderTents();
-}
-function buildTentContent(){
+
+function buildAssignContent(spots){
   var ta=getTentAssignments(tentViewDate);
-  var occ=Object.keys(ta).filter(function(k){return ta[k];}).length;
-  var grid=tents.map(function(t){var vid=ta[t.id]||null;var v=vid?vendors.find(function(x){return x.id===vid;}):null;
+  var occ=spots.filter(function(s){return ta[s.id];}).length;
+  var catLegend='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.75rem;padding:.5rem .75rem;background:#fff;border:.5px solid #e5e3de;border-radius:8px;font-size:10px">'+
+    Object.entries(CAT_COLORS).map(function(e){return'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;background:'+e[1].bg+';color:'+e[1].text+';border:.5px solid '+e[1].border+'"><span style="width:7px;height:7px;border-radius:50%;background:'+e[1].dot+';display:inline-block;flex-shrink:0"></span>'+esc(e[0].split(' / ')[0])+'</span>';}).join('')+'</div>';
+
+  // Sort spots by number for display
+  var sorted=spots.slice().sort(function(a,b){return a.num-b.num;});
+  var grid=sorted.map(function(s){
+    var vid=ta[s.id]||null;var v=vid?vendors.find(function(x){return x.id===vid;}):null;
     var cc=v?catColor(v.category):null;
     var tcStyle=v?'background:'+cc.bg+';border-color:'+cc.border+';border-width:1.5px':'';
-    return'<div class="tcell" style="'+tcStyle+'"><button data-tent-del="'+t.id+'" title="Remove from this date only" style="position:absolute;top:-7px;right:-7px;width:18px;height:18px;border-radius:50%;background:#791F1F;border:1.5px solid #fff;color:#fff;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:30;font-family:inherit">×</button><div class="tnum">Spot '+t.num+' · '+esc(t.size)+'</div>'+(v?'<div class="tvname" style="color:'+cc.text+'">'+esc(v.businessName)+'</div>'+catBadge(v.category)+'<div style="margin-top:4px">'+vsTag(v.vendorStatus||'active')+'</div>'+(v.vendorStatus==='inactive'?'<div style="font-size:9px;color:#791F1F;margin-top:3px;font-weight:600">⚠️ Now inactive</div>':'')+'<button class="tassign" data-tent-assign="'+t.id+'">✏️ Change</button>':'<div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center">Available</div><button class="tassign" data-tent-assign="'+t.id+'">+ Assign vendor</button>')+'</div>';
+    return'<div class="tcell" style="'+tcStyle+'">'+
+      '<div class="tnum">Spot '+s.num+(s.size?' · '+esc(s.size):'')+'</div>'+
+      (v
+        ?'<div class="tvname" style="color:'+cc.text+'">'+esc(v.businessName)+'</div>'+
+          catBadge(v.category)+
+          '<div style="margin-top:4px">'+vsTag(v.vendorStatus||'active')+'</div>'+
+          (v.vendorStatus==='inactive'?'<div style="font-size:9px;color:#791F1F;margin-top:3px;font-weight:600">⚠️ Now inactive</div>':'')+
+          '<button class="tassign" data-assign-spot="'+s.id+'">✏️ Change</button>'+
+          '<button class="tassign" data-unassign-spot="'+s.id+'" style="margin-top:3px;color:#791F1F;border-color:#f09595">✕ Unassign</button>'
+        :'<div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center">Available</div>'+
+          '<button class="tassign" data-assign-spot="'+s.id+'">+ Assign vendor</button>')+
+    '</div>';
   }).join('');
-  var tableRows=tents.map(function(t){var vid=ta[t.id]||null;var v=vid?vendors.find(function(x){return x.id===vid;}):null;
-    return'<tr><td style="color:#888;font-size:11px">'+t.num+'</td><td>'+esc(t.size)+'</td><td style="font-weight:'+(v?'600':'400')+';color:'+(v?'#1a1a1a':'#ccc')+'">'+( v?esc(v.businessName):'—')+'</td><td style="color:#888">'+(v?esc(v.category||'—'):'—')+'</td><td>'+(v?vsTag(v.vendorStatus||'active'):'—')+'</td><td><button class="btn-danger" style="padding:3px 8px;font-size:11px" data-tent-del="'+t.id+'">Remove</button></td></tr>';
+
+  var tableRows=sorted.map(function(s){
+    var vid=ta[s.id]||null;var v=vid?vendors.find(function(x){return x.id===vid;}):null;
+    return'<tr>'+
+      '<td style="color:#888;font-size:11px">'+s.num+'</td>'+
+      '<td>'+esc(s.size||'—')+'</td>'+
+      '<td style="font-weight:'+(v?'600':'400')+';color:'+(v?'#1a1a1a':'#ccc')+'">'+( v?esc(v.businessName):'—')+'</td>'+
+      '<td>'+(v?catBadge(v.category):'—')+'</td>'+
+      '<td>'+(v?vsTag(v.vendorStatus||'active'):'—')+'</td>'+
+      '<td><button class="btn-blue" style="padding:3px 8px;font-size:11px" data-assign-spot="'+s.id+'">Assign</button></td>'+
+    '</tr>';
   }).join('');
-  return'<style>#tentGridContainer .tcell:hover>[data-tent-del]{display:flex!important}</style>'+
-    '<div style="font-size:11px;color:#888;margin-bottom:.5rem"><strong style="color:#1a1a1a">'+occ+'/'+tents.length+'</strong> spots assigned for '+tentViewDate+' · <span style="color:#791F1F;font-size:10px">Remove only affects this date</span></div>'+
-    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.75rem;padding:.5rem .75rem;background:#fff;border:.5px solid #e5e3de;border-radius:8px;font-size:10px">'+
-      Object.entries(CAT_COLORS).map(function(e){return'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;background:'+e[1].bg+';color:'+e[1].text+';border:.5px solid '+e[1].border+'"><span style="width:7px;height:7px;border-radius:50%;background:'+e[1].dot+';display:inline-block;flex-shrink:0"></span>'+esc(e[0].split(' / ')[0])+'</span>';}).join('')+
-    '</div>'+
-    '<div id="tentGridContainer" class="tent-grid">'+grid+'</div>'+
-    '<div style="margin-top:1rem;background:#fff;border:.5px solid #e5e3de;border-radius:12px;overflow:hidden"><div style="padding:.6rem .85rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;background:#f8f7f4;border-bottom:.5px solid #e5e3de">Allocation Summary — '+tentViewDate+'</div><div style="overflow-x:auto"><table id="tentSumTable" class="report-table"><thead><tr><th>#</th><th>Size</th><th>Vendor</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div></div>';
+
+  return'<div style="font-size:11px;color:#888;margin-bottom:.5rem">'+
+      '<strong style="color:#1a1a1a">'+occ+'/'+spots.length+'</strong> spots assigned for '+tentViewDate+
+    '</div>'+catLegend+
+    '<div id="assignGridContainer" class="tent-grid">'+grid+'</div>'+
+    '<div style="margin-top:1rem;background:#fff;border:.5px solid #e5e3de;border-radius:12px;overflow:hidden">'+
+      '<div style="padding:.6rem .85rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;background:#f8f7f4;border-bottom:.5px solid #e5e3de">'+
+        'Assignment Summary — '+tentViewDate+'</div>'+
+      '<div style="overflow-x:auto"><table id="assignSumTable" class="report-table">'+
+        '<thead><tr><th>Spot #</th><th>Size</th><th>Vendor</th><th>Category</th><th>Status</th><th>Action</th></tr></thead>'+
+        '<tbody>'+tableRows+'</tbody>'+
+      '</table></div>'+
+    '</div>';
 }
-function openAddTentModal(){
-  var nextNum=tents.length?Math.max.apply(null,tents.map(function(t){return t.num;}))+1:1;
-  document.getElementById('modal-area').innerHTML='<div class="overlay" id="addTentOverlay"><div class="modal sm"><div class="mtitle">Add new spot</div><div class="fg"><label>Spot number</label><input type="number" id="new-num" value="'+nextNum+'" min="1" style="max-width:100px"></div><div class="fg"><label>Size</label><div class="size-grid" id="sizeOpts">'+[['10x10',"10'×10'",'Standard'],['20x20',"20'×20'",'Double'],['10x20',"10'×20'",'Tall'],['truck','Food truck','Vehicle']].map(function(s,i){return'<div class="sopt'+(i===0?' sel':'')+'" data-size="'+s[0]+'"><div class="sopt-name">'+s[1]+'</div><div class="sopt-dim">'+s[2]+'</div></div>';}).join('')+'</div></div><div class="mfoot" id="addTentFoot"></div></div></div>';
-  document.getElementById('addTentOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
-  document.querySelectorAll('#sizeOpts .sopt').forEach(function(opt){opt.addEventListener('click',function(){document.querySelectorAll('#sizeOpts .sopt').forEach(function(o){o.classList.remove('sel');});opt.classList.add('sel');});});
-  var foot=document.getElementById('addTentFoot');
-  var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='Cancel';canBtn.addEventListener('click',closeMod);
-  var addBtn=document.createElement('button');addBtn.className='btn-p';addBtn.textContent='Add spot';
-  addBtn.addEventListener('click',async function(){
-    var num=parseInt(document.getElementById('new-num').value)||1;
-    var selOpt=document.querySelector('#sizeOpts .sopt.sel');var size=selOpt?selOpt.dataset.size:'10x10';
-    var sizeMap={"10x10":"10'x10'","20x20":"20'x20'","10x20":"10'x20'","truck":"Food truck"};
-    var sizeLabel=sizeMap[size]||size;
-    if(tents.find(function(t){return t.num===num;})){alert('Spot '+num+' already exists.');return;}
-    var newTent={id:'t'+uid(),num:num,size:sizeLabel};
-    await sb.from('tents').upsert(newTent);tents.push(newTent);tents.sort(function(a,b){return a.num-b.num;});
-    closeMod();renderTents();
-  });
-  foot.appendChild(canBtn);foot.appendChild(addBtn);
+
+async function unassignSpot(spotId,ds){
+  if(!calRows[ds])return;
+  delete calRows[ds].tent_assignments[spotId];
+  await saveCalRow(ds);
+  refreshLayoutColors(ds);
+  renderTents();
 }
-function openTentModal(tentId,ds){
-  var t=tents.find(function(x){return x.id===tentId;});if(!t)return;
-  var ta=getTentAssignments(ds);var currentVid=ta[tentId]||'';
+
+function openAssignModal(spotId,ds,spots){
+  var spot=spots.find(function(s){return s.id===spotId;});if(!spot)return;
+  var ta=getTentAssignments(ds);var currentVid=ta[spotId]||'';
   var avail=getApproved(ds).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
   if(!avail.length)avail=eligibleVendors();
-  document.getElementById('modal-area').innerHTML='<div class="overlay" id="tentModalOverlay"><div class="modal sm"><div class="mtitle">Spot '+t.num+' — '+ds+'</div><div class="fg"><label>Assign vendor</label><select id="tv" style="width:100%"><option value="">— unassigned —</option>'+avail.map(function(v){return'<option value="'+v.id+'"'+(currentVid===v.id?' selected':'')+'>'+esc(v.businessName||'Unnamed')+' ('+esc(v.category||'—')+')</option>';}).join('')+'</select></div><div class="mfoot" id="tmFoot"></div></div></div>';
-  document.getElementById('tentModalOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
-  var foot=document.getElementById('tmFoot');
-  var unBtn=document.createElement('button');unBtn.className='btn-s';unBtn.textContent='Unassign';unBtn.addEventListener('click',async function(){if(!calRows[ds])calRows[ds]={approved:getApproved(ds),waitlist:getWaitlist(ds),tent_assignments:{}};delete calRows[ds].tent_assignments[tentId];await saveCalRow(ds);closeMod();renderTents();});
+  document.getElementById('modal-area').innerHTML=
+    '<div class="overlay" id="assignModalOverlay"><div class="modal sm">'+
+    '<div class="mtitle">Spot '+spot.num+(spot.size?' · '+esc(spot.size):'')+'</div>'+
+    '<div class="fg"><label>Assign vendor</label>'+
+      '<select id="av" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit">'+
+        '<option value="">— unassigned —</option>'+
+        avail.map(function(v){var cc=catColor(v.category);return'<option value="'+v.id+'"'+(currentVid===v.id?' selected':'')+'>'+esc(v.businessName||'Unnamed')+' ('+esc(v.category||'—')+')</option>';}).join('')+
+      '</select>'+
+    '</div>'+
+    '<div class="mfoot" id="amFoot"></div></div></div>';
+  document.getElementById('assignModalOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
+  var foot=document.getElementById('amFoot');
   var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='Cancel';canBtn.addEventListener('click',closeMod);
   var savBtn=document.createElement('button');savBtn.className='btn-p';savBtn.textContent='Save';
-  savBtn.addEventListener('click',async function(){var vid=document.getElementById('tv').value||null;if(!calRows[ds])calRows[ds]={approved:getApproved(ds),waitlist:getWaitlist(ds),tent_assignments:{}};if(vid)calRows[ds].tent_assignments[tentId]=vid;else delete calRows[ds].tent_assignments[tentId];await saveCalRow(ds);closeMod();renderTents();});
-  foot.appendChild(unBtn);foot.appendChild(canBtn);foot.appendChild(savBtn);
+  savBtn.addEventListener('click',async function(){
+    var vid=document.getElementById('av').value||null;
+    if(!calRows[ds])calRows[ds]={approved:getApproved(ds),waitlist:getWaitlist(ds),tent_assignments:{}};
+    if(vid)calRows[ds].tent_assignments[spotId]=vid;
+    else delete calRows[ds].tent_assignments[spotId];
+    await saveCalRow(ds);refreshLayoutColors(ds);closeMod();renderTents();
+  });
+  foot.appendChild(canBtn);foot.appendChild(savBtn);
 }
+
+// ── AUTO-ASSIGN — uses real XY proximity from layout for adjacency ────────
 async function autoAssign(){
   if(!tentViewDate){alert('Select a market date first.');return;}
   var v4d=getApproved(tentViewDate).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
-  if(!v4d.length){alert('No approved vendors for this date. Schedule them in Calendar first.');return;}
-  if(!tents.length){alert('No tent spots defined. Add spots first.');return;}
-  var spots=tents.slice(),assignment={},lastSpot={};
+  if(!v4d.length){alert('No approved vendors for this date.\nSchedule them in Calendar first.');return;}
+
+  // Load layout spots for this date — these are the physical positions
+  var layoutSpotList=await ensureLayoutCache(tentViewDate);
+  if(!layoutSpotList.length){alert('No spots defined for this date.\nGo to the Layout tab and define spots first.');return;}
+
+  // Build adjacency map using real XY positions from the layout
+  // Two spots are "adjacent" if the gap between their edges is < 40px (roughly touching/very close)
+  var ADJACENT_THRESHOLD=40;
+  function spotsAdjacent(a,b){
+    // Gap between bounding boxes (negative = overlapping)
+    var ax1=a.x,ax2=a.x+(a.w||80),ay1=a.y,ay2=a.y+(a.h||80);
+    var bx1=b.x,bx2=b.x+(b.w||80),by1=b.y,by2=b.y+(b.h||80);
+    var gapX=Math.max(ax1,bx1)-Math.min(ax2,bx2); // positive = gap, negative = overlap
+    var gapY=Math.max(ay1,by1)-Math.min(ay2,by2);
+    // Adjacent if boxes overlap or are very close in at least one axis
+    // and close (not far apart) in the other
+    var touchX=gapX<ADJACENT_THRESHOLD;
+    var touchY=gapY<ADJACENT_THRESHOLD;
+    var notFarX=gapX<200;
+    var notFarY=gapY<200;
+    return(touchX&&notFarY)||(touchY&&notFarX);
+  }
+
+  // Build adjacency list: spotId -> [adjacent spotIds]
+  var adjacency={};
+  layoutSpotList.forEach(function(s){adjacency[s.id]=[];});
+  for(var i=0;i<layoutSpotList.length;i++){
+    for(var j=i+1;j<layoutSpotList.length;j++){
+      var a=layoutSpotList[i],b=layoutSpotList[j];
+      if(spotsAdjacent(a,b)){adjacency[a.id].push(b.id);adjacency[b.id].push(a.id);}
+    }
+  }
+
+  var spots=layoutSpotList.slice();
+  var assignment={};
+  var lastSpot={};
+
+  // Remember where each vendor was last time (prefer same spot)
   var allDates=getMarketDates().filter(function(d){return d!==tentViewDate;}).sort();
-  v4d.forEach(function(v){for(var i=allDates.length-1;i>=0;i--){var ta=getTentAssignments(allDates[i]);var f=Object.keys(ta).find(function(tid){return ta[tid]===v.id;});if(f){lastSpot[v.id]=f;break;}}});
+  v4d.forEach(function(v){
+    for(var i=allDates.length-1;i>=0;i--){
+      var ta=getTentAssignments(allDates[i]);
+      var f=Object.keys(ta).find(function(tid){return ta[tid]===v.id;});
+      if(f){lastSpot[v.id]=f;break;}
+    }
+  });
+
+  // First pass: assign to preferred (last used) spots
   var assigned=[];
-  v4d.forEach(function(v){var p=lastSpot[v.id];if(p&&spots.find(function(s){return s.id===p;})&&!assignment[p]){assignment[p]=v.id;assigned.push(v.id);}});
+  v4d.forEach(function(v){
+    var p=lastSpot[v.id];
+    if(p&&spots.find(function(s){return s.id===p;})&&!assignment[p]){
+      assignment[p]=v.id;assigned.push(v.id);
+    }
+  });
+
+  // Second pass: place remaining vendors, avoiding same-category adjacency
   var unasgn=v4d.filter(function(v){return assigned.indexOf(v.id)===-1;});
-  var nums=spots.map(function(t){return t.num;}).sort(function(a,b){return a-b;});
-  unasgn.forEach(function(v){var placed=false;for(var i=0;i<spots.length;i++){var s=spots[i];if(assignment[s.id])continue;var idx=nums.indexOf(s.num),conflict=false;[nums[idx-1],nums[idx+1]].forEach(function(nn){if(!nn)return;var ns=spots.find(function(x){return x.num===nn;});if(ns&&assignment[ns.id]){var nv=vendors.find(function(x){return x.id===assignment[ns.id];});if(nv&&nv.category&&nv.category===v.category)conflict=true;}});if(!conflict){assignment[s.id]=v.id;placed=true;break;}}if(!placed){for(var i=0;i<spots.length;i++){if(!assignment[spots[i].id]){assignment[spots[i].id]=v.id;break;}}}});
+  // Sort spots by num for deterministic placement
+  var sorted=spots.slice().sort(function(a,b){return a.num-b.num;});
+
+  unasgn.forEach(function(v){
+    var placed=false;
+    for(var i=0;i<sorted.length;i++){
+      var s=sorted[i];
+      if(assignment[s.id])continue;
+      // Check adjacency conflict: any adjacent spot already has same category?
+      var conflict=false;
+      var neighbors=adjacency[s.id]||[];
+      neighbors.forEach(function(nid){
+        if(assignment[nid]){
+          var nv=vendors.find(function(x){return x.id===assignment[nid];});
+          if(nv&&nv.category&&nv.category===v.category)conflict=true;
+        }
+      });
+      if(!conflict){assignment[s.id]=v.id;placed=true;break;}
+    }
+    // If no conflict-free spot found, place anywhere available
+    if(!placed){
+      for(var i=0;i<sorted.length;i++){
+        if(!assignment[sorted[i].id]){assignment[sorted[i].id]=v.id;break;}
+      }
+    }
+  });
+
   if(!calRows[tentViewDate])calRows[tentViewDate]={approved:getApproved(tentViewDate),waitlist:[],tent_assignments:{}};
-  calRows[tentViewDate].tent_assignments=assignment;await saveCalRow(tentViewDate);renderTents();
-  alert('✅ Auto-assigned '+Object.values(assignment).filter(Boolean).length+' vendors for '+tentViewDate+'.');
+  calRows[tentViewDate].tent_assignments=assignment;
+  await saveCalRow(tentViewDate);
+  refreshLayoutColors(tentViewDate);
+  clearLayoutCache(tentViewDate);
+  renderTents();
+  var count=Object.values(assignment).filter(Boolean).length;
+  alert('✅ Auto-assigned '+count+' vendor'+(count!==1?'s':'')+' for '+tentViewDate+'.\n\nAdjacent spots with the same vendor category were avoided based on their actual layout positions.');
 }
+
 // ── LAYOUT (date-specific, spot deletion is local only) ───────────────────
 function renderLayout(){
   var el=document.getElementById('main-content');
@@ -609,17 +816,19 @@ function renderLayout(){
     '<div class="layout-toolbar">'+
     '<button class="btn-g" id="addLSpotBtn">+ Add spot</button>'+
     '<button class="btn-g" id="addLRowBtn">+ Add row</button>'+
+    '<div style="width:.5px;height:20px;background:#e5e3de;flex-shrink:0"></div>'+
+    '<button class="btn-s" id="lSelectModeBtn" title="Toggle select mode to tap multiple spots">☐ Select</button>'+
     '<button class="btn-s" id="lSnapBtn">Snap: <span id="lSnapLabel">on</span></button>'+
-    '<button class="btn-s" id="lClearSelBtn" style="display:none">Deselect</button>'+
-    '<button class="btn-danger" id="lDelSelBtn" style="display:none">Remove selected</button>'+
+    '<button class="btn-s" id="lClearSelBtn" style="display:none">✕ Deselect all</button>'+
+    '<button class="btn-danger" id="lDelSelBtn" style="display:none">🗑 Remove selected</button>'+
     '<button class="btn-p" id="saveLayoutBtn" style="margin-left:auto">💾 Save layout for date</button></div>'+
-    '<div class="canvas-outer" style="height:420px"><div id="layoutCanvas"></div></div>'+
+    '<div class="canvas-outer" style="height:480px;position:relative"><div id="layoutCanvas" style="position:relative;width:1400px;height:900px"></div></div>'+
     '<div class="layout-legend"><span style="font-size:11px;font-weight:600;color:#1a1a1a">Legend:</span>'+
     '<div class="ll"><div class="ls" style="background:#fff;border:1.5px solid #d0cec7"></div>Available</div>'+
     '<div class="ll"><div class="ls" style="background:#EAF3DE;border:1.5px solid #639922"></div>Assigned</div>'+
     '<div class="ll"><div class="ls" style="background:#fff;border:1.5px dashed #d0cec7"></div>Food truck</div>'+
     '<div class="ll"><div class="ls" style="background:#E6F1FB;border:1.5px solid #639922"></div>Selected</div>'+
-    '<span style="margin-left:auto;color:#ccc;font-size:10px">✕ removes from this date only — drag to arrange — Ctrl+click to multi-select</span></div>'+
+    '<span style="margin-left:auto;color:#ccc;font-size:10px">Tap to manage · drag to reposition · use Select mode to move multiple spots · ✕ removes from this date only</span></div>'+
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:5px;padding:.65rem .85rem;border-top:.5px solid #e5e3de" id="layoutStats"></div>';
   drawLayoutGrid();
   loadLayoutForDate(layoutDate);
@@ -627,14 +836,30 @@ function renderLayout(){
 }
 function drawLayoutGrid(){
   var canvas=document.getElementById('layoutCanvas');if(!canvas)return;
-  for(var x=20;x<1200;x+=20)for(var y=20;y<700;y+=20){var d=document.createElement('div');d.className='grid-dot';d.style.cssText='left:'+(x-1)+'px;top:'+(y-1)+'px';canvas.appendChild(d);}
+  for(var x=20;x<1400;x+=20)for(var y=20;y<900;y+=20){var d=document.createElement('div');d.className='grid-dot';d.style.cssText='left:'+(x-1)+'px;top:'+(y-1)+'px';canvas.appendChild(d);}
 }
 function attachLayoutEvents(){
   var di=document.getElementById('layoutDateInput');
-  if(di)di.addEventListener('change',function(){if(layoutUnsaved&&layoutSpots.length){if(!confirm('Unsaved changes. Switch date?')){this.value=layoutDate;return;}}layoutDate=this.value;loadLayoutForDate(layoutDate);});
+  if(di)di.addEventListener('change',function(){
+    if(layoutUnsaved&&layoutSpots.length){if(!confirm('Unsaved changes. Switch date?')){this.value=layoutDate;return;}}
+    layoutDate=this.value;
+    layoutSelectMode=false;
+    loadLayoutForDate(layoutDate);
+  });
   var lp=document.getElementById('loadPrevLayoutBtn');if(lp)lp.addEventListener('click',openLoadLayoutModal);
   var lc=document.getElementById('clearLayoutBtn');if(lc)lc.addEventListener('click',function(){if(!layoutSpots.length)return;if(!confirm('Clear all spots from the '+layoutDate+' layout?'))return;clearLayoutCanvas();markLayoutUnsaved();updateLayoutStats();});
   var ls=document.getElementById('lSnapBtn');if(ls)ls.addEventListener('click',function(){layoutSnapOn=!layoutSnapOn;document.getElementById('lSnapLabel').textContent=layoutSnapOn?'on':'off';});
+  // Select mode toggle — lets users tap/click spots to add to selection without opening panel
+  var lsm=document.getElementById('lSelectModeBtn');
+  if(lsm)lsm.addEventListener('click',function(){
+    layoutSelectMode=!layoutSelectMode;
+    if(!layoutSelectMode){
+      // Exiting select mode — clear selection
+      layoutSelectedIds.clear();
+      layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});
+    }
+    updateLayoutToolbar();
+  });
   var lcs=document.getElementById('lClearSelBtn');if(lcs)lcs.addEventListener('click',function(){layoutSelectedIds.clear();layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});updateLayoutToolbar();});
   var lds=document.getElementById('lDelSelBtn');if(lds)lds.addEventListener('click',function(){
     if(!layoutSelectedIds.size)return;
@@ -646,7 +871,12 @@ function attachLayoutEvents(){
   var la=document.getElementById('addLSpotBtn');if(la)la.addEventListener('click',function(){openAddLayoutModal(false);});
   var lr=document.getElementById('addLRowBtn');if(lr)lr.addEventListener('click',function(){openAddLayoutModal(true);});
   var canvas=document.getElementById('layoutCanvas');
-  if(canvas)canvas.addEventListener('click',function(e){if(e.target===this){layoutSelectedIds.clear();layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});updateLayoutToolbar();}});
+  if(canvas)canvas.addEventListener('click',function(e){
+    if(e.target!==this)return; // only fires on canvas background itself
+    layoutSelectedIds.clear();
+    layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});
+    updateLayoutToolbar();
+  });
 }
 function clearLayoutCanvas(){
   layoutSpots.forEach(function(s){var el=document.getElementById('ls-'+s.id);if(el)el.remove();});
@@ -662,23 +892,151 @@ function updateLayoutBadge(state){
 function markLayoutUnsaved(){layoutUnsaved=true;updateLayoutBadge('unsaved');}
 function updateLayoutToolbar(){
   var has=layoutSelectedIds.size>0;
-  var cs=document.getElementById('lClearSelBtn');if(cs)cs.style.display=has?'':'none';
+  var cs=document.getElementById('lClearSelBtn');if(cs)cs.style.display=(has||layoutSelectMode)?'':'none';
   var ds=document.getElementById('lDelSelBtn');if(ds)ds.style.display=has?'':'none';
+  var sm=document.getElementById('lSelectModeBtn');
+  if(sm){
+    if(layoutSelectMode){
+      sm.textContent='✓ Select ('+(layoutSelectedIds.size||0)+')';
+      sm.style.background='#1a1a1a';sm.style.color='#fff';sm.style.borderColor='#1a1a1a';
+    } else {
+      sm.textContent='☐ Select';
+      sm.style.background='';sm.style.color='';sm.style.borderColor='';
+    }
+  }
 }
 function updateLayoutStats(){
   var el=document.getElementById('layoutStats');if(!el)return;
   var occ=layoutSpots.filter(function(s){return s.vendorName;}).length;
   el.innerHTML='<div class="stat"><div class="sl">Spots</div><div class="sv">'+layoutSpots.length+'</div></div><div class="stat"><div class="sl">Assigned</div><div class="sv" style="color:#27500A">'+occ+'</div></div><div class="stat"><div class="sl">Available</div><div class="sv">'+(layoutSpots.length-occ)+'</div></div><div class="stat"><div class="sl">10×10</div><div class="sv">'+layoutSpots.filter(function(s){return s.size==='10x10';}).length+'</div></div><div class="stat"><div class="sl">20×20</div><div class="sv">'+layoutSpots.filter(function(s){return s.size==='20x20';}).length+'</div></div><div class="stat"><div class="sl">Trucks</div><div class="sv">'+layoutSpots.filter(function(s){return s.size==='truck';}).length+'</div></div>';
 }
+
+// Sync layout canvas spot colors + vendor labels with current tent assignments.
+// Call this whenever an assignment changes (from Assignments tab or auto-assign)
+// so the canvas always reflects the latest state without a full reload.
+function refreshLayoutColors(ds){
+  // Only update if the layout canvas is currently showing this date
+  if(!layoutSpots.length||layoutDate!==ds)return;
+  var ta=getTentAssignments(ds);
+  layoutSpots.forEach(function(sp){
+    // Match spot to assignment by spot id
+    var vid=ta[sp.id]||null;
+    var v=vid?vendors.find(function(x){return x.id===vid;}):null;
+    // Update in-memory spot data
+    sp.vendorId=vid||'';
+    sp.vendorName=v?v.businessName:'';
+    sp.vendorCat=v?v.category:'';
+    sp.vendorInactive=v&&v.vendorStatus==='inactive';
+    // Update the DOM element directly — no full re-render needed
+    var el=document.getElementById('ls-'+sp.id);
+    if(!el)return;
+    var dims=LSIZES[sp.size]||LSIZES['10x10'];
+    if(v){
+      var cc=catColor(v.category);
+      el.style.background=cc.bg;
+      el.style.borderColor=cc.border;
+      el.style.borderWidth='1.5px';
+    } else {
+      el.style.background='';
+      el.style.borderColor='';
+      el.style.borderWidth='';
+    }
+    // Re-render inner content (vendor name, category, hint text)
+    el.innerHTML=
+      '<button class="lspot-del" title="Remove from this date only">×</button>'+
+      '<div class="lspot-num">Spot '+sp.num+'</div>'+
+      '<div class="lspot-size">'+dims.label+'</div>'+
+      (sp.vendorName
+        ?'<div class="lspot-vendor" style="color:'+(sp.vendorCat?catColor(sp.vendorCat).text:'#27500A')+'">'+esc(sp.vendorName)+'</div>'+
+          (sp.vendorInactive
+            ?'<div style="font-size:8px;color:#791F1F;font-weight:600">⚠️ Inactive</div>'
+            :'<div class="lspot-cat">'+esc(sp.vendorCat)+'</div>')+
+          '<div style="font-size:8px;color:#aaa;margin-top:3px;text-align:center">click · drag to move</div>'
+        :'<div style="font-size:9px;color:#aaa;margin-top:6px;text-align:center">click to assign</div>');
+    // Re-attach delete button handler
+    var delBtn=el.querySelector('.lspot-del');
+    if(delBtn)delBtn.addEventListener('click',function(e){
+      e.stopPropagation();
+      removeLayoutSpotLocal(sp.id);markLayoutUnsaved();updateLayoutStats();updateLayoutToolbar();
+    });
+  });
+  updateLayoutStats();
+}
+}
 async function loadLayoutForDate(ds){
   clearLayoutCanvas();
   if(!ds){updateLayoutBadge('empty');updateLayoutStats();return;}
-  try{var r=await window.storage.get(lKey(ds));if(r&&r.value){JSON.parse(r.value).forEach(function(sp){addLayoutSpot(sp);});updateLayoutBadge('saved');}else updateLayoutBadge('empty');}catch(e){updateLayoutBadge('empty');}
-  layoutUnsaved=false;updateLayoutStats();updateLayoutToolbar();
+
+  var loaded=false;
+  try{
+    var r=await window.storage.get(lKey(ds));
+    if(r&&r.value){
+      var saved=JSON.parse(r.value);
+      // Re-populate vendor info from current live data (vendors may have changed)
+      var ta=getTentAssignments(ds);
+      // Build a map: tentNum -> vendorId from tent assignments
+      var numToVid={};
+      tents.forEach(function(t){if(ta[t.id])numToVid[t.num]=ta[t.id];});
+      saved.forEach(function(sp){
+        var vid=numToVid[sp.num]||null;
+        var v=vid?vendors.find(function(x){return x.id===vid;}):null;
+        addLayoutSpot({
+          id:sp.id,num:sp.num,size:sp.size,x:sp.x,y:sp.y,w:sp.w,h:sp.h,
+          vendorId:vid||'',
+          vendorName:v?v.businessName:'',
+          vendorCat:v?v.category:'',
+          vendorInactive:v&&v.vendorStatus==='inactive'
+        });
+      });
+      updateLayoutBadge('saved');
+      loaded=true;
+    }
+  }catch(e){}
+
+  if(!loaded){
+    // No saved layout — auto-populate from tents assigned to this date
+    var ta2=getTentAssignments(ds);
+    var hasTents=tents.length>0;
+    if(hasTents){
+      // Arrange tents in a simple grid: 4 per row, 10px gap
+      var cols=4,gap=10,startX=60,startY=60;
+      tents.forEach(function(t,i){
+        var vid=ta2[t.id]||null;
+        var v=vid?vendors.find(function(x){return x.id===vid;}):null;
+        var sizeKey=t.size==="20'x20'"?'20x20':t.size==='Food truck'?'truck':t.size==="10'x20'"?'10x20':'10x10';
+        var dims=LSIZES[sizeKey]||LSIZES['10x10'];
+        var col=i%cols,row=Math.floor(i/cols);
+        addLayoutSpot({
+          num:t.num,size:sizeKey,
+          x:startX+col*(dims.w+gap),
+          y:startY+row*(dims.h+gap+20),
+          w:dims.w,h:dims.h,
+          vendorId:vid||'',
+          vendorName:v?v.businessName:'',
+          vendorCat:v?v.category:'',
+          vendorInactive:v&&v.vendorStatus==='inactive'
+        });
+      });
+      updateLayoutBadge('unsaved');
+      layoutUnsaved=true;
+    } else {
+      updateLayoutBadge('empty');
+    }
+  }
+  updateLayoutStats();updateLayoutToolbar();
 }
+
 function addLayoutSpot(data){
   var dims=LSIZES[data.size]||LSIZES['10x10'];
-  var sp={id:data.id||uid(),num:data.num||getNextLayoutNum(),size:data.size||'10x10',x:data.x||60,y:data.y||60,w:data.w||dims.w,h:data.h||dims.h,vendorName:data.vendorName||'',vendorCat:data.vendorCat||''};
+  var sp={
+    id:data.id||uid(),num:data.num||getNextLayoutNum(),
+    size:data.size||'10x10',x:data.x||60,y:data.y||60,
+    w:data.w||dims.w,h:data.h||dims.h,
+    vendorId:data.vendorId||'',
+    vendorName:data.vendorName||'',
+    vendorCat:data.vendorCat||'',
+    vendorInactive:data.vendorInactive||false
+  };
   layoutSpots.push(sp);renderLayoutSpot(sp);return sp;
 }
 function getNextLayoutNum(){var used=new Set(layoutSpots.map(function(s){return s.num;}));var n=1;while(used.has(n))n++;return n;}
@@ -690,26 +1048,99 @@ function renderLayoutSpot(sp){
   el.style.cssText='left:'+sp.x+'px;top:'+sp.y+'px;width:'+sp.w+'px;height:'+sp.h+'px';
   if(sp.vendorName){var lcc=catColor(sp.vendorCat);el.style.background=lcc.bg;el.style.borderColor=lcc.border;el.style.borderWidth='1.5px';}
   var dims=LSIZES[sp.size]||LSIZES['10x10'];
-  var wasInactive=sp.vendorInactive;
-  el.innerHTML='<button class="lspot-del" title="Remove from this date only">×</button><div class="lspot-num">Spot '+sp.num+'</div><div class="lspot-size">'+dims.label+'</div>'+(sp.vendorName?'<div class="lspot-vendor" style="color:'+(sp.vendorCat?catColor(sp.vendorCat).text:'#27500A')+'">'+esc(sp.vendorName)+'</div>'+(wasInactive?'<div style="font-size:8px;color:#791F1F;font-weight:600">⚠️ Inactive</div>':'<div class="lspot-cat">'+esc(sp.vendorCat)+'</div>'):'');
+  el.innerHTML=
+    '<button class="lspot-del" title="Remove from this date only">×</button>'+
+    '<div class="lspot-num">Spot '+sp.num+'</div>'+
+    '<div class="lspot-size">'+dims.label+'</div>'+
+    (sp.vendorName
+      ?'<div class="lspot-vendor" style="color:'+(sp.vendorCat?catColor(sp.vendorCat).text:'#27500A')+'">'+esc(sp.vendorName)+'</div>'+
+        (sp.vendorInactive
+          ?'<div style="font-size:8px;color:#791F1F;font-weight:600">⚠️ Inactive</div>'
+          :'<div class="lspot-cat">'+esc(sp.vendorCat)+'</div>')+
+        '<div style="font-size:8px;color:#aaa;margin-top:3px;text-align:center">click · drag to move</div>'
+      :'<div style="font-size:9px;color:#aaa;margin-top:6px;text-align:center">click to assign</div>');
   document.getElementById('layoutCanvas').appendChild(el);
-  // ── Delete removes from THIS date's layout only — no Supabase, no global effect ──
-  el.querySelector('.lspot-del').addEventListener('click',function(e){e.stopPropagation();removeLayoutSpotLocal(sp.id);markLayoutUnsaved();updateLayoutStats();updateLayoutToolbar();});
-  el.addEventListener('click',function(e){
-    if(e.target.classList.contains('lspot-del'))return;
-    if(!e.ctrlKey&&!e.metaKey){layoutSelectedIds.clear();layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});}
-    if(layoutSelectedIds.has(sp.id)){layoutSelectedIds.delete(sp.id);el.classList.remove('lsel');}else{layoutSelectedIds.add(sp.id);el.classList.add('lsel');}
-    updateLayoutToolbar();
+
+  // Delete removes from THIS layout only
+  el.querySelector('.lspot-del').addEventListener('click',function(e){
+    e.stopPropagation();
+    removeLayoutSpotLocal(sp.id);markLayoutUnsaved();updateLayoutStats();updateLayoutToolbar();
   });
+
+  // ── Single mousedown handler manages both drag and click ──────────────────
+  // We measure total movement distance. If < 5px it's a click, otherwise a drag.
   el.addEventListener('mousedown',function(e){
-    if(e.target.classList.contains('lspot-del'))return;e.preventDefault();
-    if(!layoutSelectedIds.has(sp.id)){layoutSelectedIds.clear();layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});layoutSelectedIds.add(sp.id);el.classList.add('lsel');updateLayoutToolbar();}
-    var startX=e.clientX,startY=e.clientY,moved=false;
-    var orig={};layoutSelectedIds.forEach(function(sid){var s=layoutSpots.find(function(x){return x.id===sid;});if(s)orig[sid]={x:s.x,y:s.y};});
-    el.classList.add('dragging');
-    function onMove(ev){moved=true;var dx=ev.clientX-startX,dy=ev.clientY-startY;layoutSelectedIds.forEach(function(sid){var s=layoutSpots.find(function(x){return x.id===sid;});if(!s)return;var o=orig[sid];s.x=Math.max(0,snapV(o.x+dx));s.y=Math.max(0,snapV(o.y+dy));var se=document.getElementById('ls-'+sid);if(se){se.style.left=s.x+'px';se.style.top=s.y+'px';}});}
-    function onUp(){el.classList.remove('dragging');if(moved)markLayoutUnsaved();document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
-    document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
+    if(e.target.classList.contains('lspot-del'))return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    var isCtrl=e.ctrlKey||e.metaKey||layoutSelectMode;
+    var startX=e.clientX,startY=e.clientY;
+    var totalDist=0;
+    var isDrag=false;
+
+    // In select mode or Ctrl held: toggle this spot's selection without clearing others
+    // In normal mode: if spot not selected, clear all others and select just this one
+    if(!isCtrl){
+      if(!layoutSelectedIds.has(sp.id)){
+        layoutSelectedIds.clear();
+        layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});
+        layoutSelectedIds.add(sp.id);el.classList.add('lsel');updateLayoutToolbar();
+      }
+    }
+    var orig={};
+    layoutSelectedIds.forEach(function(sid){
+      var s=layoutSpots.find(function(x){return x.id===sid;});
+      if(s)orig[sid]={x:s.x,y:s.y};
+    });
+    // Also track this spot itself for solo drag when not yet selected
+    orig[sp.id]=orig[sp.id]||{x:sp.x,y:sp.y};
+
+    function onMove(ev){
+      var dx=ev.clientX-startX,dy=ev.clientY-startY;
+      totalDist=Math.sqrt(dx*dx+dy*dy);
+      if(totalDist>5){
+        isDrag=true;
+        el.classList.add('dragging');
+        // Move all selected spots
+        layoutSelectedIds.forEach(function(sid){
+          var s=layoutSpots.find(function(x){return x.id===sid;});if(!s)return;
+          var o=orig[sid];if(!o)return;
+          s.x=Math.max(0,snapV(o.x+dx));
+          s.y=Math.max(0,snapV(o.y+dy));
+          var se=document.getElementById('ls-'+sid);
+          if(se){se.style.left=s.x+'px';se.style.top=s.y+'px';}
+        });
+      }
+    }
+
+    function onUp(ev){
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onUp);
+      el.classList.remove('dragging');
+
+      if(isDrag){
+        // Finished drag — just save unsaved flag, no panel
+        markLayoutUnsaved();
+      } else {
+        // It was a click — handle select or open panel
+      if(isCtrl){
+        // Select mode or Ctrl: toggle this spot
+        if(layoutSelectedIds.has(sp.id)){layoutSelectedIds.delete(sp.id);el.classList.remove('lsel');}
+        else{layoutSelectedIds.add(sp.id);el.classList.add('lsel');}
+        updateLayoutToolbar();
+      } else {
+        // Normal click — clear selection and open panel
+        layoutSelectedIds.clear();
+        layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});
+        updateLayoutToolbar();
+        openLayoutSpotPanel(sp);
+      }
+      }
+    }
+
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
   });
 }
 // KEY: only removes from local array + DOM — no Supabase delete, no global effect
@@ -718,16 +1149,151 @@ function removeLayoutSpotLocal(id){
   layoutSelectedIds.delete(id);
   var el=document.getElementById('ls-'+id);if(el)el.remove();
 }
+
+// ── Layout spot panel — click a spot to assign vendor or edit their record ──
+function openLayoutSpotPanel(sp){
+  var v=sp.vendorId?vendors.find(function(x){return x.id===sp.vendorId;}):null;
+  var eligible=eligibleVendors();
+  // Also include currently assigned vendor even if not "eligible" (e.g. now inactive)
+  if(v&&!eligible.find(function(e){return e.id===v.id;}))eligible=eligible.concat([v]);
+  var cc=v?catColor(v.category):null;
+
+  document.getElementById('modal-area').innerHTML=
+    '<div class="overlay" id="lspOverlay"><div class="modal md">'+
+    '<div class="mtitle">⛺ Spot '+sp.num+' — '+layoutDate+'</div>'+
+
+    // Current vendor card (if assigned)
+    (v?
+      '<div style="background:'+(cc?cc.bg:'#f8f7f4')+';border:1.5px solid '+(cc?cc.border:'#d0cec7')+';border-radius:10px;padding:.85rem;margin-bottom:1rem">'+
+        '<div style="display:flex;align-items:center;gap:10px">'+
+          '<div style="width:40px;height:40px;border-radius:50%;background:'+(cc?cc.border:'#d0cec7')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:13px;font-weight:700;color:#1a1a1a">'+esc(v.businessName||'Unnamed')+'</div>'+
+            '<div style="font-size:11px;color:#888;margin-top:1px">'+esc(v.contactName||'')+(v.phone?' · '+esc(v.phone):'')+'</div>'+
+            '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">'+
+              schedTag(v.status)+
+              vsTag(v.vendorStatus||'active')+
+              catBadge(v.category)+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+        // Quick status editors
+        '<div style="margin-top:.85rem;padding-top:.75rem;border-top:1px solid rgba(0,0,0,.08)">'+
+          '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Quick edit status</div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+            '<div>'+
+              '<div style="font-size:10px;color:#888;margin-bottom:3px">Application status</div>'+
+              '<select id="lsp-appStatus" style="width:100%;font-size:12px;padding:5px 8px;border-radius:6px;border:.5px solid #d0cec7;background:#fff;font-family:inherit">'+
+                '<option value="pending"'+(v.status==='pending'?' selected':'')+'>Pending</option>'+
+                '<option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option>'+
+                '<option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option>'+
+              '</select>'+
+            '</div>'+
+            '<div>'+
+              '<div style="font-size:10px;color:#888;margin-bottom:3px">Vendor status</div>'+
+              '<select id="lsp-vsStatus" style="width:100%;font-size:12px;padding:5px 8px;border-radius:6px;border:.5px solid #d0cec7;background:#fff;font-family:inherit">'+
+                '<option value="active"'+((!v.vendorStatus||v.vendorStatus==='active')?' selected':'')+'>🟢 Active</option>'+
+                '<option value="inwork"'+(v.vendorStatus==='inwork'?' selected':'')+'>🟡 In-Work</option>'+
+                '<option value="inactive"'+(v.vendorStatus==='inactive'?' selected':'')+'>⚫ Inactive</option>'+
+              '</select>'+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:6px;margin-top:.65rem">'+
+            '<button class="btn-p" style="flex:1;font-size:11px" id="lsp-saveStatus">✓ Save status changes</button>'+
+            '<button class="btn-blue" style="font-size:11px" id="lsp-editFull">✏️ Full edit</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>':
+      '<div class="notice" style="margin-bottom:1rem">No vendor assigned to this spot yet. Select one below.</div>'
+    )+
+
+    // Assign / change vendor
+    '<div class="fg">'+
+      '<label>'+(v?'Change assigned vendor':'Assign vendor')+'</label>'+
+      '<input style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:7px 10px;font-size:13px;background:#fff;font-family:inherit;margin-bottom:.5rem;outline:none" id="lsp-search" placeholder="🔍 Search vendors…" type="text">'+
+      '<div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px" id="lsp-vendorList">'+
+        eligible.map(function(ev){
+          var ecc=catColor(ev.category);
+          return'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:.5px solid '+(sp.vendorId===ev.id?ecc.border:'#e5e3de')+';border-radius:8px;cursor:pointer;background:'+(sp.vendorId===ev.id?ecc.bg:'#fff')+'" class="lsp-vopt" data-vid="'+ev.id+'" data-name="'+esc((ev.businessName||'').toLowerCase())+'" data-cat="'+esc((ev.category||'').toLowerCase())+'">'+
+            '<input type="radio" name="lsp-vendor" value="'+ev.id+'"'+(sp.vendorId===ev.id?' checked':'')+' style="accent-color:#22c55e;flex-shrink:0">'+
+            '<div style="width:26px;height:26px;border-radius:50%;background:'+ecc.border+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+ini(ev.businessName||'?')+'</div>'+
+            '<div><div style="font-size:12px;font-weight:600;color:#1a1a1a">'+esc(ev.businessName||'Unnamed')+'</div>'+
+            '<div style="font-size:10px;color:#888">'+esc(ev.category||'—')+(ev.boothSize?' · '+esc(ev.boothSize):'')+'</div></div>'+
+          '</label>';
+        }).join('')+
+        '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:.5px solid '+(sp.vendorId===''?'#f09595':'#e5e3de')+';border-radius:8px;cursor:pointer;background:'+(sp.vendorId===''?'#FCEBEB':'#fff')+'" class="lsp-vopt" data-vid="" data-name="" data-cat="">'+
+          '<input type="radio" name="lsp-vendor" value=""'+(sp.vendorId===''?' checked':'')+' style="accent-color:#791F1F;flex-shrink:0">'+
+          '<div style="font-size:12px;color:#888">— Unassign this spot —</div>'+
+        '</label>'+
+      '</div>'+
+    '</div>'+
+    '<div class="mfoot" id="lspFoot"></div>'+
+    '</div></div>';
+
+  document.getElementById('lspOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
+
+  // Search filter
+  var srch=document.getElementById('lsp-search');
+  if(srch)srch.addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    document.querySelectorAll('.lsp-vopt').forEach(function(row){
+      row.style.display=(row.dataset.name.indexOf(q)>-1||row.dataset.cat.indexOf(q)>-1)?'':'none';
+    });
+  });
+
+  // Save status quick-edit
+  var saveStBtn=document.getElementById('lsp-saveStatus');
+  if(saveStBtn&&v)saveStBtn.addEventListener('click',async function(){
+    var newSt=document.getElementById('lsp-appStatus').value;
+    var newVs=document.getElementById('lsp-vsStatus').value;
+    await setSt(v.id,newSt);
+    await setVs(v.id,newVs);
+    // Refresh spot display
+    var updV=vendors.find(function(x){return x.id===v.id;});
+    if(updV){sp.vendorName=updV.businessName;sp.vendorCat=updV.category;sp.vendorInactive=updV.vendorStatus==='inactive';}
+    closeMod();renderLayoutSpot(sp);
+  });
+
+  // Full edit button
+  var editBtn=document.getElementById('lsp-editFull');
+  if(editBtn&&v)editBtn.addEventListener('click',function(){closeMod();openForm(v.id);});
+
+  // Footer buttons
+  var foot=document.getElementById('lspFoot');
+  var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='Cancel';canBtn.addEventListener('click',closeMod);
+  var assignBtn=document.createElement('button');assignBtn.className='btn-p';assignBtn.textContent='Assign & close';
+  assignBtn.addEventListener('click',async function(){
+    var sel=document.querySelector('input[name="lsp-vendor"]:checked');
+    var newVid=sel?sel.value:'';
+    var newV=newVid?vendors.find(function(x){return x.id===newVid;}):null;
+    // Update spot data
+    sp.vendorId=newVid;
+    sp.vendorName=newV?newV.businessName:'';
+    sp.vendorCat=newV?newV.category:'';
+    sp.vendorInactive=newV&&newV.vendorStatus==='inactive';
+    // Also update the tent assignment in calendar for this date
+    if(!calRows[layoutDate])calRows[layoutDate]={approved:getApproved(layoutDate),waitlist:getWaitlist(layoutDate),tent_assignments:{}};
+    // Use spot id directly as the key in tent_assignments
+    if(newVid)calRows[layoutDate].tent_assignments[sp.id]=newVid;
+    else delete calRows[layoutDate].tent_assignments[sp.id];
+    await saveCalRow(layoutDate);
+    markLayoutUnsaved();clearLayoutCache(layoutDate);
+    closeMod();
+    renderLayoutSpot(sp);
+    updateLayoutStats();
+  });
+  foot.appendChild(canBtn);foot.appendChild(assignBtn);
+}
 async function saveLayoutForDate(){
   if(!layoutDate){alert('Select a market date first.');return;}
   var btn=document.getElementById('saveLayoutBtn');if(btn){btn.disabled=true;btn.textContent='Saving…';}
   try{
-    var payload=JSON.stringify(layoutSpots.map(function(s){return{id:s.id,num:s.num,size:s.size,x:s.x,y:s.y,w:s.w,h:s.h,vendorName:s.vendorName,vendorCat:s.vendorCat};}));
+    var payload=JSON.stringify(layoutSpots.map(function(s){return{id:s.id,num:s.num,size:s.size,x:s.x,y:s.y,w:s.w,h:s.h,vendorId:s.vendorId||'',vendorName:s.vendorName,vendorCat:s.vendorCat,vendorInactive:s.vendorInactive||false};}));
     await window.storage.set(lKey(layoutDate),payload);
     var dr=await window.storage.get(lDatesKey());var dl=dr&&dr.value?JSON.parse(dr.value):[];
     if(dl.indexOf(layoutDate)===-1){dl.push(layoutDate);dl.sort();}
     await window.storage.set(lDatesKey(),JSON.stringify(dl));
-    layoutUnsaved=false;updateLayoutBadge('saved');
+    layoutUnsaved=false;updateLayoutBadge('saved');clearLayoutCache(layoutDate);
     if(btn){btn.textContent='✅ Saved!';setTimeout(function(){btn.textContent='💾 Save layout for date';btn.disabled=false;},1500);}
   }catch(e){alert('Save failed: '+e.message);if(btn){btn.disabled=false;btn.textContent='💾 Save layout for date';}}
 }
@@ -751,7 +1317,7 @@ async function openLoadLayoutModal(){
       var srcSpots=JSON.parse(item.dataset.spots);
       clearLayoutCanvas();
       // Copy positions but give fresh IDs and clear vendors — independent from source date
-      srcSpots.forEach(function(s){addLayoutSpot({id:uid(),num:s.num,size:s.size,x:s.x,y:s.y,w:s.w,h:s.h,vendorName:'',vendorCat:'',});});
+      srcSpots.forEach(function(s){addLayoutSpot({id:uid(),num:s.num,size:s.size,x:s.x,y:s.y,w:s.w,h:s.h,vendorId:'',vendorName:'',vendorCat:'',vendorInactive:false});});
       markLayoutUnsaved();updateLayoutStats();updateLayoutToolbar();closeMod();
     });
   });
@@ -899,19 +1465,21 @@ function openForm(id){
   // Tab nav
   function goFormTab(n){
     if(n<0||n>=formTotalTabs)return;formCompletedTabs.add(formTab);formTab=n;
-    document.querySelectorAll('.fpanel').forEach(function(p){p.classList.remove('active');});
-    document.querySelector('[data-fpanel="'+n+'"]').classList.add('active');
-    document.querySelectorAll('.fsnb').forEach(function(b,i){b.classList.remove('active');if(formCompletedTabs.has(i)&&i!==n)b.classList.add('done');if(i===n){b.classList.add('active');b.classList.remove('done');}});
-    document.getElementById('fPrevBtn').disabled=n===0;
-    document.getElementById('fNextBtn').style.display=n===formTotalTabs-1?'none':'';
-    document.getElementById('fSaveBtn').style.display=n===formTotalTabs-1?'':'none';
-    document.getElementById('fTabIndicator').textContent=(n+1)+' of '+formTotalTabs;
-    document.getElementById('fProgress').style.width=((n+1)/formTotalTabs*100)+'%';
-    var active=document.querySelector('.fsnb.active');if(active)active.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
+    var fo=document.getElementById('formOverlay');if(!fo)return;
+    fo.querySelectorAll('.fpanel').forEach(function(p){p.classList.remove('active');});
+    var target=fo.querySelector('[data-fpanel="'+n+'"]');if(target)target.classList.add('active');
+    fo.querySelectorAll('.fsnb').forEach(function(b,i){b.classList.remove('active');if(formCompletedTabs.has(i)&&i!==n)b.classList.add('done');if(i===n){b.classList.add('active');b.classList.remove('done');}});
+    var pb=document.getElementById('fPrevBtn');if(pb)pb.disabled=n===0;
+    var nb=document.getElementById('fNextBtn');if(nb)nb.style.display=n===formTotalTabs-1?'none':'';
+    var sb=document.getElementById('fSaveBtn');if(sb)sb.style.display=n===formTotalTabs-1?'':'none';
+    var ti=document.getElementById('fTabIndicator');if(ti)ti.textContent=(n+1)+' of '+formTotalTabs;
+    var pr=document.getElementById('fProgress');if(pr)pr.style.width=((n+1)/formTotalTabs*100)+'%';
+    var active=fo.querySelector('.fsnb.active');if(active)active.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
   }
   document.getElementById('fPrevBtn').addEventListener('click',function(){goFormTab(formTab-1);});
   document.getElementById('fNextBtn').addEventListener('click',function(){goFormTab(formTab+1);});
-  document.querySelectorAll('.fsnb').forEach(function(b){b.addEventListener('click',function(){goFormTab(parseInt(b.dataset.ftab));});});
+  var fo2=document.getElementById('formOverlay');
+  if(fo2)fo2.querySelectorAll('.fsnb').forEach(function(b){b.addEventListener('click',function(){goFormTab(parseInt(b.dataset.ftab));});});
   document.getElementById('fCancelBtn').addEventListener('click',closeMod);
   document.getElementById('fSaveBtn').addEventListener('click',saveV);
   // VS cards
