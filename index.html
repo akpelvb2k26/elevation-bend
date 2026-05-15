@@ -388,7 +388,7 @@ async function saveVendorDB(data,id){
   optRow.payment_received=!!data.paymentReceived;
   optRow.notes=data.notes||'';
   var{error:e2}=await sb.from('vendors').update(optRow).eq('id',row.id);
-  if(e2)console.warn('Some columns missing — run in Supabase SQL editor:\nALTER TABLE vendors ADD COLUMN IF NOT EXISTS contract_received BOOLEAN DEFAULT false;\nALTER TABLE vendors ADD COLUMN IF NOT EXISTS payment_received BOOLEAN DEFAULT false;\nALTER TABLE vendors ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT \\'\\';');
+  if(e2)console.warn('Some columns missing. Run ALTER TABLE in Supabase SQL editor to add contract_received, payment_received, notes, booth_fee columns.');
   return row.id;
 }
 async function saveCalRow(ds){
@@ -969,7 +969,6 @@ function refreshLayoutColors(ds){
     });
   });
   updateLayoutStats();
-}
 }
 async function loadLayoutForDate(ds){
   clearLayoutCanvas();
@@ -1665,7 +1664,7 @@ function renderPayments(){
                 '<strong>Setup steps:</strong><br>'+
                 '1. Create your Stripe account at <a href="https://stripe.com" target="_blank" style="color:#378ADD">stripe.com</a><br>'+
                 '2. Copy your publishable key from Stripe → Developers → API keys<br>'+
-                '3. Set <code style="background:#f0ede6;padding:1px 5px;border-radius:4px">STRIPE_PK</code> in this app's script<br>'+
+                '3. Set <code style="background:#f0ede6;padding:1px 5px;border-radius:4px">STRIPE_PK</code> in this app script<br>'+
                 '4. Deploy the Edge Functions (instructions below)'+
               '</div>'+
               '<div style="margin-top:.85rem;background:#fff;border:.5px solid #d0cec7;border-radius:8px;padding:.75rem;font-size:11px">'+
@@ -1768,19 +1767,8 @@ function renderPayments(){
       sendEmail(
         v.email,
         'Booth fee invoice — Elevation Bend Farmers Market',
-        'Hi '+(v.contactName||v.businessName)+',
-
-'+
-        'Your booth fee for the Elevation Bend Farmers Market is $'+fee+'.
-
-'+
-        'Please arrange payment at your earliest convenience.
-
-'+
-        'Thank you,
-Elevation Bend Farmers Market'
-      );
-    });
+        'Hi '+(v.contactName||v.businessName)+'\n\nYour booth fee for the Elevation Bend Farmers Market is $'+fee+'.\n\nPlease arrange payment at your earliest convenience.\n\nThank you,\nElevation Bend Farmers Market'
+      );    });
   });
 
   // Generate Stripe payment link
@@ -1793,24 +1781,11 @@ Elevation Bend Farmers Market'
       if(url){
         // Copy link and offer to email it
         navigator.clipboard.writeText(url).catch(function(){});
-        if(confirm('Payment link generated and copied to clipboard!\n\nLink: '+url+'\n\nSend this link to '+v.businessName+' by email now?')){
+        if(confirm('Payment link generated and copied to clipboard! Send this link to '+v.businessName+' by email now?')){
           sendEmail(
             v.email||'',
             'Pay your booth fee — Elevation Bend Farmers Market',
-            'Hi '+(v.contactName||v.businessName)+',
-
-'+
-            'Click the link below to pay your booth fee of $'+(v.boothFee||0).toFixed(2)+':
-
-'+
-            url+'
-
-'+
-            'No account needed — just enter your card details and you're done.
-
-'+
-            'Thank you,
-Elevation Bend Farmers Market'
+            'Hi '+(v.contactName||v.businessName)+'\n\nClick the link below to pay your booth fee of $'+(v.boothFee||0).toFixed(2)+':\n\n'+url+'\n\nNo account needed — just enter your card details.\n\nThank you,\nElevation Bend Farmers Market'
           );
         }
       }
@@ -1824,14 +1799,7 @@ Elevation Bend Farmers Market'
     sendEmail(
       unpaidVendors.map(function(v){return v.email;}).join(','),
       'Booth fee reminder — Elevation Bend Farmers Market',
-      'Hi,
-
-This is a friendly reminder that your booth fee for the Elevation Bend Farmers Market is outstanding.
-
-Please contact us to arrange payment.
-
-Thank you,
-Elevation Bend Farmers Market'
+      'Hi,\n\nThis is a friendly reminder that your booth fee for the Elevation Bend Farmers Market is outstanding.\n\nPlease contact us to arrange payment.\n\nThank you,\nElevation Bend Farmers Market'
     );
   });
 
@@ -1849,12 +1817,9 @@ Elevation Bend Farmers Market'
     }
     btn.disabled=false;btn.textContent='💳 Generate all payment links';
     if(links.length){
-      var all=links.join('
-');
+      var all=links.join('\n');
       navigator.clipboard.writeText(all).catch(function(){});
-      alert('Generated '+links.length+' payment link'+(links.length!==1?'s':'')+' (copied to clipboard):
-
-'+all);
+      alert('Generated '+links.length+' payment link'+(links.length!==1?'s':'')+' (copied to clipboard):\n\n'+all);
     }
   });
 
