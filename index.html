@@ -972,13 +972,10 @@ async function loadLayoutForDate(ds){
     var r=await window.storage.get(lKey(ds));
     if(r&&r.value){
       var saved=JSON.parse(r.value);
-      // Re-populate vendor info from current live data (vendors may have changed)
+      // Re-hydrate vendor info from current live tent assignments (keyed by spot id)
       var ta=getTentAssignments(ds);
-      // Build a map: tentNum -> vendorId from tent assignments
-      var numToVid={};
-      tents.forEach(function(t){if(ta[t.id])numToVid[t.num]=ta[t.id];});
       saved.forEach(function(sp){
-        var vid=numToVid[sp.num]||null;
+        var vid=ta[sp.id]||sp.vendorId||null;
         var v=vid?vendors.find(function(x){return x.id===vid;}):null;
         addLayoutSpot({
           id:sp.id,num:sp.num,size:sp.size,x:sp.x,y:sp.y,w:sp.w,h:sp.h,
@@ -994,35 +991,41 @@ async function loadLayoutForDate(ds){
   }catch(e){}
 
   if(!loaded){
-    // No saved layout — auto-populate from tents assigned to this date
-    var ta2=getTentAssignments(ds);
-    var hasTents=tents.length>0;
-    if(hasTents){
-      // Arrange tents in a simple grid: 4 per row, 10px gap
-      var cols=4,gap=10,startX=60,startY=60;
-      tents.forEach(function(t,i){
-        var vid=ta2[t.id]||null;
-        var v=vid?vendors.find(function(x){return x.id===vid;}):null;
-        var sizeKey=t.size==="20'x20'"?'20x20':t.size==='Food truck'?'truck':t.size==="10'x20'"?'10x20':'10x10';
-        var dims=LSIZES[sizeKey]||LSIZES['10x10'];
-        var col=i%cols,row=Math.floor(i/cols);
+    // No saved layout — create one spot per approved vendor for this date.
+    // The number of spots = number of approved vendors so there is exactly one
+    // spot available for each vendor attending that market day.
+    var approvedIds=getApproved(ds);
+    var count=approvedIds.length;
+    if(count>0){
+      // Arrange in a tidy grid: up to 5 columns, small gap
+      var COLS=5,GAP=10,START_X=60,START_Y=60;
+      var dims=LSIZES['10x10'];
+      for(var i=0;i<count;i++){
+        var col=i%COLS,row=Math.floor(i/COLS);
         addLayoutSpot({
-          num:t.num,size:sizeKey,
-          x:startX+col*(dims.w+gap),
-          y:startY+row*(dims.h+gap+20),
+          num:i+1,size:'10x10',
+          x:START_X+col*(dims.w+GAP),
+          y:START_Y+row*(dims.h+GAP+16),
           w:dims.w,h:dims.h,
-          vendorId:vid||'',
-          vendorName:v?v.businessName:'',
-          vendorCat:v?v.category:'',
-          vendorInactive:v&&v.vendorStatus==='inactive'
+          vendorId:'',vendorName:'',vendorCat:'',vendorInactive:false
         });
-      });
+      }
       updateLayoutBadge('unsaved');
       layoutUnsaved=true;
+      // Toast hint
+      var canvas=document.getElementById('layoutCanvas');
+      if(canvas){
+        var hint=document.createElement('div');
+        hint.style.cssText='position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#fef9c3;border:.5px solid #eab308;border-radius:8px;padding:6px 14px;font-size:11px;color:#a16207;white-space:nowrap;z-index:50;pointer-events:none;font-family:inherit';
+        hint.textContent=count+' spot'+(count!==1?'s':'')+' created — one per approved vendor. Drag to arrange, then Save.';
+        canvas.appendChild(hint);
+        setTimeout(function(){if(hint.parentNode)hint.parentNode.removeChild(hint);},4500);
+      }
     } else {
       updateLayoutBadge('empty');
     }
   }
+  if(loaded)layoutUnsaved=false;
   updateLayoutStats();updateLayoutToolbar();
 }
 
