@@ -23,8 +23,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .auth-footer{text-align:center;font-size:12px;color:#888;margin-top:1rem}
 .auth-link{color:#1a1a1a;font-weight:500;cursor:pointer;text-decoration:underline}
 #app-screen{display:none;padding:.75rem;max-width:980px;margin:0 auto}
-.env-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;margin-bottom:.75rem;border:.5px solid #22c55e;background:#dcfce7}
-.env-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0}
+.env-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;margin-bottom:.75rem}
+.env-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .env-label{font-size:11px;font-weight:500;flex:1;color:#15803d}
 .env-user{font-size:10px;color:#15803d}
 .signout-btn{font-size:10px;padding:4px 9px;border-radius:6px;border:.5px solid #639922;background:#fff;color:#27500A;cursor:pointer;font-family:inherit}
@@ -32,7 +32,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .hdr-title{font-size:16px;font-weight:700}
 .hdr-sub{font-size:11px;color:#888;margin-top:1px}
 nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85rem;background:#f0ede6;border-radius:8px;padding:3px}
-.nb{background:none;border:none;padding:8px 4px;font-size:12px;font-weight:700;color:#888;cursor:pointer;border-radius:6px;text-align:center;font-family:inherit;white-space:nowrap}
+.nb{background:none;border:none;padding:9px 4px;font-size:13px;font-weight:800;color:#888;cursor:pointer;border-radius:6px;text-align:center;font-family:inherit;white-space:nowrap;letter-spacing:-.01em}
 .nb.active{background:#fff;color:#1a1a1a;border:.5px solid #e5e3de;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:5px;margin-bottom:.85rem}
 .stat{background:#fff;border:.5px solid #e5e3de;border-radius:10px;padding:.5rem .65rem}
@@ -236,8 +236,17 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
   <div id="modal-area"></div>
 </div>
 <script>
-// NOTE: Run this in Supabase SQL editor if not already done:
-// ALTER TABLE vendors ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+// ── Environment detection — salmon bg in live, light gray in dev ──────────
+var IS_LIVE=window.location.hostname.indexOf('github.io')>-1||
+            (window.location.hostname!=='localhost'&&window.location.hostname!=='127.0.0.1'&&window.location.hostname!=='');
+var ENV_BG=IS_LIVE?'#fde8e0':'#f0f0f0'; // salmon (live) or light gray (dev)
+var ENV_LABEL=IS_LIVE?'Live — GitHub Pages':'Development — localhost';
+var ENV_COLOR=IS_LIVE?'#c0392b':'#555';
+var ENV_BORDER=IS_LIVE?'#e8a090':'#ccc';
+var ENV_DOT=IS_LIVE?'#e74c3c':'#999';
+document.addEventListener('DOMContentLoaded',function(){
+  document.body.style.background=ENV_BG;
+});
 
 // ── Storage shim — uses localStorage (works on GitHub Pages) ──────────────
 // Mirrors the window.storage API used in layout save/load.
@@ -273,6 +282,7 @@ const sb=createClient(SUPA_URL,SUPA_KEY);
 var vendors=[],tents=[],calRows={},vendorGroups=[],currentUser=null;
 var tab='vendors',cY=new Date().getFullYear(),cM=new Date().getMonth();
 var eId=null,vsFilter='all',reportDate='',reportType='summary',selectedCalDay='',tentViewDate='';
+var reportSortCol='',reportSortDir=1; // 1=asc, -1=desc
 var layoutDate='',layoutSpots=[],layoutUnsaved=false,layoutSelectedIds=new Set(),layoutSnapOn=true,layoutSelectMode=false;
 var formTab=0,formTotalTabs=6,formCompletedTabs=new Set();
 window._ep=[];
@@ -367,7 +377,22 @@ document.getElementById('signout-btn').addEventListener('click',async function()
   document.getElementById('auth-email').value='';document.getElementById('auth-password').value='';
 });
 async function checkSession(){var{data}=await sb.auth.getSession();if(data.session){currentUser=data.session.user;enterApp();}}
-function enterApp(){document.getElementById('auth-screen').style.display='none';document.getElementById('app-screen').style.display='block';document.getElementById('user-email').textContent=currentUser.email;loadData();}
+function enterApp(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-screen').style.display='block';
+  document.getElementById('user-email').textContent=currentUser.email;
+  // Apply environment colors
+  document.body.style.background=ENV_BG;
+  var bar=document.querySelector('.env-bar');
+  if(bar){bar.style.background=IS_LIVE?'#fde8e0':'#e8e8e8';bar.style.border='.5px solid '+ENV_BORDER;}
+  var dot=document.querySelector('.env-dot');
+  if(dot)dot.style.background=ENV_DOT;
+  var lbl=document.querySelector('.env-label');
+  if(lbl){lbl.textContent=ENV_LABEL;lbl.style.color=ENV_COLOR;}
+  var ue=document.getElementById('user-email');
+  if(ue)ue.style.color=ENV_COLOR;
+  loadData();
+}
 
 // ── DATA ──────────────────────────────────────────────────────────────────
 async function ensureSchema(){
@@ -423,25 +448,64 @@ function syncVendorDatesFromCalendar(){
 async function persistVendorDates(vid){
   var v=vendors.find(function(x){return x.id===vid;});
   if(!v)return;
-  try{await sb.from('vendors').update({selected_dates:v.selectedDates,modified_at:nowISO()}).eq('id',vid);}
+  try{await sb.from('vendors').update({selected_dates:v.selectedDates}).eq('id',vid);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',vid);}catch(e){}}
   catch(e){console.warn('Could not persist vendor dates:',e.message);}
 }
 function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',boothFee:r.booth_fee||0,photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
 async function saveVendorDB(data,id){
   var isNew=!id;
-  // Core row — only guaranteed base columns
-  var row={id:id||uid(),vendor_status:data.vendorStatus||'active',status:data.status||'pending',business_name:data.businessName||'',contact_name:data.contactName||'',email:data.email||'',phone:data.phone||'',website:data.website||'',social:data.social||'',category:data.category||'',category_comment:data.categoryComment||'',products:data.products||'',product_desc:data.productDesc||'',local_produced:data.local||'',local_comment:data.localComment||'',price_range:data.priceRange||[],licenses:data.licenses||'',licenses_comment:data.licensesComment||'',food_docs:data.foodDocs||[],liability:data.liability||'',booth_size:data.boothSize||'',own_setup:data.ownSetup||'',setup_comment:data.ownSetupComment||'',electricity:data.electricity||'',attendance:data.attendance||'',months:data.months||'',why_join:data.whyJoin||'',values:data.values||'',additional_info:data.additionalInfo||'',photos:[],selected_dates:data.selectedDates||[],modified_at:nowISO()};
-  if(isNew)row.created_at=nowISO();
+  // ── Core row — only columns that definitely exist in base Supabase vendors table ──
+  var row={
+    id:id||uid(),
+    vendor_status:data.vendorStatus||'active',
+    status:data.status||'pending',
+    business_name:data.businessName||'',
+    contact_name:data.contactName||'',
+    email:data.email||'',
+    phone:data.phone||'',
+    website:data.website||'',
+    social:data.social||'',
+    category:data.category||'',
+    category_comment:data.categoryComment||'',
+    products:data.products||'',
+    product_desc:data.productDesc||'',
+    local_produced:data.local||'',
+    local_comment:data.localComment||'',
+    price_range:data.priceRange||[],
+    licenses:data.licenses||'',
+    licenses_comment:data.licensesComment||'',
+    food_docs:data.foodDocs||[],
+    liability:data.liability||'',
+    booth_size:data.boothSize||'',
+    own_setup:data.ownSetup||'',
+    setup_comment:data.ownSetupComment||'',
+    electricity:data.electricity||'',
+    attendance:data.attendance||'',
+    months:data.months||'',
+    why_join:data.whyJoin||'',
+    values:data.values||'',
+    additional_info:data.additionalInfo||'',
+    photos:[]
+  };
   var{error}=await sb.from('vendors').upsert(row);
   if(error){alert('Error saving vendor: '+error.message);return null;}
-  // Optional columns (contract_received, payment_received, notes) — added via ALTER TABLE
-  // If missing from schema they fail silently — run SQL below to add them
-  var optRow={modified_at:nowISO()};
-  optRow.contract_received=!!data.contractReceived;
-  optRow.payment_received=!!data.paymentReceived;
-  optRow.notes=data.notes||'';
-  var{error:e2}=await sb.from('vendors').update(optRow).eq('id',row.id);
-  if(e2)console.warn('Some columns missing. Run ALTER TABLE in Supabase SQL editor to add contract_received, payment_received, notes, booth_fee columns.');
+
+  // ── Optional columns — added via ALTER TABLE; each tried separately so one
+  //    missing column doesn't block the others ──────────────────────────────
+  var optionals=[
+    {modified_at:nowISO()},
+    isNew?{created_at:nowISO()}:null,
+    {selected_dates:data.selectedDates||[]},
+    {contract_received:!!data.contractReceived},
+    {payment_received:!!data.paymentReceived},
+    {notes:data.notes||''},
+    {booth_fee:data.boothFee||0},
+  ].filter(Boolean);
+
+  for(var i=0;i<optionals.length;i++){
+    var{error:oe}=await sb.from('vendors').update(optionals[i]).eq('id',row.id);
+    if(oe)console.warn('Column not saved (run SQL migration):', Object.keys(optionals[i])[0], '-', oe.message);
+  }
   return row.id;
 }
 async function saveCalRow(ds){
@@ -539,8 +603,8 @@ function renderVendors(){
   el.querySelectorAll('[data-edit]').forEach(function(b){b.addEventListener('click',function(){openForm(b.dataset.edit);});});
   el.querySelectorAll('[data-del]').forEach(function(b){b.addEventListener('click',function(){delV(b.dataset.del);});});
 }
-async function setSt(id,val){await sb.from('vendors').update({status:val,modified_at:nowISO()}).eq('id',id);var v=vendors.find(function(x){return x.id===id;});if(v){v.status=val;v.modifiedAt=nowISO();}render();}
-async function setVs(id,val){await sb.from('vendors').update({vendor_status:val,modified_at:nowISO()}).eq('id',id);var v=vendors.find(function(x){return x.id===id;});if(v){v.vendorStatus=val;v.modifiedAt=nowISO();}render();}
+async function setSt(id,val){await sb.from('vendors').update({status:val}).eq('id',id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}var v=vendors.find(function(x){return x.id===id;});if(v){v.status=val;v.modifiedAt=nowISO();}render();}
+async function setVs(id,val){await sb.from('vendors').update({vendor_status:val}).eq('id',id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}var v=vendors.find(function(x){return x.id===id;});if(v){v.vendorStatus=val;v.modifiedAt=nowISO();}render();}
 async function delV(id){if(!confirm('Remove this vendor?'))return;await sb.from('vendors').delete().eq('id',id);vendors=vendors.filter(function(v){return v.id!==id;});render();}
 // ── CALENDAR ─────────────────────────────────────────────────────────────
 function renderCalendar(){
@@ -1565,27 +1629,149 @@ function openAddLayoutModal(isRow){
 // ── REPORTS ───────────────────────────────────────────────────────────────
 function renderReports(){
   var el=document.getElementById('main-content');var dates=getMarketDates();
-  el.innerHTML='<div style="display:flex;gap:6px;margin-bottom:.85rem;flex-wrap:wrap"><button class="'+(reportType==='summary'?'btn-p':'btn-s')+'" id="rptSumBtn">Vendor summary</button><button class="'+(reportType==='schedule'?'btn-p':'btn-s')+'" id="rptSchBtn">Market day schedule</button></div><div id="reportContent">'+(reportType==='summary'?renderSummaryReport():renderScheduleReport(dates))+'</div>';
-  document.getElementById('rptSumBtn').addEventListener('click',function(){reportType='summary';renderReports();});
-  document.getElementById('rptSchBtn').addEventListener('click',function(){reportType='schedule';renderReports();});
-  document.querySelectorAll('[data-edit-vendor]').forEach(function(row){row.addEventListener('click',function(){openForm(row.dataset.editVendor);});});
+  el.innerHTML=
+    '<div style="display:flex;gap:6px;margin-bottom:.85rem;flex-wrap:wrap">'+
+      '<button class="'+(reportType==='summary'?'btn-p':'btn-s')+'" id="rptSumBtn">Vendor summary</button>'+
+      '<button class="'+(reportType==='schedule'?'btn-p':'btn-s')+'" id="rptSchBtn">Market day schedule</button>'+
+    '</div>'+
+    '<div id="reportContent">'+(reportType==='summary'?renderSummaryReport():renderScheduleReport(dates))+'</div>';
+  document.getElementById('rptSumBtn').addEventListener('click',function(){reportType='summary';reportSortCol='';renderReports();});
+  document.getElementById('rptSchBtn').addEventListener('click',function(){reportType='schedule';reportSortCol='';renderReports();});
+  // Sort column headers
+  document.querySelectorAll('[data-sort-col]').forEach(function(th){
+    th.style.cursor='pointer';th.title='Click to sort';
+    th.addEventListener('click',function(){
+      var col=th.dataset.sortCol;
+      if(reportSortCol===col)reportSortDir*=-1;else{reportSortCol=col;reportSortDir=1;}
+      document.getElementById('reportContent').innerHTML=reportType==='summary'?renderSummaryReport():renderScheduleReport(dates);
+      // Re-attach sort listeners
+      document.querySelectorAll('[data-sort-col]').forEach(function(th2){
+        th2.style.cursor='pointer';
+        th2.addEventListener('click',function(){
+          var col2=th2.dataset.sortCol;
+          if(reportSortCol===col2)reportSortDir*=-1;else{reportSortCol=col2;reportSortDir=1;}
+          document.getElementById('reportContent').innerHTML=reportType==='summary'?renderSummaryReport():renderScheduleReport(dates);
+          attachReportClicks();
+        });
+      });
+      attachReportClicks();
+    });
+  });
+  attachReportClicks();
   var dsel=document.getElementById('reportDateSel');if(dsel)dsel.addEventListener('change',function(){reportDate=this.value;renderReports();});
 }
+
+function attachReportClicks(){
+  document.querySelectorAll('[data-edit-vendor]').forEach(function(row){
+    row.addEventListener('click',function(){openForm(row.dataset.editVendor);});
+  });
+  var dsel=document.getElementById('reportDateSel');
+  if(dsel)dsel.addEventListener('change',function(){reportDate=this.value;renderReports();});
+}
+
+function sortIcon(col){
+  if(reportSortCol!==col)return'<span style="color:#ccc;font-size:9px;margin-left:3px">⇅</span>';
+  return'<span style="color:#1a1a1a;font-size:9px;margin-left:3px">'+(reportSortDir===1?'↑':'↓')+'</span>';
+}
+
+function sortVendors(list,col){
+  if(!col)return list;
+  return list.slice().sort(function(a,b){
+    var av,bv;
+    if(col==='name'){av=a.businessName||'';bv=b.businessName||'';}
+    else if(col==='status'){av=a.vendorStatus||'';bv=b.vendorStatus||'';}
+    else if(col==='sched'){av=a.status||'';bv=b.status||'';}
+    else if(col==='contract'){av=a.contractReceived?1:0;bv=b.contractReceived?1:0;return(bv-av)*reportSortDir;}
+    else if(col==='payment'){av=a.paymentReceived?1:0;bv=b.paymentReceived?1:0;return(bv-av)*reportSortDir;}
+    else if(col==='category'){av=a.category||'';bv=b.category||'';}
+    else if(col==='dates'){av=(a.selectedDates||[]).length;bv=(b.selectedDates||[]).length;return(av-bv)*reportSortDir;}
+    else{av='';bv='';}
+    return av.localeCompare(bv)*reportSortDir;
+  });
+}
+
+function thSort(col,label){
+  return'<th data-sort-col="'+col+'" style="cursor:pointer;user-select:none;white-space:nowrap">'+label+sortIcon(col)+'</th>';
+}
+
 function renderSummaryReport(){
   if(!vendors.length)return'<div class="empty">No vendors yet.</div>';
-  return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem"><span style="font-size:12px;font-weight:600">All vendors ('+vendors.length+')</span><span style="font-size:11px;color:#888">Click any row to edit</span></div><div class="report-wrap"><div style="overflow-x:auto"><table class="report-table"><thead><tr><th>Business</th><th>Phone</th><th>Email</th><th>Status</th><th>Category</th><th>Scheduling</th><th>📄</th><th>💰</th></tr></thead><tbody>'+
-    vendors.map(function(v){var vs=v.vendorStatus||'active';var c=VSC[vs]||VSC.active;var av=avc(v.businessName||'?');return'<tr data-edit-vendor="'+v.id+'" style="cursor:pointer"><td><div style="display:flex;align-items:center;gap:7px"><div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div><span style="font-weight:600">'+esc(v.businessName||'—')+'</span></div></td><td>'+esc(v.phone||'—')+'</td><td style="font-size:10px">'+esc(v.email||'—')+'</td><td><span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span></td><td>'+esc(v.category||'—')+'</td><td>'+schedTag(v.status)+'</td><td>'+(v.contractReceived?'✅':'—')+'</td><td>'+(v.paymentReceived?'✅':'—')+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+  var sorted=sortVendors(vendors,reportSortCol);
+  return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'+
+    '<span style="font-size:12px;font-weight:600">All vendors ('+sorted.length+')</span>'+
+    '<span style="font-size:11px;color:#888">Click column headers to sort · Click any row to edit</span>'+
+  '</div>'+
+  '<div class="report-wrap"><div style="overflow-x:auto"><table class="report-table"><thead><tr>'+
+    thSort('name','Business')+
+    '<th>Phone</th><th>Email</th>'+
+    thSort('status','Vendor Status')+
+    thSort('category','Category')+
+    thSort('sched','Scheduling')+
+    thSort('contract','📄 Contract')+
+    thSort('payment','💰 Payment')+
+    thSort('dates','# Dates')+
+  '</tr></thead><tbody>'+
+    sorted.map(function(v){
+      var vs=v.vendorStatus||'active';var c=VSC[vs]||VSC.active;var av=avc(v.businessName||'?');
+      return'<tr data-edit-vendor="'+v.id+'" style="cursor:pointer">'+
+        '<td><div style="display:flex;align-items:center;gap:7px">'+
+          '<div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+          '<span style="font-weight:600">'+esc(v.businessName||'—')+'</span></div></td>'+
+        '<td>'+esc(v.phone||'—')+'</td>'+
+        '<td style="font-size:10px">'+esc(v.email||'—')+'</td>'+
+        '<td><span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span></td>'+
+        '<td>'+esc(v.category||'—')+'</td>'+
+        '<td>'+schedTag(v.status)+'</td>'+
+        '<td style="text-align:center">'+(v.contractReceived?'<span style="color:#27500A;font-size:14px">✅</span>':'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td style="text-align:center">'+(v.paymentReceived?'<span style="color:#27500A;font-size:14px">✅</span>':'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td style="text-align:center;font-weight:600;color:'+(v.selectedDates&&v.selectedDates.length?'#0C447C':'#ccc')+'">'+((v.selectedDates||[]).length||'—')+'</td>'+
+      '</tr>';
+    }).join('')+
+  '</tbody></table></div></div>';
 }
+
 function renderScheduleReport(dates){
   if(!dates.length)return'<div class="empty">No market dates scheduled yet.</div>';
   var selDate=reportDate||dates[0];
-  var dateOpts='<div class="fg" style="max-width:220px;margin-bottom:.85rem"><label>Select market date</label><select id="reportDateSel" style="width:100%;font-size:12px;padding:6px 8px;border-radius:8px;border:.5px solid #d0cec7;background:#fff;font-family:inherit">'+dates.map(function(ds){return'<option value="'+ds+'"'+(ds===selDate?' selected':'')+'>'+ds+'</option>';}).join('')+'</select></div>';
+  var dateOpts='<div class="fg" style="max-width:220px;margin-bottom:.85rem"><label>Select market date</label>'+
+    '<select id="reportDateSel" style="width:100%;font-size:12px;padding:6px 8px;border-radius:8px;border:.5px solid #d0cec7;background:#fff;font-family:inherit">'+
+    dates.map(function(ds){return'<option value="'+ds+'"'+(ds===selDate?' selected':'')+'>'+ds+'</option>';}).join('')+'</select></div>';
   var att=getApproved(selDate).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
   var ta=getTentAssignments(selDate);var vendorTent={};
   Object.keys(ta).forEach(function(tid){var t=tents.find(function(x){return x.id===tid;});if(t)vendorTent[ta[tid]]='Spot '+t.num+' ('+t.size+')';});
   if(!att.length)return dateOpts+'<div class="empty">No vendors scheduled for this date.</div>';
-  return dateOpts+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem"><span style="font-size:12px;font-weight:600">'+att.length+' vendor'+(att.length!==1?'s':'')+' for '+selDate+'</span><span style="font-size:11px;color:#888">Click any row to edit</span></div><div class="report-wrap"><div style="overflow-x:auto"><table class="report-table"><thead><tr><th>Business</th><th>Category</th><th>Vendor status</th><th>Tent/spot</th><th>Booth size</th><th>Phone</th></tr></thead><tbody>'+
-    att.map(function(v){var vs=v.vendorStatus||'active';var c=VSC[vs]||VSC.active;var av=avc(v.businessName||'?');return'<tr data-edit-vendor="'+v.id+'" style="cursor:pointer"><td><div style="display:flex;align-items:center;gap:7px"><div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div><span style="font-weight:600">'+esc(v.businessName||'—')+'</span></div></td><td>'+esc(v.category||'—')+'</td><td><span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span></td><td>'+esc(vendorTent[v.id]||'Not assigned')+'</td><td>'+esc(v.boothSize||'—')+'</td><td>'+esc(v.phone||'—')+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+  var sorted=sortVendors(att,reportSortCol);
+  return dateOpts+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'+
+      '<span style="font-size:12px;font-weight:600">'+sorted.length+' vendor'+(sorted.length!==1?'s':'')+' for '+selDate+'</span>'+
+      '<span style="font-size:11px;color:#888">Click column headers to sort · Click any row to edit</span>'+
+    '</div>'+
+    '<div class="report-wrap"><div style="overflow-x:auto"><table class="report-table"><thead><tr>'+
+      thSort('name','Business')+
+      thSort('category','Category')+
+      thSort('status','Vendor Status')+
+      '<th>Spot</th>'+
+      '<th>Booth Size</th>'+
+      thSort('contract','📄 Contract')+
+      thSort('payment','💰 Payment')+
+      '<th>Phone</th>'+
+    '</tr></thead><tbody>'+
+      sorted.map(function(v){
+        var vs=v.vendorStatus||'active';var c=VSC[vs]||VSC.active;var av=avc(v.businessName||'?');
+        return'<tr data-edit-vendor="'+v.id+'" style="cursor:pointer">'+
+          '<td><div style="display:flex;align-items:center;gap:7px">'+
+            '<div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+            '<span style="font-weight:600">'+esc(v.businessName||'—')+'</span></div></td>'+
+          '<td>'+esc(v.category||'—')+'</td>'+
+          '<td><span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span></td>'+
+          '<td>'+esc(vendorTent[v.id]||'—')+'</td>'+
+          '<td>'+esc(v.boothSize||'—')+'</td>'+
+          '<td style="text-align:center">'+(v.contractReceived?'<span style="color:#27500A;font-size:14px">✅</span>':'<span style="color:#ccc">—</span>')+'</td>'+
+          '<td style="text-align:center">'+(v.paymentReceived?'<span style="color:#27500A;font-size:14px">✅</span>':'<span style="color:#ccc">—</span>')+'</td>'+
+          '<td>'+esc(v.phone||'—')+'</td>'+
+        '</tr>';
+      }).join('')+
+    '</tbody></table></div></div>';
 }
 function renderWaitlist(){
   var el=document.getElementById('main-content');
@@ -2025,7 +2211,7 @@ function renderPayments(){
       var vid=btn.dataset.saveFee;
       var inp=el.querySelector('[data-fee-vid="'+vid+'"]');
       var fee=parseFloat(inp?inp.value:0)||0;
-      await sb.from('vendors').update({booth_fee:fee,modified_at:nowISO()}).eq('id',vid);
+      await sb.from('vendors').update({booth_fee:fee}).eq('id',vid);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',vid);}catch(e){}
       var v=vendors.find(function(x){return x.id===vid;});if(v)v.boothFee=fee;
       renderPayments();
     });
@@ -2036,7 +2222,7 @@ function renderPayments(){
     btn.addEventListener('click',async function(){
       var v=vendors.find(function(x){return x.id===btn.dataset.markPaid;});if(!v)return;
       var newVal=!v.paymentReceived;
-      await sb.from('vendors').update({payment_received:newVal,modified_at:nowISO()}).eq('id',v.id);
+      await sb.from('vendors').update({payment_received:newVal}).eq('id',v.id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',v.id);}catch(e){}
       v.paymentReceived=newVal;renderPayments();
     });
   });
@@ -2533,7 +2719,7 @@ function renderManage(){
     if(!confirm('Apply fee schedule to '+approved.length+' approved unpaid vendor'+(approved.length!==1?'s':'')+' based on their booth size?'))return;
     var sizeMap={"10'x10'":s.t10x10,"20'x20'":s.t20x20,"10'x20'":s.t10x20,'Food truck / trailer':s.ttruck};
     var updated=0;
-    for(var i=0;i<approved.length;i++){var v=approved[i];var fee=sizeMap[v.boothSize]||0;if(fee>0){await sb.from('vendors').update({booth_fee:fee,modified_at:nowISO()}).eq('id',v.id);v.boothFee=fee;updated++;}}
+    for(var i=0;i<approved.length;i++){var v=approved[i];var fee=sizeMap[v.boothSize]||0;if(fee>0){await sb.from('vendors').update({booth_fee:fee}).eq('id',v.id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',v.id);}catch(e){}v.boothFee=fee;updated++;}}
     alert('✅ Updated '+updated+' vendor'+(updated!==1?'s':'')+'.');renderManage();
   });
 }
