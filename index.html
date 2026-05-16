@@ -31,7 +31,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px}
 .hdr-title{font-size:16px;font-weight:700}
 .hdr-sub{font-size:11px;color:#888;margin-top:1px}
-nav{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin-bottom:.85rem;background:#f0ede6;border-radius:8px;padding:3px}
+nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85rem;background:#f0ede6;border-radius:8px;padding:3px}
 .nb{background:none;border:none;padding:8px 4px;font-size:12px;font-weight:700;color:#888;cursor:pointer;border-radius:6px;text-align:center;font-family:inherit;white-space:nowrap}
 .nb.active{background:#fff;color:#1a1a1a;border:.5px solid #e5e3de;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:5px;margin-bottom:.85rem}
@@ -228,6 +228,7 @@ nav{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin-bottom:.85re
     <button class="nb" data-tab="waitlist">Waitlist</button>
     <button class="nb" data-tab="payments">Payments</button>
     <button class="nb" data-tab="comms">Comms</button>
+    <button class="nb" data-tab="manage">Manage</button>
   </nav>
   <div id="stats-bar"></div>
   <div id="filter-bar"></div>
@@ -397,8 +398,33 @@ async function loadData(){
     var{data:cd,error:ce}=await sb.from('calendar').select('*');
     if(ce)throw ce;calRows={};
     (cd||[]).forEach(function(r){calRows[r.date]={approved:r.approved_vendors||[],waitlist:r.waitlist_vendors||[],tent_assignments:r.tent_assignments||{}};});
+    syncVendorDatesFromCalendar(); // keep vendor.selectedDates in sync with calendar
   }catch(e){console.error(e);}
   render();
+}
+
+// ── Single source of truth — calendar drives vendor dates ──────────────────
+// Rebuilds every vendor's selectedDates from calRows so both views match.
+// Call this after any change to calRows or vendor saves.
+function syncVendorDatesFromCalendar(){
+  var datesByVendor={};
+  Object.keys(calRows).forEach(function(ds){
+    (calRows[ds].approved||[]).forEach(function(vid){
+      if(!datesByVendor[vid])datesByVendor[vid]=[];
+      datesByVendor[vid].push(ds);
+    });
+  });
+  vendors.forEach(function(v){
+    v.selectedDates=(datesByVendor[v.id]||[]).slice().sort();
+  });
+}
+
+// Write a vendor's selectedDates back to Supabase to keep DB in sync
+async function persistVendorDates(vid){
+  var v=vendors.find(function(x){return x.id===vid;});
+  if(!v)return;
+  try{await sb.from('vendors').update({selected_dates:v.selectedDates,modified_at:nowISO()}).eq('id',vid);}
+  catch(e){console.warn('Could not persist vendor dates:',e.message);}
 }
 function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',boothFee:r.booth_fee||0,photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
 async function saveVendorDB(data,id){
@@ -445,6 +471,7 @@ function render(){
   else if(tab==='waitlist')renderWaitlist();
   else if(tab==='payments')renderPayments();
   else if(tab==='comms')renderComms();
+  else if(tab==='manage')renderManage();
 }
 function renderStats(){
   var tot=vendors.length,app=vendors.filter(function(v){return v.status==='approved';}).length,wl=vendors.filter(function(v){return v.status==='waitlist';}).length,eli=eligibleVendors().length,con=vendors.filter(function(v){return v.contractReceived;}).length,pay=vendors.filter(function(v){return v.paymentReceived;}).length,dates=getMarketDates().length;
@@ -542,19 +569,86 @@ function buildDayPanel(ds){
   var ta=getTentAssignments(ds);var vendorTent={};
   Object.keys(ta).forEach(function(tid){var t=tents.find(function(x){return x.id===tid;});if(t)vendorTent[ta[tid]]='Spot '+t.num;});
   var total=appV.length+wlV.length;
-  var header='<div class="day-report-header"><div><div style="font-size:14px;font-weight:700">📅 '+ds+'</div><div style="font-size:11px;color:#888;margin-top:2px">'+total+' vendor'+(total!==1?'s':'')+' · '+appV.length+' approved · '+wlV.length+' waitlisted</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-blue" id="manageDayBtn">+ Manage vendors</button><button class="btn-s" style="font-size:11px" id="closeDayBtn">✕ Close</button></div></div>';
-  function vcard(v,isWL){var av=avc(v.businessName||'?');
+  var assigned=Object.keys(ta).filter(function(k){return ta[k];}).length;
+  var unassigned=appV.length-assigned;
+
+  var header=
+    '<div class="day-report-header">'+
+      '<div>'+
+        '<div style="font-size:14px;font-weight:700">📅 '+ds+'</div>'+
+        '<div style="font-size:11px;color:#888;margin-top:2px">'+
+          total+' vendor'+(total!==1?'s':'')+' · '+
+          appV.length+' approved · '+wlV.length+' waitlisted'+
+        '</div>'+
+        // Spot assignment summary
+        (appV.length?
+          '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'+
+            '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">⛺ '+assigned+' spot'+(assigned!==1?'s':'')+' assigned</span>'+
+            (unassigned>0?'<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806;font-weight:600">⚠️ '+unassigned+' unassigned</span>':'<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">✓ All spots assigned</span>')+
+          '</div>':'')+
+      '</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">'+
+        '<button class="btn-blue" id="manageDayBtn">+ Manage vendors</button>'+
+        '<button class="btn-g" id="goLayoutBtn">🗺 Layout</button>'+
+        '<button class="btn-amber" id="goAssignBtn">⛺ Assignments</button>'+
+        '<button class="btn-s" style="font-size:11px" id="exportDayBtn">↓ Export</button>'+
+        '<button class="btn-s" style="font-size:11px" id="closeDayBtn">✕</button>'+
+      '</div>'+
+    '</div>';
+
+  function vcard(v,isWL){
     var cc=catColor(v.category);var wasInactive=v.vendorStatus==='inactive';
-    return'<div class="day-vendor-card" data-vid="'+v.id+'" style="'+(wasInactive?'opacity:.8;background:#fafafa':'')+'"><div class="dvc-avatar" style="background:'+cc.bg+';color:'+cc.text+';border:1.5px solid '+cc.border+'">'+ini(v.businessName||'?')+'</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">'+esc(v.businessName||'Unnamed')+(wasInactive?'<span style="font-size:9px;font-weight:500;background:#FCEBEB;color:#791F1F;padding:1px 6px;border-radius:20px;margin-left:6px;vertical-align:middle">Now inactive</span>':'')+'</div><div style="font-size:11px;color:#888;margin-top:2px">'+esc(v.contactName||'')+(v.phone?' · '+esc(v.phone):'')+'</div><div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">'+(isWL?'<span class="sched-waitlist">Waitlist</span>':'<span class="sched-approved">Approved</span>')+vsTag(v.vendorStatus||'active')+catBadge(v.category)+(vendorTent[v.id]?'<span class="tag tgr">⛺ '+vendorTent[v.id]+'</span>':'')+'</div></div><div style="font-size:11px;color:#aaa;flex-shrink:0">✏️ Edit</div></div>';
+    return'<div class="day-vendor-card" data-vid="'+v.id+'" style="'+(wasInactive?'opacity:.8;background:#fafafa':'')+'">'+
+      '<div class="dvc-avatar" style="background:'+cc.bg+';color:'+cc.text+';border:1.5px solid '+cc.border+'">'+ini(v.businessName||'?')+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:13px;font-weight:600">'+esc(v.businessName||'Unnamed')+
+          (wasInactive?'<span style="font-size:9px;font-weight:500;background:#FCEBEB;color:#791F1F;padding:1px 6px;border-radius:20px;margin-left:6px;vertical-align:middle">Now inactive</span>':'')+
+        '</div>'+
+        '<div style="font-size:11px;color:#888;margin-top:2px">'+esc(v.contactName||'')+(v.phone?' · '+esc(v.phone):'')+'</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">'+
+          (isWL?'<span class="sched-waitlist">Waitlist</span>':'<span class="sched-approved">Approved</span>')+
+          vsTag(v.vendorStatus||'active')+catBadge(v.category)+
+          (vendorTent[v.id]?'<span class="tag tgr">⛺ '+vendorTent[v.id]+'</span>':'<span style="font-size:10px;color:#aaa;padding:2px 6px">No spot</span>')+
+          (v.contractReceived?'<span class="tag tag-contract">📄</span>':'')+
+          (v.paymentReceived?'<span class="tag tag-payment">💰</span>':'')+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:#aaa;flex-shrink:0">✏️</div>'+
+    '</div>';
   }
+
   var cards='';
   if(!total)cards='<div style="padding:1.25rem;text-align:center;color:#aaa;font-size:12px">No vendors yet.<br><button class="btn-p" style="margin-top:.75rem;font-size:11px" id="addVendorDayBtn">+ Add vendors</button></div>';
-  else{if(appV.length)cards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-bottom:.5px solid #e5e3de">Approved ('+appV.length+')</div>'+appV.map(function(v){return vcard(v,false);}).join('');if(wlV.length)cards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-top:.5px solid #e5e3de">Waitlist ('+wlV.length+')</div>'+wlV.map(function(v){return vcard(v,true);}).join('');}
+  else{
+    if(appV.length)cards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-bottom:.5px solid #e5e3de">Approved ('+appV.length+')</div>'+appV.map(function(v){return vcard(v,false);}).join('');
+    if(wlV.length)cards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-top:.5px solid #e5e3de">Waitlist ('+wlV.length+')</div>'+wlV.map(function(v){return vcard(v,true);}).join('');
+  }
+
   var panel='<div class="day-report">'+header+cards+'</div>';
   setTimeout(function(){
     var mb=document.getElementById('manageDayBtn');if(mb)mb.addEventListener('click',function(){openDayManage(ds);});
     var cb=document.getElementById('closeDayBtn');if(cb)cb.addEventListener('click',function(){selectedCalDay='';renderCalendar();});
     var ab=document.getElementById('addVendorDayBtn');if(ab)ab.addEventListener('click',function(){openDayManage(ds);});
+    // Jump to Layout tab for this date
+    var gl=document.getElementById('goLayoutBtn');if(gl)gl.addEventListener('click',function(){
+      layoutDate=ds;tab='layout';
+      document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('active');});
+      document.querySelector('[data-tab="layout"]').classList.add('active');
+      closeMod();render();
+    });
+    // Jump to Assignments tab for this date
+    var ga=document.getElementById('goAssignBtn');if(ga)ga.addEventListener('click',function(){
+      tentViewDate=ds;tab='tents';
+      document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('active');});
+      document.querySelector('[data-tab="tents"]').classList.add('active');
+      closeMod();render();
+    });
+    // Export day attendees as CSV
+    var ex=document.getElementById('exportDayBtn');if(ex)ex.addEventListener('click',function(){
+      var rows=[['Business Name','Contact','Email','Phone','Category','Vendor Status','Spot','Contract','Payment']];
+      appV.forEach(function(v){rows.push([v.businessName||'',v.contactName||'',v.email||'',v.phone||'',v.category||'',v.vendorStatus||'active',vendorTent[v.id]||'Unassigned',v.contractReceived?'Yes':'No',v.paymentReceived?'Yes':'No']);});
+      downloadCSV('eb-attendees-'+ds+'.csv',rows);
+    });
     document.querySelectorAll('.day-vendor-card[data-vid]').forEach(function(card){card.addEventListener('click',function(){openForm(card.dataset.vid);});});
   },0);
   return panel;
@@ -572,13 +666,34 @@ function openDayManage(ds){
   document.getElementById('dmOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
   var s=document.getElementById('vendorSearch');if(s){s.addEventListener('input',function(){var q=this.value.toLowerCase();document.querySelectorAll('[data-vendor-row]').forEach(function(r){r.style.display=(r.dataset.name.indexOf(q)>-1||r.dataset.cat.indexOf(q)>-1)?'':'none';});});setTimeout(function(){s.focus();},100);}
   var foot=document.getElementById('dmFoot');
-  var clr=document.createElement('button');clr.className='btn-danger';clr.textContent='Clear day';clr.addEventListener('click',async function(){delete calRows[ds];await sb.from('calendar').delete().eq('date',ds);closeMod();renderCalendar();});
+  var clr=document.createElement('button');clr.className='btn-danger';clr.textContent='Clear day';clr.addEventListener('click',async function(){
+    var wasApproved=getApproved(ds).slice();
+    delete calRows[ds];
+    await sb.from('calendar').delete().eq('date',ds);
+    syncVendorDatesFromCalendar();
+    for(var i=0;i<wasApproved.length;i++) await persistVendorDates(wasApproved[i]);
+    closeMod();renderCalendar();
+  });
   var can=document.createElement('button');can.className='btn-s';can.textContent='Cancel';can.addEventListener('click',closeMod);
   var sav=document.createElement('button');sav.className='btn-p';sav.textContent='Save';
   sav.addEventListener('click',async function(){
     var a=Array.from(document.querySelectorAll('.day-check:checked')).map(function(c){return c.value;});
-    if(a.length){if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};calRows[ds].approved=a;calRows[ds].waitlist=[];await saveCalRow(ds);}
-    else{delete calRows[ds];await sb.from('calendar').delete().eq('date',ds);}
+    // Find vendors added/removed compared to previous state
+    var prev=getApproved(ds);
+    var added=a.filter(function(id){return prev.indexOf(id)===-1;});
+    var removed=prev.filter(function(id){return a.indexOf(id)===-1;});
+    if(a.length){
+      if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};
+      calRows[ds].approved=a;calRows[ds].waitlist=[];
+      await saveCalRow(ds);
+    } else {
+      delete calRows[ds];
+      await sb.from('calendar').delete().eq('date',ds);
+    }
+    // Sync vendor.selectedDates for changed vendors
+    syncVendorDatesFromCalendar();
+    var toUpdate=added.concat(removed);
+    for(var i=0;i<toUpdate.length;i++) await persistVendorDates(toUpdate[i]);
     closeMod();renderCalendar();
   });
   foot.appendChild(clr);foot.appendChild(can);foot.appendChild(sav);
@@ -1508,7 +1623,9 @@ function openForm(id){
   eId=id||null;formTab=0;formCompletedTabs=new Set();
   var v=id?vendors.find(function(x){return x.id===id;}):{};if(!v)v={};
   window._ep=(v.photos||[]).slice();
-  var vs=v.vendorStatus||'active',allDates=getMarketDates(),selectedDates=v.selectedDates||[];
+  var vs=v.vendorStatus||'active',allDates=getMarketDates();
+  // Derive which dates this vendor is on from calRows — calendar is the source of truth
+  var selectedDates=id?Object.keys(calRows).filter(function(ds){return(calRows[ds].approved||[]).indexOf(id)>-1;}).sort():[];
   var cats=['Farm / Produce Grower','Rancher / Eggs / Meat / Dairy','Baked Goods','Specialty Food / Packaged Goods','Prepared Food Vendor','Artisan / Maker','Flowers / Plants / Herbal Goods','Other'];
   function rads(name,opts,val,ck,cv){return opts.map(function(o){return'<label class="ropt'+(val===o?' sel':'')+'" data-rn="'+name+'" data-rv="'+esc(o)+'"><input type="radio" name="'+name+'" value="'+esc(o)+'"'+(val===o?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+esc(o)+'</span></label>'+(ck&&o===ck?'<div class="sub-field" id="sub_'+name+'" style="'+(val===ck?'':'display:none')+'"><textarea id="cmt_'+name+'" placeholder="Describe…">'+esc(cv||'')+'</textarea></div>':'');}).join('');}
   var html='<div class="modal lg" style="padding:0;overflow:hidden">'+
@@ -1588,7 +1705,7 @@ function openForm(id){
       '<span style="font-size:11px;color:#888" id="fTabIndicator">1 of 6</span>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
         (id&&v.email?'<button class="btn-blue" id="fEmailBtn">📧 Email vendor</button>':'')+
-        '<button class="btn-p" id="fSaveBtn" style="display:none">✓ Save vendor</button>'+
+        '<button class="btn-p" id="fSaveBtn">✓ Save vendor</button>'+
         '<button class="btn-s" id="fCancelBtn">Cancel</button>'+
       '</div>'+
     '</div></div>';
@@ -1603,7 +1720,6 @@ function openForm(id){
     fo.querySelectorAll('.fsnb').forEach(function(b,i){b.classList.remove('active');if(formCompletedTabs.has(i)&&i!==n)b.classList.add('done');if(i===n){b.classList.add('active');b.classList.remove('done');}});
     var pb=document.getElementById('fPrevBtn');if(pb)pb.disabled=n===0;
     var nb=document.getElementById('fNextBtn');if(nb)nb.style.display=n===formTotalTabs-1?'none':'';
-    var sb=document.getElementById('fSaveBtn');if(sb)sb.style.display=n===formTotalTabs-1?'':'none';
     var ti=document.getElementById('fTabIndicator');if(ti)ti.textContent=(n+1)+' of '+formTotalTabs;
     var pr=document.getElementById('fProgress');if(pr)pr.style.width=((n+1)/formTotalTabs*100)+'%';
     var active=fo.querySelector('.fsnb.active');if(active)active.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
@@ -1669,13 +1785,29 @@ async function saveV(){
   var btn=document.getElementById('fSaveBtn');if(btn){btn.disabled=true;btn.textContent='Saving…';}
   var cat=getR('category');
   var newDates=Array.from(document.querySelectorAll('#fDateChips .dc.on')).map(function(c){return c.dataset.ds;});
-  var existing=eId?vendors.find(function(v){return v.id===eId;}):null;
-  var oldDates=existing?existing.selectedDates||[]:[];
+  // Derive old dates from calRows (source of truth) not v.selectedDates
+  var oldDates=eId?Object.keys(calRows).filter(function(ds){return(calRows[ds].approved||[]).indexOf(eId)>-1;}).sort():[];
   var data={vendorStatus:getR('vendorStatus')||'active',status:((document.getElementById('fAppStatus')||{}).value||'pending'),contractReceived:!!((document.getElementById('fcb-contract')||{}).checked),paymentReceived:!!((document.getElementById('fcb-payment')||{}).checked),selectedDates:newDates,businessName:biz,contactName:contact,email:((document.getElementById('f_email')||{}).value||'').trim(),phone:((document.getElementById('f_phone')||{}).value||'').trim(),website:((document.getElementById('f_web')||{}).value||'').trim(),social:((document.getElementById('f_social')||{}).value||'').trim(),category:cat,categoryComment:cat==='Other'?((document.getElementById('cmt_category')||{}).value||''):'',products:((document.getElementById('f_products')||{}).value||'').trim(),productDesc:((document.getElementById('f_prodDesc')||{}).value||'').trim(),local:getR('local'),localComment:((document.getElementById('cmt_local')||{}).value||''),priceRange:Array.from(document.querySelectorAll('#priceChecks input:checked')).map(function(c){return c.value;}),licenses:getR('licenses'),licensesComment:((document.getElementById('cmt_licenses')||{}).value||''),foodDocs:Array.from(document.querySelectorAll('#fdChecks input:checked')).map(function(c){return c.value;}),liability:getR('liability'),boothSize:getR('boothSize'),ownSetup:getR('ownSetup'),ownSetupComment:((document.getElementById('cmt_ownSetup')||{}).value||''),electricity:getR('electricity'),attendance:getR('attendance'),months:((document.getElementById('f_months')||{}).value||'').trim(),whyJoin:((document.getElementById('f_whyJoin')||{}).value||'').trim(),values:((document.getElementById('f_values')||{}).value||'').trim(),additionalInfo:((document.getElementById('f_addl')||{}).value||'').trim(),notes:((document.getElementById('f_notes')||{}).value||'').trim(),boothFee:parseFloat((document.getElementById('f_boothFee')||{}).value||0)||0,photos:[]};
   var savedId=await saveVendorDB(data,eId);
   if(savedId){
-    for(var i=0;i<newDates.length;i++){var ds=newDates[i];if(oldDates.indexOf(ds)===-1){if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};if(calRows[ds].approved.indexOf(savedId)===-1)calRows[ds].approved.push(savedId);await saveCalRow(ds);}}
-    for(var i=0;i<oldDates.length;i++){var ds=oldDates[i];if(newDates.indexOf(ds)===-1&&calRows[ds]){calRows[ds].approved=calRows[ds].approved.filter(function(x){return x!==savedId;});await saveCalRow(ds);}}
+    // Sync calRows with the new date selection
+    for(var i=0;i<newDates.length;i++){
+      var ds=newDates[i];
+      if(oldDates.indexOf(ds)===-1){
+        if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};
+        if(calRows[ds].approved.indexOf(savedId)===-1)calRows[ds].approved.push(savedId);
+        await saveCalRow(ds);
+      }
+    }
+    for(var i=0;i<oldDates.length;i++){
+      var ds=oldDates[i];
+      if(newDates.indexOf(ds)===-1&&calRows[ds]){
+        calRows[ds].approved=calRows[ds].approved.filter(function(x){return x!==savedId;});
+        await saveCalRow(ds);
+      }
+    }
+    // Rebuild selectedDates for all vendors from calRows so everything is in sync
+    syncVendorDatesFromCalendar();
     await loadData();closeMod();
   }else{if(btn){btn.disabled=false;btn.textContent='✓ Save vendor';}}
 }
@@ -2202,36 +2334,338 @@ function renderCommsGroups(){
   });});
 }
 
+// ── MANAGEMENT TAB ────────────────────────────────────────────────────────
+// Booth fee schedule by spot size + food truck.
+// Fees are stored in localStorage and applied as defaults when setting booth fees.
+
+var FEE_KEY='eb_booth_fee_schedule';
+
+function loadFeeSchedule(){
+  try{var r=localStorage.getItem(FEE_KEY);return r?JSON.parse(r):{t10x10:0,t20x20:0,t10x20:0,ttruck:0};}
+  catch(e){return{t10x10:0,t20x20:0,t10x20:0,ttruck:0};}
+}
+function saveFeeSchedule(s){try{localStorage.setItem(FEE_KEY,JSON.stringify(s));}catch(e){}}
+
+function renderManage(){
+  var el=document.getElementById('main-content');
+  var fees=loadFeeSchedule();
+  var cats=Object.keys(CAT_COLORS);
+
+  el.innerHTML=
+    // ── CSV Import / Export row ────────────────────────────────────────────
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.85rem">'+
+
+    // Import
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:4px">📥 Import vendors from CSV</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:.85rem;line-height:1.6">Upload a CSV file to bulk-add vendors. Existing vendors with the same email are updated, new ones are created.<br><br>'+
+      '<strong>Required columns:</strong> Business Name, Contact Name, Email<br>'+
+      '<strong>Optional:</strong> Phone, Category, Booth Size, Status, Vendor Status, Website, Social</div>'+
+      '<label class="upload-zone" id="csvImportZone" style="display:block;cursor:pointer">'+
+        '<div style="font-size:22px;margin-bottom:6px">📄</div>'+
+        '<div style="font-size:12px;font-weight:600;color:#555">Click to choose a CSV file</div>'+
+        '<div style="font-size:10px;color:#aaa;margin-top:3px">or drag and drop here</div>'+
+        '<input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none">'+
+      '</label>'+
+      '<div id="csvImportStatus" style="margin-top:.65rem;font-size:11px;color:#888"></div>'+
+      '<div style="margin-top:.65rem;display:flex;gap:8px">'+
+        '<button class="btn-s" id="downloadTemplateBtn">↓ Download template</button>'+
+        '<button class="btn-p" id="runImportBtn" style="display:none">📥 Import vendors</button>'+
+      '</div>'+
+    '</div>'+
+
+    // Export
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:4px">📤 Export vendor data</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:.85rem;line-height:1.6">Download your vendor data as a CSV file. Use this to back up your data, share with others, or import into another system.</div>'+
+      '<div style="display:flex;flex-direction:column;gap:8px">'+
+        '<button class="btn-p" id="exportAllBtn" style="text-align:left;display:flex;align-items:center;gap:8px"><span style="font-size:16px">👥</span><div><div style="font-weight:600">All vendors</div><div style="font-size:10px;font-weight:400;opacity:.7">Every field for every vendor</div></div></button>'+
+        '<button class="btn-g" id="exportApprBtn" style="text-align:left;display:flex;align-items:center;gap:8px"><span style="font-size:16px">✅</span><div><div style="font-weight:600">Approved vendors only</div><div style="font-size:10px;font-weight:400;opacity:.7">Ready for the market</div></div></button>'+
+        '<button class="btn-blue" id="exportPayBtn" style="text-align:left;display:flex;align-items:center;gap:8px"><span style="font-size:16px">💳</span><div><div style="font-weight:600">Payments report</div><div style="font-size:10px;font-weight:400;opacity:.7">Fees, paid/unpaid status</div></div></button>'+
+        '<button class="btn-s" id="exportCalBtn2" style="text-align:left;display:flex;align-items:center;gap:8px"><span style="font-size:16px">📅</span><div><div style="font-weight:600">Calendar schedule</div><div style="font-size:10px;font-weight:400;opacity:.7">All dates and vendor lists</div></div></button>'+
+      '</div>'+
+    '</div>'+
+    '</div>'+
+
+    // ── Booth fee schedule ─────────────────────────────────────────────────
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.85rem">'+
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:4px">Booth fee schedule</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:1rem">Default fees by spot size. Click Apply to bulk-set fees for all approved unpaid vendors.</div>'+
+      [['t10x10',"10'×10' Standard"],['t20x20',"20'×20' Double"],['t10x20',"10'×20' Tall"],['ttruck','Food truck / trailer']].map(function(row){
+        return'<div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:.5px solid #f0ede6;gap:12px">'+
+          '<label style="font-size:12px;font-weight:500;color:#1a1a1a;flex:1">'+row[1]+'</label>'+
+          '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px;color:#888">$</span>'+
+          '<input type="number" id="fee_'+row[0]+'" value="'+(fees[row[0]]||0)+'" min="0" step="1" style="width:80px;border:.5px solid #d0cec7;border-radius:6px;padding:5px 8px;font-size:13px;font-family:inherit;text-align:right"></div>'+
+        '</div>';
+      }).join('')+
+      '<div style="margin-top:1rem;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'+
+        '<button class="btn-s" id="applyFeesBtn">Apply to all vendors</button>'+
+        '<button class="btn-p" id="saveFeesBtn">💾 Save schedule</button>'+
+      '</div>'+
+    '</div>'+
+
+    // Category color reference
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:4px">Vendor category colors</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:1rem">Colors appear throughout the app — on vendor cards, layout spots, and tent assignments.</div>'+
+      cats.map(function(cat){var c=CAT_COLORS[cat];return'<div style="display:flex;align-items:center;gap:10px;padding:.45rem 0;border-bottom:.5px solid #f0ede6">'+
+        '<div style="width:14px;height:14px;border-radius:50%;background:'+c.dot+';flex-shrink:0"></div>'+
+        '<div style="flex:1;min-width:0;font-size:12px;font-weight:500">'+esc(cat)+'</div>'+
+        '<div style="font-size:10px;padding:2px 9px;border-radius:20px;background:'+c.bg+';color:'+c.text+';border:.5px solid '+c.border+';white-space:nowrap">preview</div>'+
+      '</div>';}).join('')+
+    '</div>'+
+    '</div>'+
+
+    // Season summary
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:.75rem">Market season summary</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">'+
+        '<div class="stat"><div class="sl">Market dates</div><div class="sv">'+getMarketDates().length+'</div></div>'+
+        '<div class="stat"><div class="sl">Total vendors</div><div class="sv">'+vendors.length+'</div></div>'+
+        '<div class="stat"><div class="sl">Approved</div><div class="sv" style="color:#27500A">'+vendors.filter(function(v){return v.status==='approved';}).length+'</div></div>'+
+        '<div class="stat"><div class="sl">Contracts</div><div class="sv" style="color:#0C447C">'+vendors.filter(function(v){return v.contractReceived;}).length+'</div></div>'+
+        '<div class="stat"><div class="sl">Payments</div><div class="sv" style="color:#27500A">'+vendors.filter(function(v){return v.paymentReceived;}).length+'</div></div>'+
+        '<div class="stat"><div class="sl">Fees expected</div><div class="sv" style="font-size:13px">$'+vendors.filter(function(v){return v.status==='approved';}).reduce(function(s,v){return s+(v.boothFee||0);},0).toFixed(2)+'</div></div>'+
+        '<div class="stat"><div class="sl">Fees collected</div><div class="sv" style="color:#27500A;font-size:13px">$'+vendors.filter(function(v){return v.paymentReceived;}).reduce(function(s,v){return s+(v.boothFee||0);},0).toFixed(2)+'</div></div>'+
+      '</div>'+
+    '</div>';
+
+  // ── Export buttons ─────────────────────────────────────────────────────
+  document.getElementById('exportAllBtn').addEventListener('click',function(){exportVendorsCSV('all');});
+  document.getElementById('exportApprBtn').addEventListener('click',function(){exportVendorsCSV('approved');});
+  document.getElementById('exportPayBtn').addEventListener('click',function(){
+    var rows=[['Vendor','Email','Category','Booth Fee ($)','Payment Status','Contract']];
+    vendors.filter(function(v){return v.status==='approved';}).forEach(function(v){rows.push([v.businessName||'',v.email||'',v.category||'',(v.boothFee||0).toFixed(2),v.paymentReceived?'Paid':'Unpaid',v.contractReceived?'Received':'Pending']);});
+    downloadCSV('eb-payments-'+today()+'.csv',rows);
+  });
+  document.getElementById('exportCalBtn2').addEventListener('click',exportCalCSV);
+
+  // ── Download CSV template ───────────────────────────────────────────────
+  document.getElementById('downloadTemplateBtn').addEventListener('click',function(){
+    var rows=[
+      ['Business Name','Contact Name','Email','Phone','Website','Social','Category','Booth Size','Status','Vendor Status','Products','Notes'],
+      ['Example Farm','Jane Smith','jane@farm.com','(541) 555-0100','https://farm.com','@farmhandle','Farm / Produce Grower',"10'x10'",'approved','active','Fresh vegetables, herbs','Prefers corner spot'],
+    ];
+    downloadCSV('eb-vendor-import-template.csv',rows);
+  });
+
+  // ── CSV file input ──────────────────────────────────────────────────────
+  var csvData=[];
+  document.getElementById('csvFileInput').addEventListener('change',function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        csvData=parseCSV(ev.target.result);
+        var status=document.getElementById('csvImportStatus');
+        var runBtn=document.getElementById('runImportBtn');
+        if(csvData.length<2){status.innerHTML='<span style="color:#791F1F">CSV appears empty or invalid.</span>';return;}
+        var headers=csvData[0].map(function(h){return h.trim().toLowerCase();});
+        var hasName=headers.indexOf('business name')>-1;
+        if(!hasName){status.innerHTML='<span style="color:#791F1F">Missing required column: "Business Name"</span>';return;}
+        var count=csvData.length-1;
+        status.innerHTML='<span style="color:#27500A">✓ Found '+count+' vendor'+(count!==1?'s':'')+' ready to import.</span>';
+        runBtn.style.display='';
+      }catch(err){document.getElementById('csvImportStatus').innerHTML='<span style="color:#791F1F">Error reading file: '+esc(err.message)+'</span>';}
+    };
+    reader.readAsText(file);
+  });
+
+  // Drag and drop on import zone
+  var zone=document.getElementById('csvImportZone');
+  if(zone){
+    zone.addEventListener('dragover',function(e){e.preventDefault();zone.style.borderColor='#378ADD';zone.style.background='#E6F1FB';});
+    zone.addEventListener('dragleave',function(){zone.style.borderColor='';zone.style.background='';});
+    zone.addEventListener('drop',function(e){e.preventDefault();zone.style.borderColor='';zone.style.background='';var f=e.dataTransfer.files[0];if(f){var inp=document.getElementById('csvFileInput');var dt=new DataTransfer();dt.items.add(f);inp.files=dt.files;inp.dispatchEvent(new Event('change'));}});
+    zone.addEventListener('click',function(e){if(e.target.id!=='csvFileInput')document.getElementById('csvFileInput').click();});
+  }
+
+  // Run import
+  document.getElementById('runImportBtn').addEventListener('click',async function(){
+    if(!csvData.length){alert('No CSV data loaded.');return;}
+    var btn=this;btn.disabled=true;btn.textContent='Importing…';
+    var headers=csvData[0].map(function(h){return h.trim().toLowerCase();});
+    function col(row,name){var i=headers.indexOf(name.toLowerCase());return i>-1?(row[i]||'').trim():'';}
+    var CAT_VALID=['Farm / Produce Grower','Rancher / Eggs / Meat / Dairy','Baked Goods','Specialty Food / Packaged Goods','Prepared Food Vendor','Artisan / Maker','Flowers / Plants / Herbal Goods','Other'];
+    var created=0,updated=0,skipped=0;
+    for(var i=1;i<csvData.length;i++){
+      var row=csvData[i];
+      if(!row.length||!row.join('').trim())continue;
+      var bizName=col(row,'business name');
+      if(!bizName){skipped++;continue;}
+      var email=col(row,'email');
+      // Find existing vendor by email or business name
+      var existing=null;
+      if(email)existing=vendors.find(function(v){return v.email&&v.email.toLowerCase()===email.toLowerCase();});
+      if(!existing)existing=vendors.find(function(v){return v.businessName&&v.businessName.toLowerCase()===bizName.toLowerCase();});
+      var cat=col(row,'category');
+      if(cat&&CAT_VALID.indexOf(cat)===-1)cat='Other';
+      var status=col(row,'status');
+      if(['approved','pending','waitlist'].indexOf(status)===-1)status='pending';
+      var vs=col(row,'vendor status');
+      if(['active','inwork','inactive'].indexOf(vs)===-1)vs='active';
+      var boothSize=col(row,'booth size');
+      var data={businessName:bizName,contactName:col(row,'contact name'),email:email,phone:col(row,'phone'),website:col(row,'website'),social:col(row,'social'),category:cat,boothSize:boothSize,status:status,vendorStatus:vs,products:col(row,'products'),notes:col(row,'notes'),selectedDates:[],contractReceived:false,paymentReceived:false,boothFee:0,priceRange:[],licenses:'',foodDocs:[],liability:'',ownSetup:'',electricity:'',attendance:'',months:'',whyJoin:'',values:'',additionalInfo:''};
+      if(existing){Object.assign(existing,data);existing.modifiedAt=nowISO();}
+      var savedId=await saveVendorDB(data,existing?existing.id:null);
+      if(savedId&&!existing){vendors.unshift(Object.assign({id:savedId,createdAt:nowISO(),modifiedAt:nowISO()},data));created++;}
+      else if(existing){updated++;}
+      else skipped++;
+    }
+    btn.disabled=false;btn.textContent='📥 Import vendors';
+    document.getElementById('csvImportStatus').innerHTML='<span style="color:#27500A">✅ Done! Created: '+created+' · Updated: '+updated+' · Skipped: '+skipped+'</span>';
+    csvData=[];document.getElementById('csvFileInput').value='';document.getElementById('runImportBtn').style.display='none';
+    renderStats();renderManage();
+  });
+
+  // ── Fee schedule buttons ─────────────────────────────────────────────────
+  document.getElementById('saveFeesBtn').addEventListener('click',function(){
+    var s={t10x10:parseFloat(document.getElementById('fee_t10x10').value)||0,t20x20:parseFloat(document.getElementById('fee_t20x20').value)||0,t10x20:parseFloat(document.getElementById('fee_t10x20').value)||0,ttruck:parseFloat(document.getElementById('fee_ttruck').value)||0};
+    saveFeeSchedule(s);
+    var btn=document.getElementById('saveFeesBtn');btn.textContent='✅ Saved!';setTimeout(function(){btn.textContent='💾 Save schedule';},1500);
+  });
+  document.getElementById('applyFeesBtn').addEventListener('click',async function(){
+    var s={t10x10:parseFloat(document.getElementById('fee_t10x10').value)||0,t20x20:parseFloat(document.getElementById('fee_t20x20').value)||0,t10x20:parseFloat(document.getElementById('fee_t10x20').value)||0,ttruck:parseFloat(document.getElementById('fee_ttruck').value)||0};
+    saveFeeSchedule(s);
+    var approved=vendors.filter(function(v){return v.status==='approved'&&!v.paymentReceived;});
+    if(!approved.length){alert('No approved unpaid vendors to update.');return;}
+    if(!confirm('Apply fee schedule to '+approved.length+' approved unpaid vendor'+(approved.length!==1?'s':'')+' based on their booth size?'))return;
+    var sizeMap={"10'x10'":s.t10x10,"20'x20'":s.t20x20,"10'x20'":s.t10x20,'Food truck / trailer':s.ttruck};
+    var updated=0;
+    for(var i=0;i<approved.length;i++){var v=approved[i];var fee=sizeMap[v.boothSize]||0;if(fee>0){await sb.from('vendors').update({booth_fee:fee,modified_at:nowISO()}).eq('id',v.id);v.boothFee=fee;updated++;}}
+    alert('✅ Updated '+updated+' vendor'+(updated!==1?'s':'')+'.');renderManage();
+  });
+}
+
+// ── CSV parser (handles quoted fields) ────────────────────────────────────
+function parseCSV(text){
+  var rows=[];var lines=text.split(/\r?\n/);
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i];if(!line.trim())continue;
+    var row=[];var cur='';var inQ=false;
+    for(var j=0;j<line.length;j++){
+      var ch=line[j];
+      if(ch==='"'){if(inQ&&line[j+1]==='"'){cur+='"';j++;}else inQ=!inQ;}
+      else if(ch===','&&!inQ){row.push(cur);cur='';}
+      else cur+=ch;
+    }
+    row.push(cur);rows.push(row);
+  }
+  return rows;
+}
+
+// ── IMPROVED GROUP MODAL — filter by name, category, date, status ──────────
 function openGroupModal(groupId){
   var g=groupId?vendorGroups.find(function(x){return x.id===groupId;}):null;
   var memberIds=g?g.member_ids||[]:[];
+  var dates=getMarketDates();
+  var cats=Object.keys(CAT_COLORS);
+
   document.getElementById('modal-area').innerHTML=
-    '<div class="overlay" id="groupModalOverlay"><div class="modal md">'+
+    '<div class="overlay" id="groupModalOverlay"><div class="modal md" style="max-height:90vh;overflow-y:auto">'+
     '<div class="mtitle">'+(g?'Edit group: '+esc(g.name):'New vendor group')+'</div>'+
     '<div class="fg"><label>Group name</label><input id="gName" value="'+esc(g?g.name:'')+'" placeholder="e.g. Food vendors, Regular vendors…" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit"></div>'+
-    '<div class="fg"><label>Members <span style="font-weight:400;color:#aaa">— select vendors to include</span></label>'+
-      '<input id="gSearch" placeholder="🔍 Search vendors…" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;margin-bottom:.5rem">'+
-      '<div style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:4px" id="gMemberList">'+
-        vendors.map(function(v){
-          var av=avc(v.businessName||'?');
-          return'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:.5px solid #e5e3de;border-radius:8px;cursor:pointer;background:#fff" class="g-member-opt" data-name="'+esc((v.businessName||'').toLowerCase())+'" data-cat="'+esc((v.category||'').toLowerCase())+'">'+
-            '<input type="checkbox" value="'+v.id+'" class="g-member-cb"'+(memberIds.indexOf(v.id)>-1?' checked':'')+' style="width:15px;height:15px;accent-color:#22c55e;flex-shrink:0">'+
-            '<div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
-            '<div><div style="font-size:12px;font-weight:600">'+esc(v.businessName||'Unnamed')+'</div>'+
-            '<div style="font-size:10px;color:#888">'+esc(v.category||'—')+'</div></div>'+
-          '</label>';
-        }).join('')+
-      '</div>'+
+
+    // Filters row
+    '<div style="font-size:11px;font-weight:600;color:#555;margin-bottom:.5rem">Filter vendors</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:.65rem">'+
+      // Text search
+      '<div><div style="font-size:10px;color:#888;margin-bottom:3px">Search by name</div>'+
+      '<input id="gSearch" placeholder="🔍 Name…" style="width:100%;border:.5px solid #d0cec7;border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit"></div>'+
+      // Category filter
+      '<div><div style="font-size:10px;color:#888;margin-bottom:3px">Vendor type</div>'+
+      '<select id="gFilterCat" style="width:100%;border:.5px solid #d0cec7;border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit">'+
+        '<option value="">All types</option>'+
+        cats.map(function(c){return'<option value="'+esc(c)+'">'+esc(c.split(' / ')[0])+'</option>';}).join('')+
+      '</select></div>'+
+      // Status filter
+      '<div><div style="font-size:10px;color:#888;margin-bottom:3px">Vendor status</div>'+
+      '<select id="gFilterStatus" style="width:100%;border:.5px solid #d0cec7;border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit">'+
+        '<option value="">All statuses</option>'+
+        '<option value="approved">Approved</option>'+
+        '<option value="pending">Pending</option>'+
+        '<option value="waitlist">Waitlist</option>'+
+      '</select></div>'+
+    '</div>'+
+    // Date filter (full width)
+    (dates.length?
+      '<div style="margin-bottom:.65rem"><div style="font-size:10px;color:#888;margin-bottom:3px">Attending market date</div>'+
+      '<select id="gFilterDate" style="width:100%;border:.5px solid #d0cec7;border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit">'+
+        '<option value="">Any date</option>'+
+        dates.map(function(ds){return'<option value="'+ds+'">'+ds+'</option>';}).join('')+
+      '</select></div>':'')+
+
+    // Select all / clear
+    '<div style="display:flex;gap:6px;margin-bottom:.5rem;align-items:center">'+
+      '<button type="button" id="gSelAll" style="font-size:10px;padding:3px 9px;border-radius:20px;border:.5px solid #d0cec7;background:#f8f7f4;cursor:pointer;font-family:inherit">Select visible</button>'+
+      '<button type="button" id="gClrAll" style="font-size:10px;padding:3px 9px;border-radius:20px;border:.5px solid #d0cec7;background:#f8f7f4;cursor:pointer;font-family:inherit">Clear all</button>'+
+      '<span id="gCount" style="font-size:10px;color:#888;margin-left:4px">'+memberIds.length+' selected</span>'+
+    '</div>'+
+
+    // Vendor list
+    '<div style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;border:.5px solid #e5e3de;border-radius:8px;padding:6px" id="gMemberList">'+
+      vendors.map(function(v){
+        var av=avc(v.businessName||'?');
+        return'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:.5px solid #e5e3de;border-radius:8px;cursor:pointer;background:#fff" class="g-member-opt"'+
+          ' data-name="'+esc((v.businessName||'').toLowerCase())+'"'+
+          ' data-cat="'+esc((v.category||'').toLowerCase())+'"'+
+          ' data-catfull="'+esc(v.category||'')+'"'+
+          ' data-status="'+esc(v.status||'pending')+'"'+
+          ' data-dates="'+esc(getMarketDates().filter(function(ds){return getApproved(ds).indexOf(v.id)>-1;}).join(','))+'">'+
+          '<input type="checkbox" value="'+v.id+'" class="g-member-cb"'+(memberIds.indexOf(v.id)>-1?' checked':'')+' style="width:15px;height:15px;accent-color:#22c55e;flex-shrink:0">'+
+          '<div style="width:28px;height:28px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(v.businessName||'Unnamed')+'</div>'+
+            '<div style="font-size:10px;color:#888">'+esc(v.category||'—')+' · '+schedTag(v.status)+'</div>'+
+          '</div>'+
+        '</label>';
+      }).join('')+
     '</div>'+
     '<div class="mfoot" id="groupModalFoot"></div>'+
     '</div></div>';
 
   document.getElementById('groupModalOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
-  document.getElementById('gSearch').addEventListener('input',function(){
-    var q=this.value.toLowerCase();
+
+  // Filter function — applies all active filters simultaneously
+  function applyGroupFilters(){
+    var q=(document.getElementById('gSearch').value||'').toLowerCase();
+    var cat=(document.getElementById('gFilterCat').value||'').toLowerCase();
+    var status=(document.getElementById('gFilterStatus').value||'');
+    var date=(document.getElementById('gFilterDate')&&document.getElementById('gFilterDate').value)||'';
+    var visible=0;
     document.querySelectorAll('.g-member-opt').forEach(function(row){
-      row.style.display=(row.dataset.name.indexOf(q)>-1||row.dataset.cat.indexOf(q)>-1)?'':'none';
+      var nameMatch=!q||row.dataset.name.indexOf(q)>-1;
+      var catMatch=!cat||row.dataset.cat.indexOf(cat)>-1;
+      var statusMatch=!status||row.dataset.status===status;
+      var dateMatch=!date||row.dataset.dates.indexOf(date)>-1;
+      var show=nameMatch&&catMatch&&statusMatch&&dateMatch;
+      row.style.display=show?'':'none';
+      if(show)visible++;
     });
+    document.getElementById('gCount').textContent=
+      document.querySelectorAll('.g-member-cb:checked').length+' selected · '+visible+' visible';
+  }
+
+  function updateCount(){
+    var vis=document.querySelectorAll('.g-member-opt:not([style*="none"])').length;
+    document.getElementById('gCount').textContent=document.querySelectorAll('.g-member-cb:checked').length+' selected · '+vis+' visible';
+  }
+
+  ['gSearch','gFilterCat','gFilterStatus'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.addEventListener('input',applyGroupFilters);el&&el.addEventListener('change',applyGroupFilters);
+  });
+  var gfd=document.getElementById('gFilterDate');if(gfd)gfd.addEventListener('change',applyGroupFilters);
+
+  document.querySelectorAll('.g-member-cb').forEach(function(cb){cb.addEventListener('change',updateCount);});
+
+  document.getElementById('gSelAll').addEventListener('click',function(){
+    document.querySelectorAll('.g-member-opt:not([style*="display: none"]):not([style*="display:none"]) .g-member-cb').forEach(function(cb){cb.checked=true;});
+    updateCount();
+  });
+  document.getElementById('gClrAll').addEventListener('click',function(){
+    document.querySelectorAll('.g-member-cb').forEach(function(cb){cb.checked=false;});
+    updateCount();
   });
 
   var foot=document.getElementById('groupModalFoot');
