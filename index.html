@@ -240,13 +240,21 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
 var IS_LIVE=window.location.hostname.indexOf('github.io')>-1||
             (window.location.hostname!=='localhost'&&window.location.hostname!=='127.0.0.1'&&window.location.hostname!=='');
 var ENV_BG=IS_LIVE?'#fde8e0':'#f0f0f0'; // salmon (live) or light gray (dev)
-var ENV_LABEL=IS_LIVE?'Live — GitHub Pages':'Development — localhost';
+var ENV_LABEL=IS_LIVE?'🔴 Live — GitHub Pages':'🟡 Development — localhost';
 var ENV_COLOR=IS_LIVE?'#c0392b':'#555';
 var ENV_BORDER=IS_LIVE?'#e8a090':'#ccc';
 var ENV_DOT=IS_LIVE?'#e74c3c':'#999';
 document.addEventListener('DOMContentLoaded',function(){
   document.body.style.background=ENV_BG;
 });
+
+// ── Supabase — switches database based on environment ─────────────────────
+// LIVE:  https://akpelvb2k26.github.io/elevation-bend/  → live Supabase project
+// DEV:   http://localhost:8080                           → dev Supabase project (isolated data)
+var SUPA_URL_LIVE='https://mixubqomqdfcrgfovnwy.supabase.co';
+var SUPA_KEY_LIVE='sb_publishable_btz05uH2n90XYfkGIooLog_CY71YUW3';
+var SUPA_URL_DEV='https://zcgnzabbgktxbbrmlail.supabase.co';
+var SUPA_KEY_DEV='sb_publishable_bkiuAwIFhPe3vCq8c-YToQ_S8TTyLgI';
 
 // ── Storage shim — uses localStorage (works on GitHub Pages) ──────────────
 // Mirrors the window.storage API used in layout save/load.
@@ -274,8 +282,8 @@ window.storage = {
     } catch(e) { return {keys:[]}; }
   }
 };
-const SUPA_URL='https://mixubqomqdfcrgfovnwy.supabase.co';
-const SUPA_KEY='sb_publishable_btz05uH2n90XYfkGIooLog_CY71YUW3';
+const SUPA_URL=IS_LIVE?SUPA_URL_LIVE:SUPA_URL_DEV;
+const SUPA_KEY=IS_LIVE?SUPA_KEY_LIVE:SUPA_KEY_DEV;
 const {createClient}=supabase;
 const sb=createClient(SUPA_URL,SUPA_KEY);
 
@@ -381,14 +389,20 @@ function enterApp(){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
   document.getElementById('user-email').textContent=currentUser.email;
-  // Apply environment colors
+  // Apply environment colors and labels
   document.body.style.background=ENV_BG;
   var bar=document.querySelector('.env-bar');
   if(bar){bar.style.background=IS_LIVE?'#fde8e0':'#e8e8e8';bar.style.border='.5px solid '+ENV_BORDER;}
   var dot=document.querySelector('.env-dot');
   if(dot)dot.style.background=ENV_DOT;
   var lbl=document.querySelector('.env-label');
-  if(lbl){lbl.textContent=ENV_LABEL;lbl.style.color=ENV_COLOR;}
+  if(lbl){
+    lbl.textContent=IS_LIVE
+      ?'🔴 LIVE — akpelvb2k26.github.io  ·  DB: mixubqomqdfcrgfovnwy'
+      :'🟡 DEV — localhost  ·  DB: zcgnzabbgktxbbrmlail (isolated)';
+    lbl.style.color=ENV_COLOR;
+    lbl.style.fontWeight='600';
+  }
   var ue=document.getElementById('user-email');
   if(ue)ue.style.color=ENV_COLOR;
   loadData();
@@ -2010,10 +2024,9 @@ var STRIPE_PRICE_ID='';// Optional: your Stripe Price ID for booth fee product
 // STRIPE_PK: your publishable key from stripe.com/dashboard → API keys
 // SUPABASE_FUNCTIONS_URL: your Supabase project functions endpoint
 var STRIPE_PK='';  // e.g. 'pk_live_...' or 'pk_test_...'
-var SUPABASE_FN_URL='https://mixubqomqdfcrgfovnwy.supabase.co/functions/v1';
+var SUPABASE_FN_URL=(IS_LIVE?SUPA_URL_LIVE:SUPA_URL_DEV)+'/functions/v1';
 // Supabase anon key (JWT) — needed to call Edge Functions.
-// Get this from: Supabase Dashboard → Settings → API → anon public key (starts with eyJ...)
-var SUPA_ANON_KEY='';  // paste your anon key here
+var SUPA_ANON_KEY=IS_LIVE?SUPA_KEY_LIVE:SUPA_KEY_DEV;
 
 var stripeLoaded=false;
 var stripeInstance=null;
