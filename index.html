@@ -32,7 +32,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .hdr-title{font-size:16px;font-weight:700}
 .hdr-sub{font-size:11px;color:#888;margin-top:1px}
 nav{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin-bottom:.85rem;background:#f0ede6;border-radius:8px;padding:3px}
-.nb{background:none;border:none;padding:7px 3px;font-size:10px;font-weight:500;color:#888;cursor:pointer;border-radius:6px;text-align:center;font-family:inherit;white-space:nowrap}
+.nb{background:none;border:none;padding:8px 4px;font-size:12px;font-weight:700;color:#888;cursor:pointer;border-radius:6px;text-align:center;font-family:inherit;white-space:nowrap}
 .nb.active{background:#fff;color:#1a1a1a;border:.5px solid #e5e3de;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:5px;margin-bottom:.85rem}
 .stat{background:#fff;border:.5px solid #e5e3de;border-radius:10px;padding:.5rem .65rem}
@@ -237,6 +237,33 @@ nav{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin-bottom:.85re
 <script>
 // NOTE: Run this in Supabase SQL editor if not already done:
 // ALTER TABLE vendors ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+
+// ── Storage shim — uses localStorage (works on GitHub Pages) ──────────────
+// Mirrors the window.storage API used in layout save/load.
+window.storage = {
+  set: function(key, value) {
+    try { localStorage.setItem('eb_'+key, value); return {key:key,value:value}; }
+    catch(e) { console.error('storage.set failed:',e); return null; }
+  },
+  get: function(key) {
+    try { var v=localStorage.getItem('eb_'+key); return v!==null?{key:key,value:v}:null; }
+    catch(e) { return null; }
+  },
+  delete: function(key) {
+    try { localStorage.removeItem('eb_'+key); return {key:key,deleted:true}; }
+    catch(e) { return null; }
+  },
+  list: function(prefix) {
+    try {
+      var p='eb_'+(prefix||''), keys=[];
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i);
+        if(k&&k.startsWith(p))keys.push(k.slice(3));
+      }
+      return {keys:keys,prefix:prefix};
+    } catch(e) { return {keys:[]}; }
+  }
+};
 const SUPA_URL='https://mixubqomqdfcrgfovnwy.supabase.co';
 const SUPA_KEY='sb_publishable_btz05uH2n90XYfkGIooLog_CY71YUW3';
 const {createClient}=supabase;
@@ -420,20 +447,51 @@ function render(){
   else if(tab==='comms')renderComms();
 }
 function renderStats(){
-  var tot=vendors.length,app=vendors.filter(function(v){return v.status==='approved';}).length,wl=vendors.filter(function(v){return v.status==='waitlist';}).length,eli=eligibleVendors().length,con=vendors.filter(function(v){return v.contractReceived;}).length,pay=vendors.filter(function(v){return v.paymentReceived;}).length;
-  document.getElementById('stats-bar').innerHTML='<div class="stats"><div class="stat"><div class="sl">Total</div><div class="sv">'+tot+'</div></div><div class="stat"><div class="sl">Approved</div><div class="sv" style="color:#27500A">'+app+'</div></div><div class="stat"><div class="sl">🟢 Eligible</div><div class="sv" style="color:#15803d">'+eli+'</div></div><div class="stat"><div class="sl">Waitlist</div><div class="sv" style="color:#633806">'+wl+'</div></div><div class="stat"><div class="sl">📄 Contracts</div><div class="sv" style="color:#0C447C">'+con+'</div></div><div class="stat"><div class="sl">💰 Payments</div><div class="sv" style="color:#27500A">'+pay+'</div></div><div class="stat"><div class="sl">Dates</div><div class="sv">'+getMarketDates().length+'</div></div></div>';
+  var tot=vendors.length,app=vendors.filter(function(v){return v.status==='approved';}).length,wl=vendors.filter(function(v){return v.status==='waitlist';}).length,eli=eligibleVendors().length,con=vendors.filter(function(v){return v.contractReceived;}).length,pay=vendors.filter(function(v){return v.paymentReceived;}).length,dates=getMarketDates().length;
+  // On the Vendors tab the stat cards double as filter buttons
+  var isVendors=tab==='vendors';
+  function mkStat(filterVal,label,val,color,activeFilter){
+    var isActive=isVendors&&vsFilter===filterVal;
+    return'<div onclick="'+(isVendors?'setStatFilter(\''+filterVal+'\')':'')+'" style="background:'+(isActive?'#1a1a1a':'#fff')+';border:'+(isActive?'.5px solid #1a1a1a':'.5px solid #e5e3de')+';border-radius:10px;padding:.5rem .65rem;cursor:'+(isVendors?'pointer':'default')+';transition:all .15s'+(isActive?'':';')+'">'+
+      '<div style="font-size:9px;color:'+(isActive?'#aaa':'#888')+';margin-bottom:1px;text-transform:uppercase;letter-spacing:.03em;font-weight:600">'+label+'</div>'+
+      '<div style="font-size:16px;font-weight:700;color:'+(isActive?'#fff':color||'#1a1a1a')+'">'+val+'</div>'+
+      (isVendors?'<div style="font-size:8px;color:'+(isActive?'rgba(255,255,255,.5)':'#ccc')+';margin-top:1px">click to filter</div>':'')+
+    '</div>';
+  }
+  document.getElementById('stats-bar').innerHTML='<div class="stats">'+
+    mkStat('all','Total',tot,'#1a1a1a')+
+    mkStat('approved','Approved',app,'#27500A')+
+    mkStat('eligible','🟢 Eligible',eli,'#15803d')+
+    mkStat('waitlist','Waitlist',wl,'#633806')+
+    mkStat('pending','Pending',vendors.filter(function(v){return v.status==='pending';}).length,'#a16207')+
+    mkStat('contract','📄 Contracts',con,'#0C447C')+
+    mkStat('payment','💰 Payments',pay,'#27500A')+
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:10px;padding:.5rem .65rem"><div style="font-size:9px;color:#888;margin-bottom:1px;text-transform:uppercase;letter-spacing:.03em;font-weight:600">Dates</div><div style="font-size:16px;font-weight:700">'+dates+'</div></div>'+
+  '</div>';
 }
+function setStatFilter(f){vsFilter=f;renderStats();renderVendors();}
 function renderFilterBar(){
-  var filters=[['all','All'],['active','Active'],['inwork','In-Work'],['inactive','Inactive']];
-  document.getElementById('filter-bar').innerHTML='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.75rem">'+filters.map(function(f){var on=vsFilter===f[0];var dot=f[0]!=='all'?'<span class="vs-dot" style="background:'+VSC[f[0]].dot+';display:inline-block"></span>':'';return'<button style="font-size:11px;padding:4px 10px;border-radius:20px;border:.5px solid '+(on?'#1a1a1a':'#d0cec7')+';background:'+(on?'#1a1a1a':'#f8f7f4')+';color:'+(on?'#fff':'#888')+';cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px" onclick="setVsFilter(\''+f[0]+'\')">'+dot+f[1]+'</button>';}).join('')+'</div>';
+  // Filter bar is now embedded in stat cards above — nothing needed here
+  document.getElementById('filter-bar').innerHTML='';
 }
-function setVsFilter(f){vsFilter=f;render();}
 
 // ── VENDORS ───────────────────────────────────────────────────────────────
 function renderVendors(){
   var el=document.getElementById('main-content');
-  var allV=vendors.filter(function(v){return vsFilter==='all'||(v.vendorStatus||'active')===vsFilter;});
-  if(!allV.length){el.innerHTML='<div class="empty">'+(vendors.length?'No vendors match this filter.':'No vendors yet. Click + New to add one.')+'</div>';return;}
+  var allV=vendors.filter(function(v){
+    if(vsFilter==='all')return true;
+    if(vsFilter==='approved')return v.status==='approved';
+    if(vsFilter==='waitlist')return v.status==='waitlist';
+    if(vsFilter==='pending')return v.status==='pending';
+    if(vsFilter==='eligible')return v.status==='approved'&&(v.vendorStatus||'active')==='active';
+    if(vsFilter==='contract')return v.contractReceived;
+    if(vsFilter==='payment')return v.paymentReceived;
+    return true;
+  });
+  if(!allV.length){
+    var msg=vsFilter==='all'?'No vendors yet. Click + New to add one.':'No vendors match this filter — click Total to see all.';
+    el.innerHTML='<div class="empty">'+msg+'</div>';return;
+  }
   var html='';
   [['approved','Approved'],['pending','Pending'],['waitlist','Waitlist']].forEach(function(g){
     var list=allV.filter(function(v){return(v.status||'pending')===g[0];});
@@ -1077,20 +1135,11 @@ function renderLayoutSpot(sp){
     removeLayoutSpotLocal(sp.id);markLayoutUnsaved();updateLayoutStats();updateLayoutToolbar();
   });
 
-  // ── Single mousedown handler manages both drag and click ──────────────────
-  // We measure total movement distance. If < 5px it's a click, otherwise a drag.
-  el.addEventListener('mousedown',function(e){
-    if(e.target.classList.contains('lspot-del'))return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    var isCtrl=e.ctrlKey||e.metaKey||layoutSelectMode;
-    var startX=e.clientX,startY=e.clientY;
-    var totalDist=0;
-    var isDrag=false;
-
-    // In select mode or Ctrl held: toggle this spot's selection without clearing others
-    // In normal mode: if spot not selected, clear all others and select just this one
+  // ── Unified pointer handler — works on mouse (desktop) and touch (iOS/iPad) ──
+  // Measures movement distance: < 8px = tap/click, >= 8px = drag.
+  // Touch events use changedTouches[0] for coordinates.
+  function startInteraction(startX, startY, isCtrl){
+    var totalDist=0, isDrag=false;
     if(!isCtrl){
       if(!layoutSelectedIds.has(sp.id)){
         layoutSelectedIds.clear();
@@ -1103,16 +1152,14 @@ function renderLayoutSpot(sp){
       var s=layoutSpots.find(function(x){return x.id===sid;});
       if(s)orig[sid]={x:s.x,y:s.y};
     });
-    // Also track this spot itself for solo drag when not yet selected
     orig[sp.id]=orig[sp.id]||{x:sp.x,y:sp.y};
 
-    function onMove(ev){
-      var dx=ev.clientX-startX,dy=ev.clientY-startY;
+    function doMove(cx,cy){
+      var dx=cx-startX,dy=cy-startY;
       totalDist=Math.sqrt(dx*dx+dy*dy);
-      if(totalDist>5){
+      if(totalDist>8){
         isDrag=true;
         el.classList.add('dragging');
-        // Move all selected spots
         layoutSelectedIds.forEach(function(sid){
           var s=layoutSpots.find(function(x){return x.id===sid;});if(!s)return;
           var o=orig[sid];if(!o)return;
@@ -1124,34 +1171,72 @@ function renderLayoutSpot(sp){
       }
     }
 
-    function onUp(ev){
-      document.removeEventListener('mousemove',onMove);
-      document.removeEventListener('mouseup',onUp);
+    function doEnd(){
       el.classList.remove('dragging');
-
       if(isDrag){
-        // Finished drag — just save unsaved flag, no panel
         markLayoutUnsaved();
       } else {
-        // It was a click — handle select or open panel
-      if(isCtrl){
-        // Select mode or Ctrl: toggle this spot
-        if(layoutSelectedIds.has(sp.id)){layoutSelectedIds.delete(sp.id);el.classList.remove('lsel');}
-        else{layoutSelectedIds.add(sp.id);el.classList.add('lsel');}
-        updateLayoutToolbar();
-      } else {
-        // Normal click — clear selection and open panel
-        layoutSelectedIds.clear();
-        layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});
-        updateLayoutToolbar();
-        openLayoutSpotPanel(sp);
-      }
+        if(isCtrl){
+          if(layoutSelectedIds.has(sp.id)){layoutSelectedIds.delete(sp.id);el.classList.remove('lsel');}
+          else{layoutSelectedIds.add(sp.id);el.classList.add('lsel');}
+          updateLayoutToolbar();
+        } else {
+          layoutSelectedIds.clear();
+          layoutSpots.forEach(function(s){var se=document.getElementById('ls-'+s.id);if(se)se.classList.remove('lsel');});
+          updateLayoutToolbar();
+          openLayoutSpotPanel(sp);
+        }
       }
     }
 
-    document.addEventListener('mousemove',onMove);
-    document.addEventListener('mouseup',onUp);
+    // Mouse events
+    function onMouseMove(ev){doMove(ev.clientX,ev.clientY);}
+    function onMouseUp(){
+      document.removeEventListener('mousemove',onMouseMove);
+      document.removeEventListener('mouseup',onMouseUp);
+      doEnd();
+    }
+
+    // Touch events
+    function onTouchMove(ev){
+      ev.preventDefault(); // prevent page scroll while dragging spot
+      var t=ev.changedTouches[0];
+      doMove(t.clientX,t.clientY);
+    }
+    function onTouchEnd(ev){
+      el.removeEventListener('touchmove',onTouchMove);
+      el.removeEventListener('touchend',onTouchEnd);
+      doEnd();
+    }
+
+    return {
+      attachMouse: function(){
+        document.addEventListener('mousemove',onMouseMove);
+        document.addEventListener('mouseup',onMouseUp);
+      },
+      attachTouch: function(){
+        el.addEventListener('touchmove',onTouchMove,{passive:false});
+        el.addEventListener('touchend',onTouchEnd);
+      }
+    };
+  }
+
+  // Mouse start
+  el.addEventListener('mousedown',function(e){
+    if(e.target.classList.contains('lspot-del'))return;
+    e.preventDefault();e.stopPropagation();
+    var h=startInteraction(e.clientX,e.clientY,e.ctrlKey||e.metaKey||layoutSelectMode);
+    h.attachMouse();
   });
+
+  // Touch start (iOS / iPad)
+  el.addEventListener('touchstart',function(e){
+    if(e.target.classList.contains('lspot-del'))return;
+    e.stopPropagation();
+    var t=e.changedTouches[0];
+    var h=startInteraction(t.clientX,t.clientY,layoutSelectMode);
+    h.attachTouch();
+  },{passive:true});
 }
 // KEY: only removes from local array + DOM — no Supabase delete, no global effect
 function removeLayoutSpotLocal(id){
@@ -1169,8 +1254,9 @@ function openLayoutSpotPanel(sp){
   var cc=v?catColor(v.category):null;
 
   document.getElementById('modal-area').innerHTML=
-    '<div class="overlay" id="lspOverlay"><div class="modal md">'+
-    '<div class="mtitle">⛺ Spot '+sp.num+' — '+layoutDate+'</div>'+
+    '<div class="overlay" id="lspOverlay" style="align-items:center"><div class="modal md" style="max-height:90vh;overflow-y:auto;padding:0">'+
+    '<div class="mtitle" style="padding:1rem 1.25rem;border-bottom:.5px solid #e5e3de;margin:0">⛺ Spot '+sp.num+' — '+layoutDate+'</div>'+
+    '<div style="padding:1rem 1.25rem">'+
 
     // Current vendor card (if assigned)
     (v?
@@ -1221,13 +1307,13 @@ function openLayoutSpotPanel(sp){
     '<div class="fg">'+
       '<label>'+(v?'Change assigned vendor':'Assign vendor')+'</label>'+
       '<input style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:7px 10px;font-size:13px;background:#fff;font-family:inherit;margin-bottom:.5rem;outline:none" id="lsp-search" placeholder="🔍 Search vendors…" type="text">'+
-      '<div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px" id="lsp-vendorList">'+
+      '<div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px" id="lsp-vendorList">'+
         eligible.map(function(ev){
           var ecc=catColor(ev.category);
           return'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:.5px solid '+(sp.vendorId===ev.id?ecc.border:'#e5e3de')+';border-radius:8px;cursor:pointer;background:'+(sp.vendorId===ev.id?ecc.bg:'#fff')+'" class="lsp-vopt" data-vid="'+ev.id+'" data-name="'+esc((ev.businessName||'').toLowerCase())+'" data-cat="'+esc((ev.category||'').toLowerCase())+'">'+
             '<input type="radio" name="lsp-vendor" value="'+ev.id+'"'+(sp.vendorId===ev.id?' checked':'')+' style="accent-color:#22c55e;flex-shrink:0">'+
             '<div style="width:26px;height:26px;border-radius:50%;background:'+ecc.border+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+ini(ev.businessName||'?')+'</div>'+
-            '<div><div style="font-size:12px;font-weight:600;color:#1a1a1a">'+esc(ev.businessName||'Unnamed')+'</div>'+
+            '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(ev.businessName||'Unnamed')+'</div>'+
             '<div style="font-size:10px;color:#888">'+esc(ev.category||'—')+(ev.boothSize?' · '+esc(ev.boothSize):'')+'</div></div>'+
           '</label>';
         }).join('')+
@@ -1238,6 +1324,7 @@ function openLayoutSpotPanel(sp){
       '</div>'+
     '</div>'+
     '<div class="mfoot" id="lspFoot"></div>'+
+    '</div>'+
     '</div></div>';
 
   document.getElementById('lspOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
@@ -1433,7 +1520,29 @@ function openForm(id){
     '<div class="fg"><label>Vendor status</label><div class="vs-grid">'+['active','inwork','inactive'].map(function(k){var vc=VSC[k];return'<div class="vs-card'+(vs===k?' '+FVSC[k].cls:'')+'" data-fvs="'+k+'" id="fvsc-'+k+'"><div class="vs-card-dot" style="background:'+vc.dot+'"></div><div class="vs-card-label" style="color:'+(vs===k?FVSC[k].text:'#aaa')+'">'+vc.label+'</div><input type="radio" name="vendorStatus" value="'+k+'"'+(vs===k?' checked':'')+' style="display:none"></div>';}).join('')+'</div></div>'+
     '<div class="fg"><label>Contract &amp; payment</label><div class="toggle-grid"><label class="toggle-card'+(v.contractReceived?' on-contract':'')+'" id="ftc-contract"><div style="font-size:18px">📄</div><div><div class="tc-label">Contract received</div><div class="tc-sub">Signed on file</div></div><input type="checkbox" id="fcb-contract"'+(v.contractReceived?' checked':'')+'></label><label class="toggle-card'+(v.paymentReceived?' on-payment':'')+'" id="ftc-payment"><div style="font-size:18px">💰</div><div><div class="tc-label">Payment received</div><div class="tc-sub">Booth fee collected</div></div><input type="checkbox" id="fcb-payment"'+(v.paymentReceived?' checked':'')+'></label></div></div>'+
     '<div class="fg"><label>Application status</label><select id="fAppStatus"><option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option><option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option><option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option></select></div>'+
-    '<div class="fg"><label>Desired market dates — tap to select</label>'+(allDates.length?'<div class="date-chips" id="fDateChips">'+allDates.map(function(ds){return'<span class="dc'+(selectedDates.indexOf(ds)>-1?' on':'')+'" data-ds="'+ds+'">'+ds+'</span>';}).join('')+'</div><div style="font-size:10px;color:#888;margin-top:5px">Selecting adds vendor to that market day</div>':'<div class="notice">No market dates yet. Go to Calendar → click a date → Manage vendors.</div>')+'</div>'+
+    '<div class="fg"><label>Market dates attending <span style="font-weight:400;color:#aaa">— tap to select (Fridays Apr 1 – Nov 1, 2026)</span></label>'+
+    '<div style="margin-bottom:6px;display:flex;gap:5px;flex-wrap:wrap">'+
+      '<button type="button" onclick="(function(){document.querySelectorAll(\'#fDateChips .dc\').forEach(function(c){c.classList.add(\'on\');});})()" style="font-size:10px;padding:3px 9px;border-radius:20px;border:.5px solid #d0cec7;background:#f8f7f4;cursor:pointer;font-family:inherit">Select all</button>'+
+      '<button type="button" onclick="(function(){document.querySelectorAll(\'#fDateChips .dc\').forEach(function(c){c.classList.remove(\'on\');});})()" style="font-size:10px;padding:3px 9px;border-radius:20px;border:.5px solid #d0cec7;background:#f8f7f4;cursor:pointer;font-family:inherit">Clear all</button>'+
+    '</div>'+
+    '<div class="date-chips" id="fDateChips" style="max-height:160px;overflow-y:auto;padding:4px 2px">'+
+    (function(){
+      var dates=[];
+      var d=new Date(2026,3,1); // Apr 1 2026
+      var end=new Date(2026,10,1); // Nov 1 2026
+      // Advance to first Friday
+      while(d.getDay()!==5)d.setDate(d.getDate()+1);
+      while(d<=end){
+        var ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        var on=selectedDates.indexOf(ds)>-1;
+        dates.push('<span class="dc'+(on?' on':'')+'" data-ds="'+ds+'">'+ds+'</span>');
+        d.setDate(d.getDate()+7);
+      }
+      return dates.join('');
+    })()+
+    '</div>'+
+    '<div style="font-size:10px;color:#888;margin-top:4px" id="fDateCount">'+selectedDates.length+' date'+(selectedDates.length!==1?'s':'')+' selected</div>'+
+    '</div>'+
     '<div class="fg"><label>Booth fee <span style="font-weight:400;color:#aaa">— amount charged for this vendor</span></label>'+
     '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:13px;color:#888">$</span><input id="f_boothFee" type="number" min="0" step="1" value="'+esc(String(v.boothFee||0))+'" style="max-width:120px"></div></div>'+
     '<div class="fg"><label>Internal notes / comments <span style="font-weight:400;color:#aaa">— visible to market staff only</span></label><textarea id="f_notes" style="height:64px;font-size:13px" placeholder="e.g. Needs help with setup, prefers corner spot, follow up on contract…">'+esc(v.notes||'')+'</textarea></div>'+
@@ -1471,7 +1580,18 @@ function openForm(id){
     '<label class="upload-zone">☁️ Click to upload photos<input type="file" accept="image/*" multiple style="display:none" id="fPhotoInput"></label>'+
     '<div id="fPhotoGrid" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div></div>'+
     // FOOTER
-    '<div class="form-footer"><div style="display:flex;gap:6px"><button class="btn-s" id="fPrevBtn" disabled>‹ Previous</button><button class="btn-s" id="fNextBtn">Next ›</button></div><span style="font-size:11px;color:#888" id="fTabIndicator">1 of 6</span><div style="display:flex;gap:6px"><button class="btn-p" id="fSaveBtn" style="display:none">✓ Save vendor</button><button class="btn-s" id="fCancelBtn">Cancel</button></div></div></div>';
+    '<div class="form-footer">'+
+      '<div style="display:flex;gap:6px">'+
+        '<button class="btn-s" id="fPrevBtn" disabled>‹ Previous</button>'+
+        '<button class="btn-s" id="fNextBtn">Next ›</button>'+
+      '</div>'+
+      '<span style="font-size:11px;color:#888" id="fTabIndicator">1 of 6</span>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+        (id&&v.email?'<button class="btn-blue" id="fEmailBtn">📧 Email vendor</button>':'')+
+        '<button class="btn-p" id="fSaveBtn" style="display:none">✓ Save vendor</button>'+
+        '<button class="btn-s" id="fCancelBtn">Cancel</button>'+
+      '</div>'+
+    '</div></div>';
   document.getElementById('modal-area').innerHTML='<div class="overlay" id="formOverlay">'+html+'</div>';
   document.getElementById('formOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
   // Tab nav
@@ -1494,6 +1614,32 @@ function openForm(id){
   if(fo2)fo2.querySelectorAll('.fsnb').forEach(function(b){b.addEventListener('click',function(){goFormTab(parseInt(b.dataset.ftab));});});
   document.getElementById('fCancelBtn').addEventListener('click',closeMod);
   document.getElementById('fSaveBtn').addEventListener('click',saveV);
+  // Email vendor button — shown when editing a vendor who has an email address
+  var fEmail=document.getElementById('fEmailBtn');
+  if(fEmail){fEmail.addEventListener('click',function(){
+    // Read current email from form in case it was just edited
+    var currentEmail=((document.getElementById('f_email')||{}).value||v.email||'').trim();
+    var name=((document.getElementById('f_biz')||{}).value||v.businessName||'Vendor').trim();
+    if(!currentEmail){alert('No email address on file for this vendor.');return;}
+    // Open a quick compose modal
+    document.getElementById('modal-area').innerHTML=
+      '<div class="overlay" id="vendorEmailOverlay"><div class="modal md"><div class="mtitle">📧 Email '+esc(name)+'</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:.85rem">To: <strong>'+esc(currentEmail)+'</strong></div>'+
+      '<div class="fg"><label>Subject</label><input id="veSubject" value="Elevation Bend Farmers Market" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit"></div>'+
+      '<div class="fg"><label>Message</label><textarea id="veBody" style="width:100%;height:180px;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical" placeholder="Type your message…">Hi '+esc(v.contactName||name)+',\n\n\n\nThank you,\nElevation Bend Farmers Market</textarea></div>'+
+      '<div class="mfoot" id="vefoot"></div></div></div>';
+    document.getElementById('vendorEmailOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
+    var foot=document.getElementById('vefoot');
+    var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='Cancel';canBtn.addEventListener('click',closeMod);
+    var sendBtn=document.createElement('button');sendBtn.className='btn-p';sendBtn.textContent='📧 Open in mail app';
+    sendBtn.addEventListener('click',function(){
+      var subj=(document.getElementById('veSubject').value||'').trim();
+      var body=(document.getElementById('veBody').value||'').trim();
+      sendEmail(currentEmail,subj,body);
+      closeMod();
+    });
+    foot.appendChild(canBtn);foot.appendChild(sendBtn);
+  });}
   // VS cards
   document.querySelectorAll('[data-fvs]').forEach(function(card){card.addEventListener('click',function(){var k=card.dataset.fvs;['active','inwork','inactive'].forEach(function(x){var el=document.getElementById('fvsc-'+x);if(!el)return;el.className='vs-card';el.querySelector('.vs-card-label').style.color='#aaa';el.querySelector('input').checked=false;});card.className='vs-card '+FVSC[k].cls;card.querySelector('.vs-card-label').style.color=FVSC[k].text;card.querySelector('input').checked=true;});});
   // Toggle cards
@@ -1502,7 +1648,12 @@ function openForm(id){
   // App status
   var fas=document.getElementById('fAppStatus');if(fas)fas.addEventListener('change',function(){document.getElementById('fSchedBadge').innerHTML=schedTag(this.value);});
   // Date chips
-  document.querySelectorAll('#fDateChips .dc').forEach(function(chip){chip.addEventListener('click',function(){chip.classList.toggle('on');});});
+  document.querySelectorAll('#fDateChips .dc').forEach(function(chip){chip.addEventListener('click',function(){
+    chip.classList.toggle('on');
+    var cnt=document.querySelectorAll('#fDateChips .dc.on').length;
+    var el=document.getElementById('fDateCount');
+    if(el)el.textContent=cnt+' date'+(cnt!==1?'s':'')+' selected';
+  });});
   // Radio groups
   var subMap={category:'sub_category',local:'sub_local',licenses:'sub_licenses',ownSetup:'sub_ownSetup'};
   var trigMap={category:'Other',local:'Some (describe below)',licenses:'Not Yet (describe below)',ownSetup:'Partial (describe below)'};
