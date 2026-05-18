@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice — Elevation Bend Farmers Market</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --green:#27500A;--green-light:#EAF3DE;--green-border:#639922;
+    --blue:#0C447C;--blue-light:#E8F0FB;
+    --border:#E5E3DE;--gray-light:#F8F7F4;
+  }
+  body{font-family:'DM Sans',sans-serif;background:#f4f1ec;min-height:100vh;color:#1a1a1a;}
+  header{background:#fff;border-bottom:1.5px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .logo-text{font-size:16px;font-weight:800;color:var(--green);}
+  .logo-sub{font-size:11px;color:#888;font-weight:500;}
+  main{max-width:700px;margin:32px auto;padding:0 16px;}
+  .card{background:#fff;border-radius:16px;border:.5px solid var(--border);overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.06);}
+  .inv-header{padding:28px 32px;border-bottom:2px solid #1a1a1a;display:flex;justify-content:space-between;align-items:flex-start;}
+  .market-name{font-size:22px;font-weight:800;color:var(--green);}
+  .market-sub{font-size:11px;color:#888;margin-top:3px;line-height:1.6;}
+  .inv-title h1{font-size:32px;font-weight:900;text-align:right;color:#1a1a1a;}
+  .inv-num{font-size:13px;color:#888;text-align:right;margin-top:2px;font-family:'DM Mono',monospace;}
+  .status-badge{display:inline-block;margin-top:6px;font-size:11px;padding:4px 12px;border-radius:20px;font-weight:700;}
+  .bill-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:24px 32px;border-bottom:.5px solid var(--border);}
+  .bill-block label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#888;font-weight:700;display:block;margin-bottom:8px;}
+  .bill-block .name{font-size:17px;font-weight:800;margin-bottom:4px;}
+  .bill-block .val{font-size:13px;line-height:1.7;color:#555;}
+  table{width:100%;border-collapse:collapse;}
+  .table-wrap{padding:0 32px;}
+  thead tr{background:var(--gray-light);}
+  th{text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#888;font-weight:700;border-bottom:1.5px solid var(--border);}
+  td{padding:12px;border-bottom:.5px solid #f0ede6;font-size:13px;}
+  tr:last-child td{border-bottom:none;}
+  .totals{padding:16px 32px;text-align:right;border-top:1.5px solid var(--border);}
+  .total-row{display:flex;justify-content:flex-end;gap:80px;padding:4px 0;font-size:13px;color:#555;}
+  .total-row.grand{font-size:20px;font-weight:900;color:#1a1a1a;border-top:2px solid #1a1a1a;margin-top:8px;padding-top:12px;}
+  .pay-section{padding:24px 32px;border-top:.5px solid var(--border);}
+  .pay-btn{display:inline-block;background:var(--green);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:15px;font-weight:800;letter-spacing:-.01em;transition:opacity .15s;}
+  .pay-btn:hover{opacity:.88;}
+  .notes{padding:16px 32px;background:var(--gray-light);font-size:13px;color:#555;border-top:.5px solid var(--border);}
+  footer{text-align:center;padding:32px;font-size:12px;color:#aaa;margin-top:16px;}
+  .loading{display:flex;align-items:center;justify-content:center;min-height:300px;flex-direction:column;gap:12px;}
+  .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .error{text-align:center;padding:48px;color:#888;}
+  .error h2{font-size:20px;font-weight:700;margin-bottom:8px;}
+  @media(max-width:600px){
+    .bill-section{grid-template-columns:1fr;}
+    .inv-header{flex-direction:column;gap:16px;}
+    .inv-title{text-align:left;}
+    .inv-title h1{text-align:left;}
+    .inv-num{text-align:left;}
+  }
+  @media print{
+    body{background:#fff;}
+    header,.pay-section{display:none;}
+    main{margin:0;max-width:100%;}
+    .card{box-shadow:none;border:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌿</div>
+    <div>
+      <div class="logo-text">Elevation Bend</div>
+      <div class="logo-sub">Farmers Market · Bend, Oregon</div>
+    </div>
+  </div>
+  <button onclick="window.print()" style="background:var(--gray-light);border:.5px solid var(--border);border-radius:8px;padding:8px 16px;font-size:13px;font-family:inherit;cursor:pointer;font-weight:600">🖨 Print</button>
+</header>
+
+<main>
+  <div id="root" class="loading">
+    <div class="spinner"></div>
+    <div style="font-size:13px;color:#888">Loading invoice…</div>
+  </div>
+</main>
+
+<footer>Elevation Bend Farmers Market · Bend, Oregon · Secure invoice viewer</footer>
+
+<script>
+const SUPA_URL='https://mixubqomqdfcrgfovnwy.supabase.co';
+const SUPA_KEY='sb_publishable_btz05uH2n90XYfkGIooLog_CY71YUW3';
+const {createClient}=supabase;
+const sb=createClient(SUPA_URL,SUPA_KEY);
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmt(d){if(!d)return'';try{return new Date(d).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});}catch(e){return d;}}
+
+const params=new URLSearchParams(window.location.search);
+const invoiceId=params.get('id')||params.get('invoice');
+
+async function load(){
+  const root=document.getElementById('root');
+
+  if(!invoiceId){
+    root.innerHTML='<div class="error"><h2>No invoice specified</h2><p>Please use the link provided in your email.</p></div>';
+    return;
+  }
+
+  // Load invoice + vendor
+  const [{data:inv,error:invErr},{data:vendors}]=await Promise.all([
+    sb.from('invoices').select('*').eq('id',invoiceId).single(),
+    sb.from('vendors').select('id,business_name,contact_name,email,phone,category,booth_size'),
+  ]);
+
+  if(invErr||!inv){
+    root.innerHTML='<div class="error"><h2>Invoice not found</h2><p>This invoice link may be invalid or expired. Please contact us.</p></div>';
+    return;
+  }
+
+  const v=(vendors||[]).find(function(x){return x.id===inv.vendor_id;})||{};
+  const lineItems=inv.line_items||((inv.dates||[]).map(function(d){return{date:d,description:'Booth fee ('+(v.booth_size||'standard')+')',amount:parseFloat(inv.total||0)/Math.max((inv.dates||[]).length,1)};}));
+  const total=parseFloat(inv.total||0);
+
+  // Status badge
+  const statusStyles={
+    paid:'background:#EAF3DE;color:#27500A',
+    sent:'background:#E8F0FB;color:#0C447C',
+    draft:'background:#f0ede6;color:#555',
+    overdue:'background:#FCEBEB;color:#791F1F'
+  };
+  const statusLabels={paid:'✅ PAID',sent:'📧 SENT',draft:'📝 DRAFT',overdue:'⚠️ OVERDUE'};
+  const isOverdue=inv.status==='sent'&&inv.due_date&&new Date(inv.due_date)<new Date();
+  const statusKey=isOverdue?'overdue':inv.status;
+
+  document.title='Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market';
+
+  root.innerHTML=
+    '<div class="card">'+
+
+    // Header
+    '<div class="inv-header">'+
+      '<div>'+
+        '<div class="market-name">Elevation Bend</div>'+
+        '<div class="market-sub">Farmers Market · Bend, Oregon<br>elevation.bend@market.com</div>'+
+      '</div>'+
+      '<div class="inv-title">'+
+        '<h1>INVOICE</h1>'+
+        '<div class="inv-num">'+esc(inv.invoice_number)+'</div>'+
+        '<div><span class="status-badge" style="'+statusStyles[statusKey]+'">'+statusLabels[statusKey]+'</span></div>'+
+      '</div>'+
+    '</div>'+
+
+    // Billing
+    '<div class="bill-section">'+
+      '<div class="bill-block">'+
+        '<label>Bill to</label>'+
+        '<div class="name">'+esc(v.business_name||'Vendor')+'</div>'+
+        '<div class="val">'+
+          (v.contact_name?esc(v.contact_name)+'<br>':'')+
+          (v.email?esc(v.email)+'<br>':'')+
+          (v.phone?esc(v.phone)+'<br>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="bill-block">'+
+        '<label>Invoice details</label>'+
+        '<div class="val">'+
+          '<strong>Invoice #:</strong> '+esc(inv.invoice_number)+'<br>'+
+          '<strong>Issued:</strong> '+fmt(inv.created_at)+'<br>'+
+          (inv.due_date?'<strong>Due:</strong> '+fmt(inv.due_date)+'<br>':'')+
+          (inv.status==='paid'&&inv.paid_at?'<strong>Paid:</strong> '+fmt(inv.paid_at)+'<br>':'')+
+          '<strong>Booth size:</strong> '+esc(v.booth_size||'Standard')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
+    // Line items
+    '<div class="table-wrap" style="padding-top:16px;padding-bottom:8px">'+
+    '<table>'+
+      '<thead><tr><th>#</th><th>Market Date</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead>'+
+      '<tbody>'+
+      lineItems.map(function(li,i){
+        return'<tr>'+
+          '<td style="color:#aaa;font-family:DM Mono,monospace;font-size:11px">'+(i+1)+'</td>'+
+          '<td><strong>'+esc(li.date||'')+'</strong></td>'+
+          '<td style="color:#555">'+esc(li.description||'Booth fee')+'</td>'+
+          '<td style="text-align:right;font-weight:700;font-family:DM Mono,monospace">$'+parseFloat(li.amount||0).toFixed(2)+'</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody>'+
+    '</table>'+
+    '</div>'+
+
+    // Totals
+    '<div class="totals">'+
+      '<div class="total-row"><span>Subtotal</span><span>$'+total.toFixed(2)+'</span></div>'+
+      '<div class="total-row"><span>Tax</span><span>$0.00</span></div>'+
+      '<div class="total-row grand"><span>Total Due</span><span>$'+total.toFixed(2)+'</span></div>'+
+    '</div>'+
+
+    // Pay section
+    (inv.status!=='paid'&&inv.stripe_payment_link
+      ?'<div class="pay-section" style="background:var(--green-light);border-top:2px solid var(--green-border)">'+
+          '<div style="font-size:14px;font-weight:800;color:var(--green);margin-bottom:6px">Pay Online</div>'+
+          '<div style="font-size:13px;color:#555;margin-bottom:16px">Secure payment — no account required. Click below to pay with card.</div>'+
+          '<a href="'+esc(inv.stripe_payment_link)+'" class="pay-btn">💳 Pay $'+total.toFixed(2)+' Now</a>'+
+        '</div>'
+      :inv.status==='paid'
+        ?'<div class="pay-section" style="background:var(--green-light)">'+
+            '<div style="font-size:15px;font-weight:800;color:var(--green)">✅ Payment received — thank you!</div>'+
+            (inv.paid_at?'<div style="font-size:12px;color:#639922;margin-top:4px">Paid on '+fmt(inv.paid_at)+'</div>':'')+
+          '</div>'
+        :'')+
+
+    // Notes
+    (inv.notes?'<div class="notes"><strong>Notes:</strong> '+esc(inv.notes)+'</div>':'')+
+
+    // Footer
+    '<div style="padding:20px 32px;border-top:.5px solid var(--border);font-size:11px;color:#aaa;text-align:center;line-height:1.8">'+
+      'Thank you for being part of the Elevation Bend Farmers Market community!<br>'+
+      'Questions? Contact us at elevation.bend@market.com'+
+    '</div>'+
+    '</div>';
+}
+
+load();
+</script>
+</body>
+</html>
