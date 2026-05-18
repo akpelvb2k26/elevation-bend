@@ -1233,8 +1233,8 @@ function buildAssignContent(spots,approvedVendors){
     if(sp)vendorSpot[vid]='Spot '+sp.num+(sp.size?' ('+sp.size+')':'');
   });
 
-  var catLegend='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.75rem;padding:.5rem .75rem;background:#fff;border:.5px solid #e5e3de;border-radius:8px;font-size:10px">'+
-    Object.entries(CAT_COLORS).map(function(e){return'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;background:'+e[1].bg+';color:'+e[1].text+';border:.5px solid '+e[1].border+'"><span style="width:7px;height:7px;border-radius:50%;background:'+e[1].dot+';display:inline-block;flex-shrink:0"></span>'+esc(e[0].split(' / ')[0])+'</span>';}).join('')+'</div>';
+  var catLegend='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:.75rem;padding:.75rem 1rem;background:#fff;border:.5px solid #e5e3de;border-radius:8px">'+
+    Object.entries(CAT_COLORS).map(function(e){return'<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 14px;border-radius:20px;background:'+e[1].bg+';color:'+e[1].text+';border:.5px solid '+e[1].border+';font-size:13px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;background:'+e[1].dot+';display:inline-block;flex-shrink:0"></span>'+esc(e[0])+'</span>';}).join('')+'</div>';
 
   // ── Vendor list for this date ─────────────────────────────────────────
   var vendorListHTML='';
@@ -3278,10 +3278,11 @@ function openForm(id){
                 '</div>'+
               '</div>'+
               '<div style="display:flex;gap:5px;flex-wrap:wrap">'+
-                '<button class="btn-s" style="font-size:11px;padding:4px 10px" data-finv-pdf="'+inv.id+'">📄 PDF</button>'+
+                '<button class="btn-s" style="font-size:11px;padding:4px 10px" data-finv-pdf="'+inv.id+'">📄 Detail</button>'+
                 (inv.status!=='paid'?'<button class="btn-blue" style="font-size:11px;padding:4px 10px" data-finv-send="'+inv.id+'">📧 Send</button>':'')+
                 (inv.status!=='paid'?'<button class="btn-p" style="font-size:11px;padding:4px 10px" data-finv-paid="'+inv.id+'">✓ Mark paid</button>':
                   '<button class="btn-s" style="font-size:11px;padding:4px 10px" data-finv-unpaid="'+inv.id+'">↩ Unmark</button>')+
+                '<button class="btn-danger" style="font-size:11px;padding:4px 10px" data-finv-del="'+inv.id+'">Delete</button>'+
               '</div>'+
             '</div>';
           }).join('')+
@@ -3358,7 +3359,17 @@ function openForm(id){
         v.paymentReceived=true;
         await sb.from('vendors').update({payment_received:true}).eq('id',v.id);
         inv.status='paid';inv.paid_at=nowISO();
-        // Re-open the invoice panel for this vendor
+        fInv.click();
+      });
+    });
+
+    document.querySelectorAll('[data-finv-del]').forEach(function(btn){
+      btn.addEventListener('click',async function(){
+        if(!confirm('Delete this invoice?'))return;
+        var id=btn.dataset.finvDel;
+        var{error}=await sb.from('invoices').delete().eq('id',id);
+        if(error){alert('Error deleting: '+error.message);return;}
+        invoices=invoices.filter(function(x){return x.id!==id;});
         fInv.click();
       });
     });
@@ -3525,10 +3536,15 @@ function startPaymentsPoll(){
         changed=true;
       }
     });
-    if(changed){
-      await loadInvoices();
-      renderPayments();
+    // Also check for invoice status changes
+    var{data:invData}=await sb.from('invoices').select('id,status,paid_at').order('created_at',{ascending:false});
+    if(invData){
+      invData.forEach(function(row){
+        var inv=invoices.find(function(x){return x.id===row.id;});
+        if(inv&&inv.status!==row.status){inv.status=row.status;inv.paid_at=row.paid_at;changed=true;}
+      });
     }
+    if(changed)renderPayments();
   },8000);
 }
 
@@ -3579,7 +3595,6 @@ async function renderPayments(){
         invThSort('sent','📧 Sent')+
         invThSort('paid','✅ Paid')+
         '<th>Payment Link</th>'+
-        '<th>Actions</th>'+
       '</tr></thead>'+
       '<tbody>'+
       (invoices.length
@@ -3588,13 +3603,21 @@ async function renderPayments(){
           var isOverdue=inv.status==='sent'&&inv.due_date&&new Date(inv.due_date)<new Date();
           var displayStatus=isOverdue?'overdue':inv.status;
           var datesArr=Array.isArray(inv.dates)?inv.dates:(inv.line_items||[]).map(function(li){return li.date;}).filter(Boolean);
-          return'<tr style="cursor:'+(v?'pointer':'default')+'" '+(v?'data-vendor-id="'+v.id+'"':'')+'>'+
-            '<td style="font-size:12px;font-weight:700;white-space:nowrap">'+esc(inv.invoice_number||'—')+'</td>'+
+          return'<tr style="cursor:default" '+(v?'data-vendor-id="'+v.id+'"':'')+'>'+
+            '<td style="font-size:12px;font-weight:700;white-space:nowrap;font-family:monospace">'+esc(inv.invoice_number||'—')+'</td>'+
             '<td>'+
-              '<div style="display:flex;align-items:center;gap:7px">'+
+              '<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'+
                 '<div style="width:26px;height:26px;border-radius:50%;background:'+(v?catColor(v.category).bg:'#f0ede6')+';color:'+(v?catColor(v.category).text:'#888')+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+ini(v?v.businessName||'?':'?')+'</div>'+
                 '<div><div style="font-size:12px;font-weight:600">'+esc(v?v.businessName:'Unknown')+'</div>'+
                 '<div style="font-size:10px;color:#888">'+esc(v?v.email||'':'')+'</div></div>'+
+              '</div>'+
+              '<div style="display:flex;gap:3px;flex-wrap:wrap" onclick="event.stopPropagation()">'+
+                (v?'<button class="btn-s" style="font-size:10px;padding:2px 7px" data-pay-edit="'+v.id+'">Edit</button>':'')+
+                '<button class="btn-s" style="font-size:10px;padding:2px 7px" data-inv-pdf="'+inv.id+'">PDF</button>'+
+                (inv.status!=='paid'?'<button class="btn-blue" style="font-size:10px;padding:2px 7px" data-inv-send="'+inv.id+'">Send</button>':'')+
+                (inv.status!=='paid'?'<button class="btn-p" style="font-size:10px;padding:2px 7px" data-inv-paid="'+inv.id+'">Mark Paid</button>':
+                  '<button class="btn-s" style="font-size:10px;padding:2px 7px" data-inv-unpaid="'+inv.id+'">Unmark</button>')+
+                '<button class="btn-danger" style="font-size:10px;padding:2px 7px" data-inv-del="'+inv.id+'">Delete</button>'+
               '</div>'+
             '</td>'+
             '<td>'+(v?catBadge(v.category):'—')+'</td>'+
@@ -3612,16 +3635,6 @@ async function renderPayments(){
             '<td>'+
               (inv.stripe_payment_link?'<a href="'+esc(inv.stripe_payment_link)+'" target="_blank" style="font-size:11px;color:#378ADD;text-decoration:none;white-space:nowrap">🔗 Pay link ↗</a>':'<span style="color:#aaa;font-size:11px">—</span>')+
             '</td>'+
-            '<td>'+
-              '<div style="display:flex;gap:3px;flex-wrap:wrap">'+
-                (v?'<button class="btn-s" style="font-size:11px;padding:3px 8px" data-pay-edit="'+v.id+'">Edit</button>':'')+
-                '<button class="btn-s" style="font-size:11px;padding:3px 8px" data-inv-pdf="'+inv.id+'">PDF</button>'+
-                (inv.status!=='paid'?'<button class="btn-blue" style="font-size:11px;padding:3px 8px" data-inv-send="'+inv.id+'">Send</button>':'')+
-                (inv.status!=='paid'?'<button class="btn-p" style="font-size:11px;padding:3px 8px" data-inv-paid="'+inv.id+'">Mark Paid</button>':
-                  '<button class="btn-s" style="font-size:11px;padding:3px 8px" data-inv-unpaid="'+inv.id+'">Unmark</button>')+
-                '<button class="btn-danger" style="font-size:11px;padding:3px 8px" data-inv-del="'+inv.id+'">Delete</button>'+
-              '</div>'+
-            '</td>'+
           '</tr>';
         }).join('')
         :'<tr><td colspan="10" style="text-align:center;color:#aaa;padding:2rem;font-size:12px">No invoices yet. Click + New invoice to get started.</td></tr>')+
@@ -3635,21 +3648,15 @@ async function renderPayments(){
   var refreshBtn=document.getElementById('payRefreshBtn');
   if(refreshBtn)refreshBtn.addEventListener('click',async function(){
     refreshBtn.disabled=true;refreshBtn.textContent='🔄 Refreshing…';
-    // Reload vendors fresh from Supabase
+    await loadInvoices();
     var{data}=await sb.from('vendors').select('id,payment_received,contract_received,booth_fee').eq('status','approved');
     if(data){
       data.forEach(function(row){
         var v=vendors.find(function(x){return x.id===row.id;});
-        if(v){
-          v.paymentReceived=row.payment_received;
-          v.contractReceived=row.contract_received;
-          v.boothFee=row.booth_fee||0;
-        }
+        if(v){v.paymentReceived=row.payment_received;v.contractReceived=row.contract_received;v.boothFee=row.booth_fee||0;}
       });
     }
-    // Also reload invoices
-    await loadInvoices();
-    refreshBtn.disabled=false;refreshBtn.textContent='🔄 Refresh status';
+    refreshBtn.disabled=false;refreshBtn.textContent='🔄 Refresh';
     renderPayments();
   });
 
@@ -3747,6 +3754,75 @@ async function renderPayments(){
 
   el.querySelectorAll('[data-pay-edit]').forEach(function(btn){
     btn.addEventListener('click',function(){openForm(btn.dataset.payEdit);});
+  });
+
+  el.querySelectorAll('[data-inv-pdf]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var inv=invoices.find(function(x){return x.id===btn.dataset.invPdf;});
+      if(inv)generateInvoicePDF(inv);
+    });
+  });
+
+  el.querySelectorAll('[data-inv-send]').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var inv=invoices.find(function(x){return x.id===btn.dataset.invSend;});
+      if(!inv)return;
+      var v=vendors.find(function(x){return x.id===inv.vendor_id;});
+      if(!v||!v.email){alert('Vendor email not found.');return;}
+      btn.disabled=true;btn.textContent='Sending…';
+      if(!inv.stripe_payment_link&&STRIPE_PK&&parseFloat(inv.total||0)>0){
+        try{
+          var sr=await fetch(SUPABASE_FN_URL+'/stripe-session',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPA_ANON_KEY||SUPA_KEY,'Authorization':'Bearer '+(SUPA_ANON_KEY||SUPA_KEY)},body:JSON.stringify({action:'create_payment_link',vendorId:v.id,vendorName:v.businessName,amount:parseFloat(inv.total||0)})});
+          var rd=await sr.json();
+          if(rd.url){inv.stripe_payment_link=rd.url;await sb.from('invoices').update({stripe_payment_link:rd.url,modified_at:nowISO()}).eq('id',inv.id);}
+        }catch(e){console.warn('Stripe link failed:',e);}
+      }
+      await sb.from('invoices').update({status:'sent',sent_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
+      inv.status='sent';inv.sent_at=nowISO();
+      var invoiceHTML=buildInvoiceHTML(inv);
+      var sent=await sendEmailResend({to:v.email,subject:'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',html:invoiceHTML,text:'Hi '+(v.contactName||v.businessName)+',\n\nInvoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\n'+(inv.stripe_payment_link?'Pay online: '+inv.stripe_payment_link+'\n\n':'')+'Thank you,\nElevation Bend Farmers Market'});
+      if(!sent)sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market','Hi '+(v.contactName||v.businessName)+',\n\nInvoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\nThank you,\nElevation Bend Farmers Market');
+      btn.disabled=false;btn.textContent='Send';
+      renderPayments();
+    });
+  });
+
+  el.querySelectorAll('[data-inv-paid]').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var inv=invoices.find(function(x){return x.id===btn.dataset.invPaid;});
+      console.log('Mark paid clicked, inv:', inv&&inv.id, 'current status:', inv&&inv.status);
+      if(!inv)return;
+      var res=await sb.from('invoices').update({status:'paid',paid_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
+      console.log('Update result:', res.error, res.status);
+      inv.status='paid';inv.paid_at=nowISO();
+      var v=vendors.find(function(x){return x.id===inv.vendor_id;});
+      if(v){v.paymentReceived=true;await sb.from('vendors').update({payment_received:true,modified_at:nowISO()}).eq('id',v.id);}
+      await loadInvoices();
+      console.log('After loadInvoices, status:', invoices.find(function(x){return x.id===inv.id;})&&invoices.find(function(x){return x.id===inv.id;}).status);
+      renderPayments();
+    });
+  });
+
+  el.querySelectorAll('[data-inv-unpaid]').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var inv=invoices.find(function(x){return x.id===btn.dataset.invUnpaid;});
+      if(!inv)return;
+      await sb.from('invoices').update({status:'sent',paid_at:null,modified_at:nowISO()}).eq('id',inv.id);
+      inv.status='sent';inv.paid_at=null;
+      await loadInvoices();
+      renderPayments();
+    });
+  });
+
+  el.querySelectorAll('[data-inv-del]').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      if(!confirm('Delete this invoice?'))return;
+      var id=btn.dataset.invDel;
+      var{error}=await sb.from('invoices').delete().eq('id',id);
+      if(error){alert('Error deleting: '+error.message);return;}
+      invoices=invoices.filter(function(x){return x.id!==id;});
+      renderPayments();
+    });
   });
 
   // Save booth fee
@@ -3894,7 +3970,10 @@ function nextInvoiceNumber(){
 async function loadInvoices(){
   try{
     var{data,error}=await sb.from('invoices').select('*').order('created_at',{ascending:false});
-    if(!error&&data)invoices=data;
+    if(!error&&data){
+      invoices.length=0;
+      data.forEach(function(row){invoices.push(row);});
+    }
   }catch(e){invoices=[];}
 }
 
@@ -4106,47 +4185,45 @@ async function renderInvoiceSection(){
       var inv=invoices.find(function(x){return x.id===btn.dataset.invSend;});
       if(!inv)return;
       var v=vendors.find(function(x){return x.id===inv.vendor_id;});
+      if(!v||!v.email){alert('Vendor email not found.');return;}
+      btn.disabled=true;btn.textContent='Sending…';
+
+      // Generate Stripe link if not already on invoice
+      if(!inv.stripe_payment_link&&STRIPE_PK&&parseFloat(inv.total||0)>0){
+        try{
+          var res=await fetch(SUPABASE_FN_URL+'/stripe-session',{
+            method:'POST',
+            headers:{'Content-Type':'application/json','apikey':SUPA_ANON_KEY||SUPA_KEY,'Authorization':'Bearer '+(SUPA_ANON_KEY||SUPA_KEY)},
+            body:JSON.stringify({action:'create_payment_link',vendorId:v.id,vendorName:v.businessName,amount:parseFloat(inv.total||0)})
+          });
+          var rd=await res.json();
+          if(rd.url){
+            inv.stripe_payment_link=rd.url;
+            await sb.from('invoices').update({stripe_payment_link:rd.url,modified_at:nowISO()}).eq('id',inv.id);
+          }
+        }catch(e){console.warn('Stripe link failed:',e);}
+      }
+
+      // Mark as sent
       await sb.from('invoices').update({status:'sent',sent_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
       inv.status='sent';inv.sent_at=nowISO();
-      if(v&&v.email){
-        var body='Hi '+(v.contactName||v.businessName||'Vendor')+',\n\nPlease find your invoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\n'+(inv.stripe_payment_link?'Pay online: '+inv.stripe_payment_link+'\n\n':'')+'Thank you,\nElevation Bend Farmers Market';
-        sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',body);
-      }
+
+      // Send via Resend with full HTML invoice
+      var invoiceHTML=buildInvoiceHTML(inv);
+      var sent=await sendEmailResend({
+        to:v.email,
+        subject:'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',
+        html:invoiceHTML,
+        text:'Hi '+(v.contactName||v.businessName)+',\n\nInvoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\n'+(inv.stripe_payment_link?'Pay online: '+inv.stripe_payment_link+'\n\n':'')+'Thank you,\nElevation Bend Farmers Market'
+      });
+      if(!sent)sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market','Hi '+(v.contactName||v.businessName)+',\n\nInvoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\nThank you,\nElevation Bend Farmers Market');
+
+      btn.disabled=false;btn.textContent='Send';
       renderPayments();
     });
   });
 
-  el.querySelectorAll('[data-inv-paid]').forEach(function(btn){
-    btn.addEventListener('click',async function(){
-      var inv=invoices.find(function(x){return x.id===btn.dataset.invPaid;});
-      if(!inv)return;
-      await sb.from('invoices').update({status:'paid',paid_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
-      inv.status='paid';inv.paid_at=nowISO();
-      var v=vendors.find(function(x){return x.id===inv.vendor_id;});
-      if(v){v.paymentReceived=true;await sb.from('vendors').update({payment_received:true}).eq('id',v.id);}
-      renderPayments();
-    });
-  });
-
-  el.querySelectorAll('[data-inv-unpaid]').forEach(function(btn){
-    btn.addEventListener('click',async function(){
-      var inv=invoices.find(function(x){return x.id===btn.dataset.invUnpaid;});
-      if(!inv)return;
-      await sb.from('invoices').update({status:'sent',paid_at:null,modified_at:nowISO()}).eq('id',inv.id);
-      inv.status='sent';inv.paid_at=null;
-      renderPayments();
-    });
-  });
-
-  el.querySelectorAll('[data-inv-del]').forEach(function(btn){
-    btn.addEventListener('click',async function(){
-      if(!confirm('Delete this invoice?'))return;
-      var id=btn.dataset.invDel;
-      await sb.from('invoices').delete().eq('id',id);
-      invoices=invoices.filter(function(x){return x.id!==id;});
-      renderPayments();
-    });
-  });
+  // handlers are in renderPayments
 
   var newBtn=document.getElementById('invNewBtn');
   if(newBtn)newBtn.addEventListener('click',function(){openInvoiceModal('');});
@@ -4328,7 +4405,6 @@ function buildInvoiceHTML(inv){
   var lineItems=inv.line_items||dates.map(function(ds){return{date:ds,description:'Booth fee ('+(v.boothSize||'standard')+')',amount:feePerDate};});
   var total=parseFloat(inv.total||0);
   var cc=catColor(v.category);
-  var appUrl='https://akpelvb2k26.github.io/elevation-bend/invoice-viewer.html?id='+encodeURIComponent(inv.id);
   return'<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice '+esc(inv.invoice_number)+'</title>'+
   '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;color:#1a1a1a;padding:40px;max-width:700px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid #1a1a1a;}.market-name{font-size:22px;font-weight:800;color:#27500A;letter-spacing:-.02em;}.market-sub{font-size:11px;color:#888;margin-top:3px;}.inv-title{text-align:right;}.inv-title h1{font-size:28px;font-weight:800;color:#1a1a1a;}.inv-title .inv-num{font-size:13px;color:#888;margin-top:4px;}.inv-title .status-badge{display:inline-block;margin-top:6px;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;background:'+(inv.status==='paid'?'#EAF3DE':inv.status==='sent'?'#E6F1FB':'#f3f4f6')+';color:'+(inv.status==='paid'?'#27500A':inv.status==='sent'?'#0C447C':'#555')+'}.bill-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;}.bill-block label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#888;font-weight:600;display:block;margin-bottom:6px;}.bill-block .val{font-size:13px;line-height:1.6;}.bill-block .name{font-size:15px;font-weight:700;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}thead tr{background:#f8f7f4;}th{text-align:left;padding:8px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#888;border-bottom:1px solid #e5e3de;}td{padding:10px 12px;border-bottom:.5px solid #f0ede6;font-size:13px;}tr:last-child td{border-bottom:none;}.totals{text-align:right;margin-bottom:28px;}.total-row{display:flex;justify-content:flex-end;gap:80px;padding:6px 0;font-size:13px;}.total-row.grand{font-size:18px;font-weight:800;border-top:2px solid #1a1a1a;margin-top:6px;padding-top:10px;}.footer{margin-top:40px;padding-top:16px;border-top:.5px solid #e5e3de;font-size:10px;color:#aaa;text-align:center;line-height:1.7;}.vendor-tag{display:inline-block;background:'+cc.bg+';color:'+cc.text+';border:1px solid '+cc.border+';border-radius:20px;font-size:10px;padding:2px 8px;margin-top:4px;font-weight:600;}.pay-btn{display:inline-block;margin-top:16px;background:#27500A;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;}@media print{body{padding:20px;}.no-print{display:none;}}</style></head><body>'+
   '<div class="no-print" style="text-align:right;margin-bottom:20px;display:flex;gap:8px;justify-content:flex-end"><button onclick="window.print()" style="background:#27500A;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:600">🖨 Print / Save as PDF</button><button onclick="window.close()" style="background:#f8f7f4;color:#555;border:.5px solid #d0cec7;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit">Close</button></div>'+
@@ -4339,8 +4415,9 @@ function buildInvoiceHTML(inv){
   lineItems.map(function(li){return'<tr><td>'+esc(li.date||'')+'</td><td>'+esc(li.description||'')+'</td><td style="text-align:right">$'+parseFloat(li.amount||0).toFixed(2)+'</td></tr>';}).join('')+
   '</tbody></table>'+
   '<div class="totals"><div class="total-row grand"><span>Total Due</span><span>$'+total.toFixed(2)+'</span></div></div>'+
-  (inv.stripe_payment_link?'<div style="text-align:center;margin:24px 0"><a href="'+esc(inv.stripe_payment_link)+'" class="pay-btn">💳 Pay Now Online</a><br><a href="'+appUrl+'" style="display:inline-block;margin-top:10px;font-size:12px;color:#378ADD;text-decoration:none">🔍 View Invoice Online</a></div>':
-    '<div style="text-align:center;margin:24px 0"><a href="'+appUrl+'" style="display:inline-block;font-size:13px;color:#378ADD;text-decoration:none;padding:10px 20px;border:.5px solid #378ADD;border-radius:8px">🔍 View Invoice Online</a></div>')+
+  (inv.stripe_payment_link
+    ?'<div style="text-align:center;margin:24px 0;padding:20px;background:#EAF3DE;border-radius:10px;border:2px solid #639922"><div style="font-size:13px;color:#27500A;margin-bottom:12px;font-weight:600">Secure payment — no account required</div><a href="'+esc(inv.stripe_payment_link)+'" class="pay-btn">💳 Pay $'+parseFloat(inv.total||0).toFixed(2)+' Now</a></div>'
+    :'<div style="margin:24px 0;padding:16px 20px;background:#f8f7f4;border-radius:10px;border:1px solid #e5e3de;font-size:13px;color:#555"><strong>To pay:</strong> Reply to this email or contact us at elevation.bend@market.com to arrange payment.</div>')+
   (inv.notes?'<div style="background:#f8f7f4;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:#555"><strong>Notes:</strong> '+esc(inv.notes)+'</div>':'')+
   '<div class="footer">Elevation Bend Farmers Market · Bend, Oregon<br>Thank you for being part of our market community!</div>'+
   '</body></html>';
