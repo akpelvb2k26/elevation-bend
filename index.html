@@ -504,7 +504,7 @@ async function persistVendorDates(vid){
   try{await sb.from('vendors').update({selected_dates:v.selectedDates}).eq('id',vid);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',vid);}catch(e){}}
   catch(e){console.warn('Could not persist vendor dates:',e.message);}
 }
-function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',boothFee:r.booth_fee||0,photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
+function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local||r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.own_setup_comment||r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',boothFee:r.booth_fee||0,photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
 async function saveVendorDB(data,id){
   var isNew=!id;
   // ── Core row — only columns that definitely exist in base Supabase vendors table ──
@@ -531,7 +531,7 @@ async function saveVendorDB(data,id){
     liability:data.liability||'',
     booth_size:data.boothSize||'',
     own_setup:data.ownSetup||'',
-    setup_comment:data.ownSetupComment||'',
+    own_setup_comment:data.ownSetupComment||'',
     electricity:data.electricity||'',
     attendance:data.attendance||'',
     months:data.months||'',
@@ -4788,7 +4788,9 @@ function renderManage(){
               if(!existing)existing=vendors.find(function(v){return v.businessName&&v.businessName.toLowerCase()===bizName.toLowerCase();});
               var rowId=existing?existing.id:uid();
               var dbRow={
-                id:rowId,status:appStatus,vendor_status:vs,
+                id:rowId,
+                status:appStatus,
+                vendor_status:vs,
                 business_name:bizName,
                 contact_name:colByName(row,'primary contact name')||colByName(row,'contact name'),
                 email:email,
@@ -4800,20 +4802,28 @@ function renderManage(){
                 products:colByName(row,'please describe your products in detail (include ingredients/materials, sourcing, and what makes your product unique)')||colByName(row,'products'),
                 notes:colByName(row,'anything else we should know about you or your business?')||colByName(row,'notes'),
                 licenses:colByName(row,'do you hold all required licenses and permits for your products?')||colByName(row,'licenses'),
-                liability:colByName(row,'do you carry general liability insurance?')||colByName(row,'liability'),
                 electricity:colByName(row,'electricity needed?')||colByName(row,'electricity'),
+                local:colByName(row,'are all products locally grown, made, or produced?')||colByName(row,'local'),
+                own_setup:colByName(row,'will you bring your own tent, table, and display?')||colByName(row,'own setup'),
+                liability:colByName(row,'do you carry general liability insurance?')||colByName(row,'liability'),
                 attendance:colByName(row,'how often would you like to attend?')||colByName(row,'attendance'),
                 months:colByName(row,'months or dates interested in:')||colByName(row,'months or dates interested in')||colByName(row,'months'),
-                whyJoin:colByName(row,'why do you want to be part of elevation farmers market?')||colByName(row,'why join'),
+                why_join:colByName(row,'why do you want to be part of elevation farmers market?')||colByName(row,'why join'),
                 values:colByName(row,'what values guide your business?')||colByName(row,'values'),
-                local:colByName(row,'are all products locally grown, made, or produced?')||colByName(row,'local'),
-                ownSetup:colByName(row,'will you bring your own tent, table, and display?')||colByName(row,'own setup'),
-                priceRange:[],photos:[],food_docs:[],selected_dates:[],
-                contract_received:false,payment_received:false,booth_fee:0,
+                additional_info:colByName(row,'anything else we should know about you or your business?')||colByName(row,'additional info'),
+                price_range:[],
+                photos:[],
+                food_docs:[],
+                selected_dates:[],
+                contract_received:false,
+                payment_received:false,
+                booth_fee:0,
                 modified_at:nowISO()
               };
               var subDate=colByName(row,'submission date');
-              if(!existing)dbRow.created_at=subDate?new Date(subDate).toISOString():nowISO();
+              var createdAt=nowISO();
+              if(subDate){try{var d=new Date(subDate);if(!isNaN(d.getTime()))createdAt=d.toISOString();}catch(e){}}
+              if(!existing)dbRow.created_at=createdAt;
               newRows.push(dbRow);
               if(existing)updatedIds.push(rowId);
             }
@@ -4835,7 +4845,7 @@ function renderManage(){
             for(var c=0;c<newRows.length;c+=CHUNK){
               var chunk=newRows.slice(c,c+CHUNK);
               var res=await sb.from('vendors').upsert(chunk);
-              if(res.error){console.error('Chunk error:',res.error);errorMsg=res.error.message;errors++;}
+              if(res.error){console.error('Chunk error:',res.error,'sample row:',JSON.stringify(chunk[0]));errorMsg=res.error.message;errors++;}
               statusEl.innerHTML='<span style="color:#a16207">⏳ Saved '+(Math.min(c+CHUNK,newRows.length))+' / '+newRows.length+'…</span>';
             }
             var created=newRows.length-updatedIds.length,updated=updatedIds.length;
@@ -4969,18 +4979,24 @@ function renderManage(){
 
 // ── CSV parser (handles quoted fields) ────────────────────────────────────
 function parseCSV(text){
-  var rows=[];var lines=text.split(/\r?\n/);
-  for(var i=0;i<lines.length;i++){
-    var line=lines[i];if(!line.trim())continue;
-    var row=[];var cur='';var inQ=false;
-    for(var j=0;j<line.length;j++){
-      var ch=line[j];
-      if(ch==='"'){if(inQ&&line[j+1]==='"'){cur+='"';j++;}else inQ=!inQ;}
-      else if(ch===','&&!inQ){row.push(cur);cur='';}
-      else cur+=ch;
+  var rows=[],row=[],cur='',inQ=false;
+  for(var i=0;i<text.length;i++){
+    var ch=text[i];
+    if(ch==='"'){
+      if(inQ&&text[i+1]==='"'){cur+='"';i++;}
+      else inQ=!inQ;
+    } else if(ch===','&&!inQ){
+      row.push(cur);cur='';
+    } else if((ch==='\n'||ch==='\r')&&!inQ){
+      if(ch==='\r'&&text[i+1]==='\n')i++;
+      row.push(cur);cur='';
+      if(row.join('').trim())rows.push(row);
+      row=[];
+    } else {
+      cur+=ch;
     }
-    row.push(cur);rows.push(row);
   }
+  if(cur||row.length){row.push(cur);if(row.join('').trim())rows.push(row);}
   return rows;
 }
 
