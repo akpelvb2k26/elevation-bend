@@ -4712,9 +4712,10 @@ function renderManage(){
           statusEl.innerHTML='<span style="color:#791F1F">CSV appears empty — check the file and try again.</span>';
           return;
         }
-        var headers=csvData[0].map(function(h){return h.trim().toLowerCase();});
-        if(headers.indexOf('business name')===-1){
-          statusEl.innerHTML='<span style="color:#791F1F">Missing required column: "Business Name". Check your file matches the template.</span>';
+        var headers=csvData[0].map(function(h){return(h||'').trim().toLowerCase();});
+        var hasBizCol=headers.some(function(h){return h.indexOf('business')>-1||h.indexOf('farm name')>-1;});
+        if(!hasBizCol){
+          statusEl.innerHTML='<span style="color:#791F1F">Missing required column: "Business Name" or "Business / Farm Name". Found columns: '+csvData[0].slice(0,5).join(', ')+'</span>';
           return;
         }
         var count=csvData.length-1;
@@ -4728,20 +4729,58 @@ function renderManage(){
             runBtn.disabled=true;runBtn.textContent='Importing…';
             statusEl.innerHTML='<span style="color:#a16207">⏳ Building records…</span>';
             var hdrs=csvData[0].map(function(h){return h.trim().toLowerCase();});
-            function col(row,name){var idx=hdrs.indexOf(name.toLowerCase());return idx>-1?(row[idx]||'').trim():'';}
+            // Direct column mapping from the known form export format
+            // Columns: Submission date(0), Business/Farm Name(1), Primary Contact Name(2),
+            // Email(3), Phone(4), City/Region(5), Website/Social(6), Category(7), Other(8),
+            // Products(9), Local(10), Price range(11), Licenses(12), Explain(13),
+            // Prepared food(14), Liability(15), Booth size(16), Own setup(17), Explain2(18),
+            // Electricity(19), Attendance(20), Months(21), Why join(22), Values(23),
+            // Additional(24), Photos(25)
+            function getColIdx(name){return hdrs.indexOf(name.toLowerCase().trim());}
+            function colIdx(row,idx){return idx>-1&&idx<row.length?(row[idx]||'').trim():'';}
+            function colByName(row,name){var i=getColIdx(name);return colIdx(row,i);}
+
+            // Find business name column index once
+            var bizIdx=-1;
+            var bizCandidates=['business / farm name','business name','businessname','farm name'];
+            for(var bi=0;bi<bizCandidates.length;bi++){var bi2=getColIdx(bizCandidates[bi]);if(bi2>-1){bizIdx=bi2;break;}}
+            // If still not found, try partial match
+            if(bizIdx===-1){for(var bi=0;bi<hdrs.length;bi++){if(hdrs[bi].indexOf('business')>-1||hdrs[bi].indexOf('farm name')>-1){bizIdx=bi;break;}}}
+
+            function mapCategory(raw){
+              if(!raw)return'Other';
+              var r=raw.toLowerCase();
+              if(r.indexOf('farm')>-1||r.indexOf('produce')>-1||r.indexOf('vegetable')>-1||r.indexOf('fruit')>-1)return'Farm / Produce Grower';
+              if(r.indexOf('ranch')>-1||r.indexOf('egg')>-1||r.indexOf('meat')>-1||r.indexOf('dairy')>-1)return'Rancher / Eggs / Meat / Dairy';
+              if(r.indexOf('baked')>-1||r.indexOf('bakery')>-1||r.indexOf('bread')>-1||r.indexOf('pastry')>-1)return'Baked Goods';
+              if(r.indexOf('specialty food')>-1||r.indexOf('packaged')>-1||r.indexOf('jam')>-1||r.indexOf('sauce')>-1||r.indexOf('honey')>-1)return'Specialty Food / Packaged Goods';
+              if(r.indexOf('prepared')>-1||r.indexOf('hot food')>-1||r.indexOf('food truck')>-1)return'Prepared Food Vendor';
+              if(r.indexOf('artisan')>-1||r.indexOf('maker')>-1||r.indexOf('craft')>-1||r.indexOf('jewelry')>-1||r.indexOf('pottery')>-1)return'Artisan / Maker';
+              if(r.indexOf('flower')>-1||r.indexOf('plant')>-1||r.indexOf('herbal')>-1||r.indexOf('herb')>-1||r.indexOf('botanical')>-1)return'Flowers / Plants / Herbal Goods';
+              return'Other';
+            }
+            function mapBoothSize(raw){
+              if(!raw)return'';
+              var r=raw.replace(/['']/g,"'").replace(/\s+/g,' ').trim();
+              if(r.indexOf("10' x 20'")>-1||r.indexOf("10'x20'")>-1)return"10'x20'";
+              if(r.indexOf("20' x 20'")>-1||r.indexOf("20'x20'")>-1)return"20'x20'";
+              if(r.indexOf("10' x 10'")>-1||r.indexOf("10'x10'")>-1)return"10'x10'";
+              if(r.indexOf('truck')>-1||r.indexOf('trailer')>-1)return'Food truck / trailer';
+              return r;
+            }
             var CAT_VALID=['Farm / Produce Grower','Rancher / Eggs / Meat / Dairy','Baked Goods','Specialty Food / Packaged Goods','Prepared Food Vendor','Artisan / Maker','Flowers / Plants / Herbal Goods','Other'];
             var newRows=[],updatedIds=[],skipped=0;
             for(var i=1;i<csvData.length;i++){
               var row=csvData[i];
               if(!row.length||!row.join('').trim())continue;
-              var bizName=col(row,'business name');
+              var bizName=bizIdx>-1?colIdx(row,bizIdx):'';
               if(!bizName){skipped++;continue;}
-              var email=col(row,'email');
-              var cat=col(row,'category');
-              if(cat&&CAT_VALID.indexOf(cat)===-1)cat='Other';
-              var appStatus=col(row,'status');
+              var email=colByName(row,'email');
+              var rawCat=colByName(row,'(select all that apply)')||colByName(row,'category')||colByName(row,'vendor type');
+              var cat=mapCategory(rawCat);
+              var appStatus=colByName(row,'status');
               if(['approved','pending','waitlist'].indexOf(appStatus)===-1)appStatus='pending';
-              var vs=col(row,'vendor status');
+              var vs=colByName(row,'vendor status');
               if(['active','inwork','inactive'].indexOf(vs)===-1)vs='active';
               var existing=null;
               if(email)existing=vendors.find(function(v){return v.email&&v.email.toLowerCase()===email.toLowerCase();});
@@ -4749,16 +4788,31 @@ function renderManage(){
               var rowId=existing?existing.id:uid();
               var dbRow={
                 id:rowId,status:appStatus,vendor_status:vs,
-                business_name:bizName,contact_name:col(row,'contact name'),
-                email:email,phone:col(row,'phone'),website:col(row,'website'),
-                social:col(row,'social'),category:cat,booth_size:col(row,'booth size'),
-                products:col(row,'products'),notes:col(row,'notes'),
-                licenses:col(row,'licenses')||col(row,'licensing')||'',
-                photos:[],price_range:[],food_docs:[],selected_dates:[],
+                business_name:bizName,
+                contact_name:colByName(row,'primary contact name')||colByName(row,'contact name'),
+                email:email,
+                phone:colByName(row,'phone'),
+                website:colByName(row,'website and/or social media links')||colByName(row,'website'),
+                social:colByName(row,'website and/or social media links')||colByName(row,'social'),
+                category:cat,
+                booth_size:mapBoothSize(colByName(row,'booth size requested')||colByName(row,'booth size')),
+                products:colByName(row,'please describe your products in detail (include ingredients/materials, sourcing, and what makes your product unique)')||colByName(row,'products'),
+                notes:colByName(row,'anything else we should know about you or your business?')||colByName(row,'notes'),
+                licenses:colByName(row,'do you hold all required licenses and permits for your products?')||colByName(row,'licenses'),
+                liability:colByName(row,'do you carry general liability insurance?')||colByName(row,'liability'),
+                electricity:colByName(row,'electricity needed?')||colByName(row,'electricity'),
+                attendance:colByName(row,'how often would you like to attend?')||colByName(row,'attendance'),
+                months:colByName(row,'months or dates interested in:')||colByName(row,'months or dates interested in')||colByName(row,'months'),
+                whyJoin:colByName(row,'why do you want to be part of elevation farmers market?')||colByName(row,'why join'),
+                values:colByName(row,'what values guide your business?')||colByName(row,'values'),
+                local:colByName(row,'are all products locally grown, made, or produced?')||colByName(row,'local'),
+                ownSetup:colByName(row,'will you bring your own tent, table, and display?')||colByName(row,'own setup'),
+                priceRange:[],photos:[],food_docs:[],selected_dates:[],
                 contract_received:false,payment_received:false,booth_fee:0,
                 modified_at:nowISO()
               };
-              if(!existing)dbRow.created_at=nowISO();
+              var subDate=colByName(row,'submission date');
+              if(!existing)dbRow.created_at=subDate?new Date(subDate).toISOString():nowISO();
               newRows.push(dbRow);
               if(existing)updatedIds.push(rowId);
             }
@@ -4766,8 +4820,14 @@ function renderManage(){
               statusEl.innerHTML='<span style="color:#791F1F">No valid rows found to import.</span>';
               runBtn.disabled=false;runBtn.textContent='📥 Import vendors';return;
             }
+            // Deduplicate by ID — keep last occurrence if CSV has duplicate rows
+            var seen={};
+            newRows=newRows.filter(function(r){
+              if(seen[r.id])return false;
+              seen[r.id]=true;return true;
+            });
             statusEl.innerHTML='<span style="color:#a16207">⏳ Saving '+newRows.length+' vendors…</span>';
-            var CHUNK=20,errors=0,errorMsg='';
+            var CHUNK=10,errors=0,errorMsg='';
             for(var c=0;c<newRows.length;c+=CHUNK){
               var chunk=newRows.slice(c,c+CHUNK);
               var res=await sb.from('vendors').upsert(chunk);
