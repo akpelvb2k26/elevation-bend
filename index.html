@@ -120,9 +120,9 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
 .report-table td{padding:9px 10px;border-bottom:.5px solid #f0ede6;vertical-align:middle;font-size:13px}
 .report-table tr:hover td{background:#f8f7f4;cursor:pointer}
 .report-wrap{background:#fff;border:.5px solid #e5e3de;border-radius:12px;overflow:hidden;margin-bottom:.85rem}
-.sched-approved{background:#EAF3DE;color:#27500A;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;display:inline-block}
-.sched-waitlist{background:#FAEEDA;color:#633806;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;display:inline-block}
-.sched-pending{background:#f0ede6;color:#555;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;display:inline-block}
+.sched-approved{background:#EAF3DE;color:#27500A;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #639922}
+.sched-waitlist{background:#FEF9C3;color:#A16207;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #EAB308}
+.sched-pending{background:#FDECEA;color:#9B3A2E;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #F1948A}
 .overlay{background:rgba(0,0,0,.4);position:fixed;inset:0;z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto}
 .modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;margin:auto}
 .modal.sm{max-width:380px}.modal.md{max-width:500px}.modal.lg{max-width:640px}
@@ -226,7 +226,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="nb" data-tab="layout">Layout</button>
     <button class="nb" data-tab="reports">Reports</button>
     <button class="nb" data-tab="waitlist">Waitlist</button>
-    <button class="nb" data-tab="payments">Payments</button>
+    <button class="nb" data-tab="payments">Invoices</button>
     <button class="nb" data-tab="comms">Comms</button>
     <button class="nb" data-tab="manage">Manage</button>
   </nav>
@@ -444,7 +444,25 @@ function enterApp(){
     ue.style.color=IS_LIVE?'#c0392b':'#aaa';
     ue.style.fontSize=IS_LIVE?'':'13px';
   }
-  loadData();
+  loadData().then(function(){
+    // Handle URL parameters
+    var urlParams=new URLSearchParams(window.location.search);
+    var dateParam=urlParams.get('date');
+    var invoiceParam=urlParams.get('invoice');
+    if(dateParam){
+      tab='layout';layoutDate=dateParam;
+      document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('active');});
+      var layoutBtn=document.querySelector('[data-tab="layout"]');
+      if(layoutBtn)layoutBtn.classList.add('active');
+      render();
+    } else if(invoiceParam){
+      tab='payments';
+      document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('active');});
+      var payBtn=document.querySelector('[data-tab="payments"]');
+      if(payBtn)payBtn.classList.add('active');
+      render();
+    }
+  });
 }
 
 // ── DATA ──────────────────────────────────────────────────────────────────
@@ -1117,9 +1135,11 @@ function renderTents(){
         dates.map(function(ds){return'<option value="'+ds+'"'+(ds===tentViewDate?' selected':'')+'>'+ds+'</option>';}).join('')+
        '</select>'
       :'<span style="font-size:12px;color:#aaa;font-style:italic">No market dates yet</span>')+
+    '<span id="layoutSentBadge" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#f0ede6;color:#888">Checking…</span>'+
     '</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
       '<button class="btn-blue" id="autoAssignBtn">⚡ Auto-assign</button>'+
+      '<button class="btn-g" id="sendLayoutFromAssignBtn">Send Layout</button>'+
       '<button class="btn-s" id="clearTentDateBtn">Clear assignments</button>'+
     '</div></div>'+
     '<div class="notice" style="margin-bottom:.75rem">'+
@@ -1130,6 +1150,27 @@ function renderTents(){
   var sel=document.getElementById('tentDateSel');
   if(sel)sel.addEventListener('change',function(){tentViewDate=this.value;renderTents();});
   document.getElementById('autoAssignBtn').addEventListener('click',autoAssign);
+
+  // Send layout button
+  var slBtn=document.getElementById('sendLayoutFromAssignBtn');
+  if(slBtn)slBtn.addEventListener('click',function(){if(tentViewDate)sendLayoutToVendors(tentViewDate);});
+
+  // Load sent_at from layouts table and show badge
+  (async function(){
+    var badge=document.getElementById('layoutSentBadge');
+    if(!badge||!tentViewDate)return;
+    try{
+      var{data}=await sb.from('layouts').select('sent_at,sent_count').eq('date',tentViewDate).single();
+      if(data&&data.sent_at){
+        badge.style.background='#EAF3DE';badge.style.color='#27500A';
+        badge.textContent='📤 Layout sent '+fmtDateMDY(data.sent_at)+(data.sent_count>1?' ('+data.sent_count+'x)':'');
+      } else {
+        badge.style.background='#FDECEA';badge.style.color='#9B3A2E';
+        badge.textContent='⚠️ Layout not sent yet';
+      }
+    }catch(e){badge.style.display='none';}
+  })();
+
   document.getElementById('clearTentDateBtn').addEventListener('click',async function(){
     if(!tentViewDate||!confirm('Clear all vendor assignments for '+tentViewDate+'?'))return;
     if(calRows[tentViewDate])calRows[tentViewDate].tent_assignments={};
@@ -1799,11 +1840,81 @@ function sendLayoutToVendors(ds){
     var pdfBtn=document.createElement('button');pdfBtn.className='btn-g';pdfBtn.textContent='📄 Open layout PDF';
     pdfBtn.addEventListener('click',function(){generateLayoutPDF(ds,null);});
     var sendBtn=document.createElement('button');sendBtn.className='btn-p';sendBtn.textContent='📧 Send to selected vendors';
-    sendBtn.addEventListener('click',function(){
+    sendBtn.addEventListener('click',async function(){
       var ids=Array.from(document.querySelectorAll('.le-cb:checked')).map(function(c){return c.value;});
       if(!ids.length){alert('No vendors selected.');return;}
       closeMod();
-      generateLayoutPDF(ds,ids);
+      // Track send time in layouts table
+      var sentAt=nowISO();
+      try{
+        var{data:existLayout}=await sb.from('layouts').select('sent_count').eq('date',ds).single();
+        var newCount=(existLayout&&existLayout.sent_count?existLayout.sent_count:0)+1;
+        await sb.from('layouts').upsert({
+          date:ds,
+          sent_at:sentAt,
+          sent_count:newCount,
+          modified_at:sentAt
+        },{onConflict:'date',ignoreDuplicates:false});
+      }catch(e){console.warn('Could not save sent_at:',e);}
+
+      // Send personalized email to each selected vendor via Resend
+      var selectedVendors=ids.map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(function(v){return v&&v.email;});
+      var sentCount=0,failCount=0;
+      sendBtn.disabled=true;sendBtn.textContent='Sending…';
+
+      for(var i=0;i<selectedVendors.length;i++){
+        var sv=selectedVendors[i];
+        var spotId=Object.keys(ta).find(function(sid){return ta[sid]===sv.id;});
+        var spot=spotId?sp.find(function(s){return s.id===spotId;}):null;
+        var cc=catColor(sv.category);
+        var spotInfo=spot?'<strong>Spot '+spot.num+'</strong>'+(spot.size?' ('+spot.size+')':''):'<span style="color:#a16207">No spot assigned yet</span>';
+
+        var layoutUrl='https://akpelvb2k26.github.io/elevation-bend/layout-viewer.html?date='+encodeURIComponent(ds);
+
+        var layoutHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Market Layout — '+ds+'</title></head><body style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:32px;color:#1a1a1a">'+
+          '<div style="font-size:22px;font-weight:800;color:#27500A;margin-bottom:4px">Elevation Bend</div>'+
+          '<div style="font-size:13px;color:#888;margin-bottom:28px;border-bottom:2px solid #e5e3de;padding-bottom:16px">Farmers Market · Bend, Oregon</div>'+
+          '<h2 style="font-size:18px;margin-bottom:4px">Market Layout — '+esc(ds)+'</h2>'+
+          '<p style="color:#888;font-size:13px;margin-bottom:24px">Hi '+esc(sv.contactName||sv.businessName)+', here are your spot details for the upcoming market day.</p>'+
+          '<div style="background:'+cc.bg+';border:2px solid '+cc.border+';border-radius:12px;padding:20px 24px;margin-bottom:24px">'+
+            '<div style="font-size:11px;font-weight:700;color:'+cc.text+';text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Your Spot Assignment</div>'+
+            '<div style="font-size:28px;font-weight:900;color:'+cc.text+';margin-bottom:4px">'+spotInfo+'</div>'+
+            '<div style="font-size:14px;color:'+cc.text+';font-weight:600">'+esc(sv.businessName)+'</div>'+
+            '<div style="font-size:12px;color:'+cc.text+';opacity:.8;margin-top:4px">'+esc(sv.category||'')+'</div>'+
+          '</div>'+
+          '<div style="text-align:center;margin-bottom:24px">'+
+            '<a href="'+layoutUrl+'" style="display:inline-block;background:#27500A;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:14px;font-weight:700">🗺 View Full Market Layout</a>'+
+            '<div style="font-size:11px;color:#aaa;margin-top:8px">Click to see the complete floor plan and all vendor spots</div>'+
+          '</div>'+
+          '<div style="background:#f8f7f4;border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:13px;line-height:1.6">'+
+            '<strong>Market Date:</strong> '+esc(ds)+'<br>'+
+            '<strong>Setup:</strong> Please arrive 1 hour before market opens<br>'+
+            '<strong>Questions?</strong> Reply to this email'+
+          '</div>'+
+          '<div style="font-size:11px;color:#aaa;text-align:center;margin-top:32px;padding-top:16px;border-top:.5px solid #e5e3de">'+
+            'Elevation Bend Farmers Market · Bend, Oregon<br>Thank you for being part of our market!'+
+          '</div>'+
+        '</body></html>';
+
+        var ok=await sendEmailResend({
+          to:sv.email,
+          subject:'Your Market Spot — '+ds+' — Elevation Bend Farmers Market',
+          html:layoutHtml,
+          text:'Hi '+sv.contactName+',\n\nYour spot for the market on '+ds+' is: '+(spot?'Spot '+spot.num:'not yet assigned')+'.\n\nThank you,\nElevation Bend Farmers Market'
+        });
+        if(ok)sentCount++;else failCount++;
+      }
+
+      if(failCount>0){
+        alert('Sent '+sentCount+' emails via Resend. '+failCount+' failed — opening layout PDF as fallback.');
+        generateLayoutPDF(ds,ids);
+      } else {
+        var t=document.createElement('div');
+        t.style.cssText='position:fixed;bottom:24px;right:24px;background:#27500A;color:#fff;padding:14px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+        t.textContent='✅ Layout sent to '+sentCount+' vendor'+(sentCount!==1?'s':'');
+        document.body.appendChild(t);
+        setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4000);
+      }
     });
     foot.appendChild(canBtn);foot.appendChild(pdfBtn);foot.appendChild(sendBtn);
   });
@@ -3214,30 +3325,18 @@ function openForm(id){
         await sb.from('invoices').update({status:'sent',sent_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
         inv.status='sent';inv.sent_at=nowISO();
 
-        var lineStr=(inv.line_items||[]).map(function(li){
-          return'  '+li.date+' — $'+parseFloat(li.amount||0).toFixed(2)+' ('+li.description+')';
-        }).join('\n');
-        var paySection=inv.stripe_payment_link
-          ?'💳 PAY ONLINE (no account needed):\n'+inv.stripe_payment_link+'\n\n'
-          :'Please contact us or reply to this email to arrange payment.\n\n';
-        var body=
-          'Hi '+(v.contactName||v.businessName)+',\n\n'+
-          'Please find your invoice for the Elevation Bend Farmers Market.\n\n'+
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'+
-          'INVOICE: '+inv.invoice_number+'\n'+
-          'VENDOR: '+v.businessName+'\n'+
-          'BOOTH SIZE: '+(v.boothSize||'—')+'\n'+
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'+
-          'MARKET DATES:\n'+(lineStr||'  No dates listed')+'\n\n'+
-          'TOTAL DUE: $'+parseFloat(inv.total||0).toFixed(2)+'\n'+
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'+
-          paySection+
-          'Thank you,\nElevation Bend Farmers Market';
-
-        generateInvoicePDF(inv);
-        setTimeout(function(){
-          sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',body);
-        },500);
+        // Send via Resend with full HTML invoice
+        var invoiceHTML=buildInvoiceHTML(inv);
+        var sent=await sendEmailResend({
+          to:v.email,
+          subject:'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',
+          html:invoiceHTML,
+          text:'Hi '+(v.contactName||v.businessName)+',\n\nYour invoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\n'+(inv.stripe_payment_link?'Pay online: '+inv.stripe_payment_link+'\n\n':'')+'Thank you,\nElevation Bend Farmers Market'
+        });
+        if(!sent){
+          generateInvoicePDF(inv);
+          setTimeout(function(){sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market','Hi '+(v.contactName||v.businessName)+',\n\nInvoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\nThank you,\nElevation Bend Farmers Market');},500);
+        }
         btn.disabled=false;btn.textContent='📧 Send';
         fInv.click();
       });
@@ -3302,7 +3401,8 @@ async function saveV(){
   function resetBtn(){if(btn){btn.disabled=false;btn.textContent='✓ Save vendor';}}
   try{
   var cat=getR('category');
-  var newDates=Array.from(document.querySelectorAll('#fDateChips .dc.on')).map(function(c){return c.dataset.ds;});
+  var newDates=Array.from(document.querySelectorAll('#fDateChips .dc.on')).map(function(c){return c.dataset.ds||c.getAttribute('data-ds')||'';}).filter(function(d){return d&&d.length>0;});
+  console.log('saveV newDates:', newDates, 'chips found:', document.querySelectorAll('#fDateChips .dc.on').length);
   var oldDates=eId?Object.keys(calRows).filter(function(ds){return(calRows[ds].approved||[]).indexOf(eId)>-1;}).sort():[];
   var currentV=eId?vendors.find(function(x){return x.id===eId;}):null;
   var data={vendorStatus:getR('vendorStatus')||'active',status:((document.getElementById('fAppStatus')||{}).value||'pending'),contractReceived:!!((document.getElementById('fcb-contract')||{}).checked),paymentReceived:!!((document.getElementById('fcb-payment')||{}).checked),selectedDates:newDates,businessName:biz,contactName:contact,email:((document.getElementById('f_email')||{}).value||'').trim(),phone:((document.getElementById('f_phone')||{}).value||'').trim(),website:((document.getElementById('f_web')||{}).value||'').trim(),social:((document.getElementById('f_social')||{}).value||'').trim(),category:cat,categoryComment:cat==='Other'?((document.getElementById('cmt_category')||{}).value||''):'',products:((document.getElementById('f_products')||{}).value||'').trim(),productDesc:((document.getElementById('f_prodDesc')||{}).value||'').trim(),local:getR('local'),localComment:((document.getElementById('cmt_local')||{}).value||''),priceRange:Array.from(document.querySelectorAll('#priceChecks input:checked')).map(function(c){return c.value;}),licenses:getR('licenses'),licensesComment:((document.getElementById('cmt_licenses')||{}).value||''),foodDocs:Array.from(document.querySelectorAll('#fdChecks input:checked')).map(function(c){return c.value;}),liability:getR('liability'),boothSize:getR('boothSize'),ownSetup:getR('ownSetup'),ownSetupComment:((document.getElementById('cmt_ownSetup')||{}).value||''),electricity:getR('electricity'),attendance:getR('attendance'),months:((document.getElementById('f_months')||{}).value||'').trim(),whyJoin:((document.getElementById('f_whyJoin')||{}).value||'').trim(),values:((document.getElementById('f_values')||{}).value||'').trim(),additionalInfo:((document.getElementById('f_addl')||{}).value||'').trim(),notes:((document.getElementById('f_notes')||{}).value||'').trim(),boothFee:(currentV&&currentV.boothFee)||0,photos:[]};
@@ -3616,33 +3716,19 @@ async function renderPayments(){
       await sb.from('invoices').update({status:'sent',sent_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
       inv.status='sent';inv.sent_at=nowISO();
 
-      // 3. Build full invoice details in email body
-      var paySection=inv.stripe_payment_link
-        ?'💳 PAY ONLINE (no account needed):\n'+inv.stripe_payment_link+'\n\n'
-        :'Please contact us or reply to this email to arrange payment.\n\n';
-      var datesStr=(inv.dates||[]).sort().join('\n  • ')||'your upcoming market dates';
-      var lineStr=(inv.line_items||[]).map(function(li){
-        return'  '+li.date+' — $'+parseFloat(li.amount||0).toFixed(2)+' ('+li.description+')';
-      }).join('\n');
-      var emailBody=
-        'Hi '+(v.contactName||v.businessName)+',\n\n'+
-        'Please find your invoice details for the Elevation Bend Farmers Market below.\n\n'+
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'+
-        'INVOICE: '+inv.invoice_number+'\n'+
-        'VENDOR: '+v.businessName+'\n'+
-        'BOOTH SIZE: '+(v.boothSize||'—')+'\n'+
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'+
-        'MARKET DATES:\n'+(lineStr||'  • '+datesStr)+'\n\n'+
-        'TOTAL DUE: $'+parseFloat(inv.total||0).toFixed(2)+'\n'+
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'+
-        paySection+
-        'Thank you,\nElevation Bend Farmers Market';
-
-      // 4. Open PDF and Gmail
-      generateInvoicePDF(inv);
-      setTimeout(function(){
-        sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',emailBody);
-      },500);
+      // Send via Resend with full HTML invoice
+      var invoiceHTML=buildInvoiceHTML(inv);
+      var sent=await sendEmailResend({
+        to:v.email,
+        subject:'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',
+        html:invoiceHTML,
+        text:'Hi '+(v.contactName||v.businessName)+',\n\nPlease find your invoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\n'+(inv.stripe_payment_link?'Pay online: '+inv.stripe_payment_link+'\n\n':'')+'Thank you,\nElevation Bend Farmers Market'
+      });
+      if(!sent){
+        // Fallback: open PDF + Gmail
+        generateInvoicePDF(inv);
+        setTimeout(function(){sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market','Hi '+(v.contactName||v.businessName)+',\n\nYour invoice for $'+parseFloat(inv.total||0).toFixed(2)+(inv.stripe_payment_link?'\n\nPay online: '+inv.stripe_payment_link:'')+'\n\nThank you,\nElevation Bend Farmers Market');},500);
+      }
 
       renderPayments();
     });
@@ -4070,15 +4156,21 @@ async function renderInvoiceSection(){
 
 function openInvoiceModal(vendorId){
   var v=vendorId?vendors.find(function(x){return x.id===vendorId;}):null;
-  // Get dates from calRows (source of truth) not just selectedDates
+  // Get dates from calRows first, then fall back to selectedDates
   var vDates=vendorId
     ?Object.keys(calRows).filter(function(ds){return(calRows[ds].approved||[]).indexOf(vendorId)>-1;}).sort()
     :[];
-  if(!vDates.length&&v)vDates=(v.selectedDates||[]).slice().sort();
+  // Also include any dates in selectedDates not yet in calRows
+  if(v&&v.selectedDates){
+    v.selectedDates.forEach(function(ds){
+      if(vDates.indexOf(ds)===-1)vDates.push(ds);
+    });
+    vDates.sort();
+  }
   var feePerDate=v?feeForBoothSize(v.boothSize):0;
 
   document.getElementById('modal-area').innerHTML=
-    '<div class="overlay" id="invModalOverlay"><div class="modal md" style="max-height:90vh;overflow-y:auto">'+
+    '<div class="overlay" id="invModalOverlay"><div class="modal md" style="max-height:90vh;overflow-y:auto;min-width:480px">'+
     '<div class="mtitle">📄 New invoice'+(v?' — '+esc(v.businessName):'')+'</div>'+
 
     // Vendor + booth info strip
@@ -4096,9 +4188,26 @@ function openInvoiceModal(vendorId){
       '</select></div>':'')+
 
     '<div class="fg"><label>Select dates to invoice</label>'+
-    '<div id="invDateList" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;padding:4px 0;border:.5px solid #e5e3de;border-radius:8px;padding:8px">'+
+    '<div id="invDateList" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;overflow-x:hidden;border:.5px solid #e5e3de;border-radius:8px;padding:8px">'+
       (vDates.length
-        ?vDates.map(function(d){return'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:3px 0"><input type="checkbox" value="'+d+'" checked style="accent-color:#639922"> <span style="font-weight:600">'+d+'</span></label>';}).join('')
+        ?vDates.map(function(d){
+            // Find existing invoice for this vendor+date
+            var existingInv=invoices.find(function(i){
+              return i.vendor_id===vendorId&&(i.dates||[]).indexOf(d)>-1;
+            });
+            var badge='';
+            var preChecked=!existingInv; // pre-check only uninvoiced dates
+            if(existingInv){
+              if(existingInv.status==='paid')badge='<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#EAF3DE;color:#27500A;margin-left:6px">✅ Paid</span>';
+              else if(existingInv.status==='sent')badge='<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#E8F0FB;color:#0C447C;margin-left:6px">📧 Sent — '+existingInv.invoice_number+'</span>';
+              else badge='<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#f0ede6;color:#888;margin-left:6px">Draft — '+existingInv.invoice_number+'</span>';
+            }
+            return'<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;padding:4px 0;width:100%">'+
+              '<input type="checkbox" value="'+d+'"'+(preChecked?' checked':'')+' style="accent-color:#639922;flex-shrink:0;width:16px;height:16px"> '+
+              '<span style="font-weight:600;color:#1a1a1a;flex:1">'+esc(d)+'</span>'+
+              badge+
+            '</label>';
+          }).join('')
         :'<div style="font-size:11px;color:#aaa;padding:4px">No dates found for this vendor. Add dates via the Calendar tab first.</div>')+
     '</div></div>'+
 
@@ -4211,133 +4320,35 @@ function openBulkInvoiceModal(){
   foot.appendChild(canBtn);foot.appendChild(genBtn);
 }
 
-function generateInvoicePDF(inv){
+function buildInvoiceHTML(inv){
   var v=vendors.find(function(x){return x.id===inv.vendor_id;});
-  if(!v){alert('Vendor not found.');return;}
-  var fees=loadFeeSchedule();
+  if(!v)return null;
   var feePerDate=feeForBoothSize(v.boothSize);
   var dates=inv.dates||[];
-  var lineItems=inv.line_items||dates.map(function(ds){return{date:ds,description:'Booth fee ('+esc(v.boothSize||'standard')+')',amount:feePerDate};});
+  var lineItems=inv.line_items||dates.map(function(ds){return{date:ds,description:'Booth fee ('+(v.boothSize||'standard')+')',amount:feePerDate};});
   var total=parseFloat(inv.total||0);
   var cc=catColor(v.category);
-
-  // Generate a print-ready HTML invoice in a new window
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice '+esc(inv.invoice_number)+'</title>'+
-  '<style>'+
-    '*{margin:0;padding:0;box-sizing:border-box;}'+
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;color:#1a1a1a;padding:40px;max-width:700px;margin:0 auto;}'+
-    '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid #1a1a1a;}'+
-    '.market-name{font-size:22px;font-weight:800;color:#27500A;letter-spacing:-.02em;}'+
-    '.market-sub{font-size:11px;color:#888;margin-top:3px;}'+
-    '.inv-title{text-align:right;}'+
-    '.inv-title h1{font-size:28px;font-weight:800;color:#1a1a1a;}'+
-    '.inv-title .inv-num{font-size:13px;color:#888;margin-top:4px;}'+
-    '.inv-title .status-badge{display:inline-block;margin-top:6px;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;background:'+(inv.status==='paid'?'#EAF3DE':inv.status==='sent'?'#E6F1FB':'#f3f4f6')+';color:'+(inv.status==='paid'?'#27500A':inv.status==='sent'?'#0C447C':'#555')+'}'+
-    '.bill-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;}'+
-    '.bill-block label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#888;font-weight:600;display:block;margin-bottom:6px;}'+
-    '.bill-block .val{font-size:13px;line-height:1.6;}'+
-    '.bill-block .name{font-size:15px;font-weight:700;margin-bottom:4px;}'+
-    'table{width:100%;border-collapse:collapse;margin-bottom:20px;}'+
-    'thead tr{background:#f8f7f4;}'+
-    'th{text-align:left;padding:8px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#888;border-bottom:1px solid #e5e3de;}'+
-    'td{padding:10px 12px;border-bottom:.5px solid #f0ede6;font-size:13px;}'+
-    'tr:last-child td{border-bottom:none;}'+
-    '.totals{text-align:right;margin-bottom:28px;}'+
-    '.total-row{display:flex;justify-content:flex-end;gap:80px;padding:6px 0;font-size:13px;}'+
-    '.total-row.grand{font-size:18px;font-weight:800;border-top:2px solid #1a1a1a;margin-top:6px;padding-top:10px;}'+
-    '.footer{margin-top:40px;padding-top:16px;border-top:.5px solid #e5e3de;font-size:10px;color:#aaa;text-align:center;line-height:1.7;}'+
-    '.vendor-tag{display:inline-block;background:'+cc.bg+';color:'+cc.text+';border:1px solid '+cc.border+';border-radius:20px;font-size:10px;padding:2px 8px;margin-top:4px;font-weight:600;}'+
-    '@media print{body{padding:20px;} .no-print{display:none;}}'+
-  '</style></head><body>'+
-
-  // Print button
-  '<div class="no-print" style="text-align:right;margin-bottom:20px;display:flex;gap:8px;justify-content:flex-end">'+
-    '<button onclick="window.print()" style="background:#27500A;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:600">🖨 Print / Save as PDF</button>'+
-    '<button onclick="window.close()" style="background:#f8f7f4;color:#555;border:.5px solid #d0cec7;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit">Close</button>'+
-  '</div>'+
-
-  // Header
-  '<div class="header">'+
-    '<div>'+
-      '<div class="market-name">Elevation Bend</div>'+
-      '<div class="market-sub">Farmers Market · Bend, Oregon</div>'+
-      '<div class="market-sub" style="margin-top:2px">elevation.bend@market.com</div>'+
-    '</div>'+
-    '<div class="inv-title">'+
-      '<h1>INVOICE</h1>'+
-      '<div class="inv-num">'+esc(inv.invoice_number)+'</div>'+
-      '<div class="status-badge">'+(inv.status==='paid'?'✅ PAID':inv.status==='sent'?'📧 SENT':'📝 DRAFT')+'</div>'+
-    '</div>'+
-  '</div>'+
-
-  // Billing info
-  '<div class="bill-section">'+
-    '<div class="bill-block">'+
-      '<label>Bill to</label>'+
-      '<div class="name">'+esc(v.businessName||'Vendor')+'</div>'+
-      '<div class="val">'+
-        (v.contactName?esc(v.contactName)+'<br>':'')+
-        (v.email?esc(v.email)+'<br>':'')+
-        (v.phone?esc(v.phone)+'<br>':'')+
-      '</div>'+
-      '<div class="vendor-tag">'+esc(v.category||'Vendor')+'</div>'+
-    '</div>'+
-    '<div class="bill-block" style="text-align:right">'+
-      '<label>Invoice details</label>'+
-      '<div class="val">'+
-        '<strong>Invoice date:</strong> '+today()+'<br>'+
-        (inv.due_date?'<strong>Due date:</strong> '+inv.due_date+'<br>':'')+
-        (inv.status==='paid'&&inv.paid_at?'<strong>Paid on:</strong> '+inv.paid_at.slice(0,10)+'<br>':'')+
-        '<strong>Booth size:</strong> '+esc(v.boothSize||'Standard')+'<br>'+
-        '<strong>Rate:</strong> $'+feePerDate.toFixed(2)+' per date'+
-      '</div>'+
-    '</div>'+
-  '</div>'+
-
-  // Line items table
-  '<table>'+
-    '<thead><tr><th>#</th><th>Date</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead>'+
-    '<tbody>'+
-    lineItems.map(function(item,i){
-      return'<tr><td style="color:#aaa">'+(i+1)+'</td><td><strong>'+esc(item.date)+'</strong></td><td>'+esc(item.description||'Booth fee')+'</td><td style="text-align:right;font-weight:600">$'+parseFloat(item.amount||0).toFixed(2)+'</td></tr>';
-    }).join('')+
-    '</tbody>'+
-  '</table>'+
-
-  // Totals
-  '<div class="totals">'+
-    '<div class="total-row"><span>Subtotal</span><span>$'+total.toFixed(2)+'</span></div>'+
-    '<div class="total-row"><span>Tax (0%)</span><span>$0.00</span></div>'+
-    '<div class="total-row grand"><span>Total due</span><span style="color:'+(inv.status==='paid'?'#27500A':'#1a1a1a')+'">$'+total.toFixed(2)+'</span></div>'+
-  '</div>'+
-
-  // Payment link section — always shown, prominent call to action
-  '<div style="background:'+(inv.stripe_payment_link?'#EAF3DE':'#f8f7f4')+';border:2px solid '+(inv.stripe_payment_link?'#639922':'#e5e3de')+';border-radius:10px;padding:16px 20px;margin-bottom:20px">'+
-    '<div style="font-size:14px;font-weight:800;color:'+(inv.stripe_payment_link?'#27500A':'#1a1a1a')+';margin-bottom:6px">'+
-      (inv.stripe_payment_link?'💳 Pay Online':'Payment Instructions')+
-    '</div>'+
-    (inv.stripe_payment_link
-      ?'<div style="font-size:12px;color:#27500A;margin-bottom:8px">Click the link below to pay securely — no account required:</div>'+
-        '<a href="'+inv.stripe_payment_link+'" style="display:inline-block;background:#27500A;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700">Pay $'+parseFloat(inv.total||0).toFixed(2)+' Now →</a>'+
-        '<div style="margin-top:8px;font-size:10px;color:#639922;word-break:break-all">'+inv.stripe_payment_link+'</div>'
-      :'<div style="font-size:12px;color:#555">Please contact us to arrange payment for this invoice.</div>'+
-        '<div style="font-size:11px;color:#888;margin-top:4px">elevation.bend@market.com · Bend, Oregon</div>')+
-  '</div>'+
-
-  // Notes
-  (inv.notes?'<div style="background:#f8f7f4;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:#555">'+
-    '<strong>Notes:</strong> '+esc(inv.notes)+
-  '</div>':'')+
-
-  // Footer
-  '<div class="footer">'+
-    'Thank you for being part of the Elevation Bend Farmers Market community!<br>'+
-    'Questions? Contact us at elevation.bend@market.com<br>'+
-    'Elevation Bend Farmers Market · Bend, Oregon · elevationbend.com'+
-  '</div>'+
-
+  var appUrl='https://akpelvb2k26.github.io/elevation-bend/invoice-viewer.html?id='+encodeURIComponent(inv.id);
+  return'<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice '+esc(inv.invoice_number)+'</title>'+
+  '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;color:#1a1a1a;padding:40px;max-width:700px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid #1a1a1a;}.market-name{font-size:22px;font-weight:800;color:#27500A;letter-spacing:-.02em;}.market-sub{font-size:11px;color:#888;margin-top:3px;}.inv-title{text-align:right;}.inv-title h1{font-size:28px;font-weight:800;color:#1a1a1a;}.inv-title .inv-num{font-size:13px;color:#888;margin-top:4px;}.inv-title .status-badge{display:inline-block;margin-top:6px;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;background:'+(inv.status==='paid'?'#EAF3DE':inv.status==='sent'?'#E6F1FB':'#f3f4f6')+';color:'+(inv.status==='paid'?'#27500A':inv.status==='sent'?'#0C447C':'#555')+'}.bill-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;}.bill-block label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#888;font-weight:600;display:block;margin-bottom:6px;}.bill-block .val{font-size:13px;line-height:1.6;}.bill-block .name{font-size:15px;font-weight:700;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}thead tr{background:#f8f7f4;}th{text-align:left;padding:8px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#888;border-bottom:1px solid #e5e3de;}td{padding:10px 12px;border-bottom:.5px solid #f0ede6;font-size:13px;}tr:last-child td{border-bottom:none;}.totals{text-align:right;margin-bottom:28px;}.total-row{display:flex;justify-content:flex-end;gap:80px;padding:6px 0;font-size:13px;}.total-row.grand{font-size:18px;font-weight:800;border-top:2px solid #1a1a1a;margin-top:6px;padding-top:10px;}.footer{margin-top:40px;padding-top:16px;border-top:.5px solid #e5e3de;font-size:10px;color:#aaa;text-align:center;line-height:1.7;}.vendor-tag{display:inline-block;background:'+cc.bg+';color:'+cc.text+';border:1px solid '+cc.border+';border-radius:20px;font-size:10px;padding:2px 8px;margin-top:4px;font-weight:600;}.pay-btn{display:inline-block;margin-top:16px;background:#27500A;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;}@media print{body{padding:20px;}.no-print{display:none;}}</style></head><body>'+
+  '<div class="no-print" style="text-align:right;margin-bottom:20px;display:flex;gap:8px;justify-content:flex-end"><button onclick="window.print()" style="background:#27500A;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:600">🖨 Print / Save as PDF</button><button onclick="window.close()" style="background:#f8f7f4;color:#555;border:.5px solid #d0cec7;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit">Close</button></div>'+
+  '<div class="header"><div><div class="market-name">Elevation Bend</div><div class="market-sub">Farmers Market · Bend, Oregon</div><div class="market-sub" style="margin-top:2px">elevation.bend@market.com</div></div><div class="inv-title"><h1>INVOICE</h1><div class="inv-num">'+esc(inv.invoice_number)+'</div><div class="status-badge">'+(inv.status==='paid'?'✅ PAID':inv.status==='sent'?'📧 SENT':'📝 DRAFT')+'</div></div></div>'+
+  '<div class="bill-section"><div class="bill-block"><label>Bill to</label><div class="name">'+esc(v.businessName||'Vendor')+'</div><div class="val">'+(v.contactName?esc(v.contactName)+'<br>':'')+(v.email?esc(v.email)+'<br>':'')+(v.phone?esc(v.phone)+'<br>':'')+'</div><span class="vendor-tag">'+esc(v.category||'Vendor')+'</span></div>'+
+  '<div class="bill-block"><label>Invoice details</label><div class="val">Invoice # <strong>'+esc(inv.invoice_number)+'</strong><br>'+(inv.due_date?'Due: '+inv.due_date+'<br>':'')+'Issued: '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+'</div></div></div>'+
+  '<table><thead><tr><th>Date</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead><tbody>'+
+  lineItems.map(function(li){return'<tr><td>'+esc(li.date||'')+'</td><td>'+esc(li.description||'')+'</td><td style="text-align:right">$'+parseFloat(li.amount||0).toFixed(2)+'</td></tr>';}).join('')+
+  '</tbody></table>'+
+  '<div class="totals"><div class="total-row grand"><span>Total Due</span><span>$'+total.toFixed(2)+'</span></div></div>'+
+  (inv.stripe_payment_link?'<div style="text-align:center;margin:24px 0"><a href="'+esc(inv.stripe_payment_link)+'" class="pay-btn">💳 Pay Now Online</a><br><a href="'+appUrl+'" style="display:inline-block;margin-top:10px;font-size:12px;color:#378ADD;text-decoration:none">🔍 View Invoice Online</a></div>':
+    '<div style="text-align:center;margin:24px 0"><a href="'+appUrl+'" style="display:inline-block;font-size:13px;color:#378ADD;text-decoration:none;padding:10px 20px;border:.5px solid #378ADD;border-radius:8px">🔍 View Invoice Online</a></div>')+
+  (inv.notes?'<div style="background:#f8f7f4;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:#555"><strong>Notes:</strong> '+esc(inv.notes)+'</div>':'')+
+  '<div class="footer">Elevation Bend Farmers Market · Bend, Oregon<br>Thank you for being part of our market community!</div>'+
   '</body></html>';
+}
 
+function generateInvoicePDF(inv){
+  var html=buildInvoiceHTML(inv);
+  if(!html){alert('Vendor not found.');return;}
   var win=window.open('','_blank','width=750,height=900,scrollbars=yes');
   if(win){win.document.write(html);win.document.close();}
   else{alert('Please allow pop-ups to view the invoice PDF.');}
@@ -5138,23 +5149,45 @@ function openGroupModal(groupId){
 // ── sendEmail — swap this body for Gmail API when ready ───────────────────
 // TO SWITCH TO GMAIL API: replace the window.open line with a fetch() call
 // to your Gmail API endpoint with the same to/subject/body parameters.
-function sendEmail(to,subject,body){
-  var isBulk=to.indexOf(',')>-1;
-  var url='https://mail.google.com/mail/?view=cm'+
-    '&to='+encodeURIComponent(to)+
-    '&su='+encodeURIComponent(subject)+
-    '&body='+encodeURIComponent(body);
-  if(isBulk){
-    // Remind user to move recipients to BCC before sending
-    setTimeout(function(){alert('📧 Tip: Move all recipients from TO to BCC before sending so vendors don\'t see each other\'s email addresses.');},800);
+// ── Email via Resend ───────────────────────────────────────────────────────
+async function sendEmailResend(opts){
+  // opts: { to, bcc, subject, text, attachments }
+  try{
+    var res=await fetch(SUPABASE_FN_URL+'/send-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPA_ANON_KEY||SUPA_KEY,'Authorization':'Bearer '+(SUPA_ANON_KEY||SUPA_KEY)},
+      body:JSON.stringify(opts)
+    });
+    var data=await res.json();
+    if(!data.success)console.warn('Resend error:',data.error);
+    return data.success;
+  }catch(e){
+    console.warn('Resend failed, falling back to Gmail:',e);
+    return false;
   }
-  var a=document.createElement('a');
-  a.href=url;
-  a.target='_blank';
-  a.rel='noopener';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+}
+
+function sendEmail(to,subject,body){
+  var isBulk=to&&to.indexOf(',')>-1;
+  // Try Resend first
+  var opts=isBulk
+    ?{bcc:to.split(',').map(function(e){return e.trim();}),subject:subject,text:body}
+    :{to:to,subject:subject,text:body};
+  sendEmailResend(opts).then(function(ok){
+    if(!ok){
+      // Fallback to Gmail compose
+      var url='https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(to)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+      var a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';
+      document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);},100);
+    } else {
+      // Show brief confirmation
+      var t=document.createElement('div');
+      t.style.cssText='position:fixed;bottom:24px;right:24px;background:#27500A;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+      t.textContent='✅ Email sent via Resend';
+      document.body.appendChild(t);
+      setTimeout(function(){document.body.removeChild(t);},3000);
+    }
+  });
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────
