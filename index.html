@@ -672,6 +672,7 @@ function sortVendorList(list){
     else if(vSortCol==='vstatus'){av=a.vendorStatus||'';bv=b.vendorStatus||'';}
     else if(vSortCol==='booth'){av=a.boothSize||'';bv=b.boothSize||'';}
     else if(vSortCol==='dates'){av=(a.selectedDates||[]).length;bv=(b.selectedDates||[]).length;return(av-bv)*vSortDir;}
+    else if(vSortCol==='sched'){var so={approved:0,waitlist:1,pending:2};av=so[a.status]||2;bv=so[b.status]||2;return(av-bv)*vSortDir;}
     else if(vSortCol==='contract'){av=a.contractReceived?1:0;bv=b.contractReceived?1:0;return(bv-av)*vSortDir;}
     else if(vSortCol==='payment'){av=a.paymentReceived?1:0;bv=b.paymentReceived?1:0;return(bv-av)*vSortDir;}
     else if(vSortCol==='modified'){av=a.modifiedAt||'';bv=b.modifiedAt||'';}
@@ -715,7 +716,7 @@ function renderVendors(){
       vTh('name','Business')+
       '<th style="white-space:nowrap">Contact</th>'+
       vTh('category','Category')+
-      '<th>Sched.</th>'+
+      vTh('sched','Sched.')+
       vTh('vstatus','Status')+
       vTh('dates','Dates')+
       vTh('contract','Contract')+
@@ -733,7 +734,7 @@ function renderVendors(){
             '<div style="font-size:13px;font-weight:700;white-space:nowrap">'+esc(v.businessName||'—')+'</div>'+
           '</div>'+
           '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" onclick="event.stopPropagation()">'+
-            '<select data-set-st="'+v.id+'" style="font-size:11px;padding:3px 6px;border:.5px solid #d0cec7;border-radius:6px;background:#fff;font-family:inherit;cursor:pointer">'+
+            '<select data-set-st="'+v.id+'" style="font-size:11px;padding:3px 6px;border:.5px solid #d0cec7;border-radius:6px;font-family:inherit;cursor:pointer;font-weight:600;background:'+(v.status==='approved'?'#EAF3DE':v.status==='waitlist'?'#FEF9C3':'#FDECEA')+';color:'+(v.status==='approved'?'#27500A':v.status==='waitlist'?'#A16207':'#9B3A2E')+'">'+
               '<option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option>'+
               '<option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option>'+
               '<option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option>'+
@@ -774,7 +775,12 @@ function renderVendors(){
     renderVendors();
   });
   el.querySelectorAll('[data-set-st]').forEach(function(sel){
-    sel.addEventListener('change',function(){setSt(sel.dataset.setSt,sel.value);});
+    sel.addEventListener('change',function(){
+      var v=sel.value;
+      sel.style.background=v==='approved'?'#EAF3DE':v==='waitlist'?'#FEF9C3':'#FDECEA';
+      sel.style.color=v==='approved'?'#27500A':v==='waitlist'?'#A16207':'#9B3A2E';
+      setSt(sel.dataset.setSt,v);
+    });
   });
   el.querySelectorAll('[data-set-vs]').forEach(function(sel){
     sel.addEventListener('change',function(){setVs(sel.dataset.setVs,sel.value);});
