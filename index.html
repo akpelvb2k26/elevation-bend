@@ -3514,12 +3514,12 @@ async function renderPayments(){
             '</td>'+
             '<td>'+
               '<div style="display:flex;gap:3px;flex-wrap:wrap">'+
-                (v?'<button class="btn-s" style="font-size:11px;padding:3px 8px" data-pay-edit="'+v.id+'">✏️</button>':'')+
-                '<button class="btn-s" style="font-size:11px;padding:3px 8px" data-inv-pdf="'+inv.id+'">📄</button>'+
-                (inv.status!=='paid'?'<button class="btn-blue" style="font-size:11px;padding:3px 8px" data-inv-send="'+inv.id+'">📧</button>':'')+
-                (inv.status!=='paid'?'<button class="btn-p" style="font-size:11px;padding:3px 8px" data-inv-paid="'+inv.id+'">✓</button>':
-                  '<button class="btn-s" style="font-size:11px;padding:3px 8px" data-inv-unpaid="'+inv.id+'">↩</button>')+
-                '<button class="btn-danger" style="font-size:11px;padding:3px 8px" data-inv-del="'+inv.id+'">✕</button>'+
+                (v?'<button class="btn-s" style="font-size:11px;padding:3px 8px" data-pay-edit="'+v.id+'">Edit</button>':'')+
+                '<button class="btn-s" style="font-size:11px;padding:3px 8px" data-inv-pdf="'+inv.id+'">PDF</button>'+
+                (inv.status!=='paid'?'<button class="btn-blue" style="font-size:11px;padding:3px 8px" data-inv-send="'+inv.id+'">Send</button>':'')+
+                (inv.status!=='paid'?'<button class="btn-p" style="font-size:11px;padding:3px 8px" data-inv-paid="'+inv.id+'">Mark Paid</button>':
+                  '<button class="btn-s" style="font-size:11px;padding:3px 8px" data-inv-unpaid="'+inv.id+'">Unmark</button>')+
+                '<button class="btn-danger" style="font-size:11px;padding:3px 8px" data-inv-del="'+inv.id+'">Delete</button>'+
               '</div>'+
             '</td>'+
           '</tr>';
@@ -4817,7 +4817,8 @@ function renderManage(){
               if(existing)updatedIds.push(rowId);
             }
             if(!newRows.length){
-              statusEl.innerHTML='<span style="color:#791F1F">No valid rows found to import.</span>';
+              console.log('Import: no rows found. csvData length:', csvData.length, 'bizIdx:', bizIdx, 'headers:', hdrs.slice(0,5));
+              statusEl.innerHTML='<span style="color:#791F1F">No valid rows found. bizIdx='+bizIdx+' headers='+hdrs.slice(0,3).join('|')+'</span>';
               runBtn.disabled=false;runBtn.textContent='📥 Import vendors';return;
             }
             // Deduplicate by ID — keep last occurrence if CSV has duplicate rows
@@ -4827,7 +4828,9 @@ function renderManage(){
               seen[r.id]=true;return true;
             });
             statusEl.innerHTML='<span style="color:#a16207">⏳ Saving '+newRows.length+' vendors…</span>';
-            var CHUNK=10,errors=0,errorMsg='';
+            console.log('Import: attempting to save',newRows.length,'rows');
+            console.log('Sample row:', JSON.stringify(newRows[0]));
+            var CHUNK=5,errors=0,errorMsg='';
             for(var c=0;c<newRows.length;c+=CHUNK){
               var chunk=newRows.slice(c,c+CHUNK);
               var res=await sb.from('vendors').upsert(chunk);
