@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Layout — Elevation Bend Farmers Market</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --green:#27500A;--green-light:#EAF3DE;--green-border:#639922;
+    --amber:#A16207;--amber-light:#FEF9C3;
+    --blue:#0C447C;--blue-light:#E8F0FB;
+    --gray:#555;--gray-light:#F8F7F4;--border:#E5E3DE;
+  }
+  body{font-family:'DM Sans',sans-serif;background:#f4f1ec;min-height:100vh;color:#1a1a1a;}
+  header{background:#fff;border-bottom:1.5px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .logo-text{font-size:16px;font-weight:800;color:var(--green);}
+  .logo-sub{font-size:11px;color:#888;font-weight:500;}
+  .date-badge{background:var(--green-light);color:var(--green);font-size:13px;font-weight:700;padding:6px 14px;border-radius:20px;border:1px solid var(--green-border);}
+  main{max-width:1200px;margin:0 auto;padding:24px;}
+  .section-title{font-size:13px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px;}
+  /* Legend */
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;padding:16px;background:#fff;border-radius:12px;border:.5px solid var(--border);}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;}
+  /* Layout canvas */
+  .canvas-wrap{background:#fff;border-radius:16px;border:.5px solid var(--border);overflow:auto;position:relative;box-shadow:0 2px 12px rgba(0,0,0,.06);}
+  .canvas{position:relative;min-height:400px;}
+  .spot{position:absolute;border-radius:8px;border:2px solid #d0cec7;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6px 4px;cursor:pointer;transition:transform .15s,box-shadow .15s;}
+  .spot:hover{transform:scale(1.04);box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:10;}
+  .spot-num{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:#aaa;margin-bottom:2px;}
+  .spot-name{font-size:11px;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;width:90%;}
+  .spot-cat{font-size:9px;font-weight:600;opacity:.8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:90%;}
+  .spot-empty{opacity:.4;}
+  /* Popup */
+  .popup{position:fixed;z-index:1000;background:#fff;border-radius:14px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.18);min-width:240px;max-width:300px;border:2px solid var(--border);animation:popIn .15s ease;}
+  @keyframes popIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+  .popup-close{position:absolute;top:10px;right:12px;font-size:18px;cursor:pointer;color:#888;line-height:1;}
+  .popup-spot{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+  .popup-name{font-size:20px;font-weight:800;margin-bottom:4px;}
+  .popup-cat{font-size:13px;font-weight:600;opacity:.8;}
+  .popup-size{font-size:11px;color:#aaa;margin-top:6px;}
+  /* Loading */
+  .loading{display:flex;align-items:center;justify-content:center;min-height:300px;flex-direction:column;gap:12px;}
+  .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .error{text-align:center;padding:48px;color:#888;}
+  .error h2{font-size:20px;font-weight:700;margin-bottom:8px;color:#555;}
+  footer{text-align:center;padding:32px;font-size:12px;color:#aaa;border-top:.5px solid var(--border);margin-top:32px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌿</div>
+    <div>
+      <div class="logo-text">Elevation Bend</div>
+      <div class="logo-sub">Farmers Market · Bend, Oregon</div>
+    </div>
+  </div>
+  <div class="date-badge" id="dateBadge">Loading…</div>
+</header>
+
+<main>
+  <div id="root" class="loading">
+    <div class="spinner"></div>
+    <div style="font-size:13px;color:#888">Loading layout…</div>
+  </div>
+</main>
+
+<footer>Elevation Bend Farmers Market · Bend, Oregon · Read-only market layout view</footer>
+
+<script>
+const SUPA_URL='https://mixubqomqdfcrgfovnwy.supabase.co';
+const SUPA_KEY='sb_publishable_btz05uH2n90XYfkGIooLog_CY71YUW3';
+const {createClient}=supabase;
+const sb=createClient(SUPA_URL,SUPA_KEY);
+
+const CAT_COLORS={
+  'Farm / Produce Grower':{bg:'#EAF3DE',border:'#639922',text:'#27500A',dot:'#639922'},
+  'Rancher / Eggs / Meat / Dairy':{bg:'#FEF3E2',border:'#D97706',text:'#92400E',dot:'#D97706'},
+  'Baked Goods':{bg:'#FDF2E9',border:'#E67E22',text:'#784212',dot:'#E67E22'},
+  'Specialty Food / Packaged Goods':{bg:'#EBF5FB',border:'#2E86C1',text:'#1A5276',dot:'#2E86C1'},
+  'Prepared Food Vendor':{bg:'#FDEDEC',border:'#E74C3C',text:'#7B241C',dot:'#E74C3C'},
+  'Artisan / Maker':{bg:'#F4ECF7',border:'#8E44AD',text:'#6C3483',dot:'#8E44AD'},
+  'Flowers / Plants / Herbal Goods':{bg:'#E8F8F5',border:'#1ABC9C',text:'#0E6655',dot:'#1ABC9C'},
+  'Other':{bg:'#F2F3F4',border:'#85929E',text:'#566573',dot:'#85929E'},
+};
+function catColor(cat){return CAT_COLORS[cat]||CAT_COLORS['Other'];}
+
+const params=new URLSearchParams(window.location.search);
+const date=params.get('date');
+
+async function load(){
+  const root=document.getElementById('root');
+  const badge=document.getElementById('dateBadge');
+
+  if(!date){
+    root.innerHTML='<div class="error"><h2>No date specified</h2><p>Please use the link provided in your email.</p></div>';
+    return;
+  }
+
+  badge.textContent=date;
+  document.title='Layout for '+date+' — Elevation Bend Farmers Market';
+
+  // Load layout spots
+  const [{data:layoutData},{data:calData},{data:vendorData}]=await Promise.all([
+    sb.from('layouts').select('spots,sent_at').eq('date',date).single(),
+    sb.from('calendar').select('approved_vendors,tent_assignments').eq('date',date).single(),
+    sb.from('vendors').select('id,business_name,category,booth_size,contact_name,email'),
+  ]);
+
+  if(!layoutData||!layoutData.spots||!layoutData.spots.length){
+    root.innerHTML='<div class="error"><h2>Layout not available</h2><p>The layout for '+date+' has not been published yet.</p></div>';
+    return;
+  }
+
+  const spots=typeof layoutData.spots==='string'?JSON.parse(layoutData.spots):layoutData.spots;
+  const ta=(calData&&calData.tent_assignments)||{};
+  const vendors=(vendorData||[]);
+
+  function getVendor(id){return vendors.find(function(v){return v.id===id;});}
+
+  // Build legend
+  const cats=new Set();
+  Object.values(ta).forEach(function(vid){
+    const v=getVendor(vid);
+    if(v&&v.category)cats.add(v.category);
+  });
+  const legendHTML='<div class="section-title">Vendor Categories</div><div class="legend">'+
+    Array.from(cats).map(function(cat){
+      const cc=catColor(cat);
+      return'<div class="legend-item" style="background:'+cc.bg+';color:'+cc.text+';border:1px solid '+cc.border+'">'+
+        '<span style="width:8px;height:8px;border-radius:50%;background:'+cc.dot+';display:inline-block;flex-shrink:0"></span>'+
+        cat+'</div>';
+    }).join('')+'</div>';
+
+  // Find canvas bounds
+  let maxX=800,maxY=600;
+  spots.forEach(function(s){maxX=Math.max(maxX,s.x+(s.w||120)+20);maxY=Math.max(maxY,s.y+(s.h||60)+20);});
+
+  // Build spots HTML
+  const spotsHTML=spots.map(function(s){
+    const vid=ta[s.id];
+    const v=vid?getVendor(vid):null;
+    const cc=v?catColor(v.category):{bg:'#fff',border:'#d0cec7',text:'#888',dot:'#d0cec7'};
+    return'<div class="spot'+(v?'':' spot-empty')+'" '+
+      'style="left:'+s.x+'px;top:'+s.y+'px;width:'+(s.w||120)+'px;height:'+(s.h||60)+'px;'+
+      'background:'+cc.bg+';border-color:'+cc.border+'" '+
+      'data-id="'+s.id+'" data-vid="'+(vid||'')+'" data-num="'+s.num+'" data-size="'+(s.size||'')+'"'+
+      (v?'onclick="showPopup(event,this)"':'')+'>'+
+      '<div class="spot-num">Spot '+s.num+'</div>'+
+      (v?'<div class="spot-name" style="color:'+cc.text+'">'+esc(v.business_name)+'</div>':
+         '<div class="spot-name" style="color:#ccc">Available</div>')+
+      (v&&v.category?'<div class="spot-cat" style="color:'+cc.text+'">'+esc(v.category)+'</div>':'')+
+    '</div>';
+  }).join('');
+
+  root.innerHTML=legendHTML+
+    '<div class="section-title">Floor Plan</div>'+
+    '<div class="canvas-wrap"><div class="canvas" style="width:'+maxX+'px;height:'+maxY+'px">'+spotsHTML+'</div></div>'+
+    (layoutData.sent_at?'<div style="font-size:11px;color:#aaa;text-align:right;margin-top:8px">Layout published '+new Date(layoutData.sent_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+'</div>':'');
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+let activePopup=null;
+function showPopup(e,el){
+  e.stopPropagation();
+  if(activePopup)activePopup.remove();
+  const vid=el.dataset.vid;
+  const vendors_=document.querySelectorAll('.spot');
+  const v=Array.from(vendors_).find(function(s){return s.dataset.vid===vid;});
+  // Find vendor data
+  const num=el.dataset.num;
+  const size=el.dataset.size;
+  const name=el.querySelector('.spot-name')&&el.querySelector('.spot-name').textContent;
+  const cat=el.querySelector('.spot-cat')&&el.querySelector('.spot-cat').textContent;
+  const cc=catColor(cat);
+  const popup=document.createElement('div');
+  popup.className='popup';
+  popup.style.border='2px solid '+cc.border;
+  popup.innerHTML='<div class="popup-close" onclick="this.parentNode.remove()">✕</div>'+
+    '<div class="popup-spot">Spot '+num+(size?' · '+size:'')+'</div>'+
+    '<div class="popup-name" style="color:'+cc.text+'">'+esc(name)+'</div>'+
+    (cat?'<div class="popup-cat" style="color:'+cc.text+'">'+esc(cat)+'</div>':'')+
+    '<div class="popup-size">Click outside to close</div>';
+  const rect=el.getBoundingClientRect();
+  const left=Math.min(rect.right+8,window.innerWidth-320);
+  const top=Math.max(8,Math.min(rect.top,window.innerHeight-200));
+  popup.style.left=left+'px';popup.style.top=top+'px';
+  document.body.appendChild(popup);
+  activePopup=popup;
+}
+document.addEventListener('click',function(){if(activePopup){activePopup.remove();activePopup=null;}});
+
+load();
+</script>
+</body>
+</html>
