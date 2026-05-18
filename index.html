@@ -4728,6 +4728,7 @@ function renderManage(){
           runBtn.onclick=async function(){
             runBtn.disabled=true;runBtn.textContent='Importing…';
             statusEl.innerHTML='<span style="color:#a16207">⏳ Building records…</span>';
+            try{
             var hdrs=csvData[0].map(function(h){return h.trim().toLowerCase();});
             // Direct column mapping from the known form export format
             // Columns: Submission date(0), Business/Farm Name(1), Primary Contact Name(2),
@@ -4847,6 +4848,11 @@ function renderManage(){
               if(dropZone){dropZone.style.borderColor='#d0cec7';dropZone.style.background='';}
               runBtn.style.display='none';
               await loadData();
+            }
+            }catch(importErr){
+              console.error('Import error:', importErr);
+              statusEl.innerHTML='<span style="color:#791F1F">Import error: '+esc(importErr.message||String(importErr))+'</span>';
+              runBtn.disabled=false;runBtn.textContent='📥 Import vendors';
             }
           };
         }
