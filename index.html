@@ -3164,8 +3164,16 @@ function renderWaitlist(){
 function openExportModal(){
   if(!vendors.length){alert('No vendor data to export.');return;}
   function mkRow(id,icon,title,sub){return'<div style="display:flex;align-items:center;gap:10px;padding:.75rem;border:.5px solid #e5e3de;border-radius:10px;cursor:pointer;background:#fff;margin-bottom:6px" id="'+id+'"><div style="font-size:22px;flex-shrink:0">'+icon+'</div><div><div style="font-size:12px;font-weight:600">'+title+'</div>'+(sub?'<div style="font-size:10px;color:#888">'+sub+'</div>':'')+'</div></div>';}
-  document.getElementById('modal-area').innerHTML='<div class="overlay" id="exportOverlay"><div class="modal md"><div class="mtitle">↓ Export data</div>'+mkRow('exportVendorsBtn','👥','All vendors — full details','Every field, contract, payment, dates')+mkRow('exportApprovedBtn','✅','Approved vendors only','')+mkRow('exportWaitlistBtn','⏳','Waitlist only','')+mkRow('exportTentsBtn','⛺','Tent allocations (all dates)','')+mkRow('exportCalBtn','📅','Market dates schedule','')+'<div class="mfoot" id="exportFoot"></div></div></div>';
+  document.getElementById('modal-area').innerHTML='<div class="overlay" id="exportOverlay"><div class="modal md"><div class="mtitle">↓ Export data</div>'+
+    mkRow('exportFullBtn','📊','Full vendor report — with invoices','Vendors + selected dates + invoice sent/paid status')+
+    mkRow('exportVendorsBtn','👥','All vendors — full details','Every field, contract, payment, dates')+
+    mkRow('exportApprovedBtn','✅','Approved vendors only','')+
+    mkRow('exportWaitlistBtn','⏳','Waitlist only','')+
+    mkRow('exportTentsBtn','⛺','Tent allocations (all dates)','')+
+    mkRow('exportCalBtn','📅','Market dates schedule','')+
+    '<div class="mfoot" id="exportFoot"></div></div></div>';
   document.getElementById('exportOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
+  document.getElementById('exportFullBtn').addEventListener('click',exportFullVendorReport);
   document.getElementById('exportVendorsBtn').addEventListener('click',function(){exportVendorsCSV('all');});
   document.getElementById('exportApprovedBtn').addEventListener('click',function(){exportVendorsCSV('approved');});
   document.getElementById('exportWaitlistBtn').addEventListener('click',function(){exportVendorsCSV('waitlist');});
@@ -3175,6 +3183,71 @@ function openExportModal(){
   document.getElementById('exportFoot').appendChild(cb);
 }
 function downloadCSV(fn,rows){var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);}
+function exportFullVendorReport(){
+  if(!vendors.length){alert('No vendor data to export.');return;}
+  var rows=[['Business Name','Contact','Email','Phone','Category','App. Status','Vendor Status','Booth Size','Contract','Payment Received','Selected Dates','# Dates','Invoice #','Invoice Status','Invoice Sent','Invoice Paid','Invoice Total','Attendance','Months','Why Join','Values','Additional Info','Created','Modified']];
+  vendors.forEach(function(v){
+    // Find all invoices for this vendor
+    var vInvoices=invoices.filter(function(i){return i.vendor_id===v.id;});
+    if(vInvoices.length){
+      vInvoices.forEach(function(inv){
+        rows.push([
+          v.businessName||'',
+          v.contactName||'',
+          v.email||'',
+          v.phone||'',
+          v.category||'',
+          v.status||'pending',
+          v.vendorStatus||'active',
+          v.boothSize||'',
+          v.contractReceived?'Yes':'No',
+          v.paymentReceived?'Yes':'No',
+          (v.selectedDates||[]).sort().join('; '),
+          (v.selectedDates||[]).length,
+          inv.invoice_number||'',
+          inv.status||'',
+          inv.sent_at?fmtDT(inv.sent_at):'',
+          inv.paid_at?fmtDT(inv.paid_at):'',
+          parseFloat(inv.total||0).toFixed(2),
+          v.attendance||'',
+          v.months||'',
+          v.whyJoin||'',
+          v.values||'',
+          v.additionalInfo||'',
+          fmtDT(v.createdAt),
+          fmtDT(v.modifiedAt)
+        ]);
+      });
+    } else {
+      // Vendor with no invoices
+      rows.push([
+        v.businessName||'',
+        v.contactName||'',
+        v.email||'',
+        v.phone||'',
+        v.category||'',
+        v.status||'pending',
+        v.vendorStatus||'active',
+        v.boothSize||'',
+        v.contractReceived?'Yes':'No',
+        v.paymentReceived?'Yes':'No',
+        (v.selectedDates||[]).sort().join('; '),
+        (v.selectedDates||[]).length,
+        '','','','','',
+        v.attendance||'',
+        v.months||'',
+        v.whyJoin||'',
+        v.values||'',
+        v.additionalInfo||'',
+        fmtDT(v.createdAt),
+        fmtDT(v.modifiedAt)
+      ]);
+    }
+  });
+  downloadCSV('eb-full-vendor-report-'+today()+'.csv',rows);
+  closeMod();
+}
+
 function exportVendorsCSV(filter){
   var list=filter==='all'?vendors:vendors.filter(function(v){return v.status===filter;});
   if(!list.length){alert('No vendors to export.');return;}
