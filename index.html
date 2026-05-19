@@ -668,6 +668,7 @@ function sortVendorList(list){
   return list.slice().sort(function(a,b){
     var av,bv;
     if(vSortCol==='name'){av=a.businessName||'';bv=b.businessName||'';}
+    else if(vSortCol==='contact'){av=a.contactName||'';bv=b.contactName||'';}
     else if(vSortCol==='category'){av=a.category||'';bv=b.category||'';}
     else if(vSortCol==='vstatus'){av=a.vendorStatus||'';bv=b.vendorStatus||'';}
     else if(vSortCol==='booth'){av=a.boothSize||'';bv=b.boothSize||'';}
@@ -714,7 +715,7 @@ function renderVendors(){
     '<table style="width:100%;border-collapse:collapse;min-width:900px">'+
     '<thead><tr style="background:#f8f7f4;border-bottom:.5px solid #e5e3de">'+
       vTh('name','Business')+
-      '<th style="white-space:nowrap">Contact</th>'+
+      vTh('contact','Contact')+
       vTh('category','Category')+
       vTh('sched','Sched.')+
       vTh('vstatus','Status')+
@@ -1512,13 +1513,15 @@ async function autoAssign(){
   if(!layoutSpotList.length){alert('No spots defined for this date.\nGo to the Layout tab and define spots first.');return;}
 
   // Build adjacency map using real XY positions
-  var ADJACENT_THRESHOLD=40;
+  var ADJACENT_THRESHOLD=120; // spots within 120px gap are considered adjacent
   function spotsAdjacent(a,b){
-    var ax1=a.x,ax2=a.x+(a.w||80),ay1=a.y,ay2=a.y+(a.h||80);
-    var bx1=b.x,bx2=b.x+(b.w||80),by1=b.y,by2=b.y+(b.h||80);
-    var gapX=Math.max(ax1,bx1)-Math.min(ax2,bx2);
-    var gapY=Math.max(ay1,by1)-Math.min(ay2,by2);
-    return(gapX<ADJACENT_THRESHOLD&&gapY<200)||(gapY<ADJACENT_THRESHOLD&&gapX<200);
+    var ax1=a.x,ax2=a.x+(a.w||80),ay1=a.y,ay2=a.y+(a.h||60);
+    var bx1=b.x,bx2=b.x+(b.w||80),by1=b.y,by2=b.y+(b.h||60);
+    // Gap between the two bounding boxes (negative means overlapping)
+    var gapX=Math.max(0,Math.max(ax1,bx1)-Math.min(ax2,bx2));
+    var gapY=Math.max(0,Math.max(ay1,by1)-Math.min(ay2,by2));
+    // Adjacent if close horizontally AND in same horizontal band, OR close vertically AND in same vertical band
+    return(gapX<=ADJACENT_THRESHOLD&&gapY<=ADJACENT_THRESHOLD);
   }
   var adjacency={};
   layoutSpotList.forEach(function(s){adjacency[s.id]=[];});
@@ -2089,9 +2092,9 @@ function renderLayout(){
     '<div style="width:.5px;height:20px;background:#e5e3de;flex-shrink:0"></div>'+
     '<button class="btn-s" id="lSelectModeBtn" title="Toggle select mode to tap multiple spots">☐ Select</button>'+
     '<button class="btn-s" id="lSelectAllBtn" style="display:none">☑ All</button>'+
-    '<button class="btn-s" id="lSnapBtn">Snap: <span id="lSnapLabel">on</span></button>'+
-    '<button class="btn-s" id="lClearSelBtn" style="display:none">✕ Deselect all</button>'+
+    '<button class="btn-s" id="lClearSelBtn" style="display:none">✕ Deselect</button>'+
     '<button class="btn-danger" id="lDelSelBtn" style="display:none">🗑 Remove selected</button>'+
+    '<button class="btn-s" id="lSnapBtn">Snap: <span id="lSnapLabel">on</span></button>'+
     '<button class="btn-p" id="saveLayoutBtn" style="margin-left:auto">💾 Save layout for date</button></div>'+
     '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:.65rem .85rem;background:#fff;border:.5px solid #e5e3de;border-radius:10px;margin-bottom:.5rem">'+
       '<span style="font-size:13px;font-weight:800;color:#1a1a1a;margin-right:4px;align-self:center">Vendor Types:</span>'+
@@ -3476,17 +3479,11 @@ function openForm(id){
                 '</div>'+
                 invStatusBadge(status)+
               '</div>'+
-              '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">'+
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+
                 '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:6px;padding:5px 8px">'+
                   '<div style="font-size:9px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:2px">Sent</div>'+
                   '<div style="font-size:11px;font-weight:600;color:'+(inv.sent_at?'#0C447C':'#aaa')+'">'+
                     (inv.sent_at?'📧 '+fmtDate(inv.sent_at):'—')+
-                  '</div>'+
-                '</div>'+
-                '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:6px;padding:5px 8px">'+
-                  '<div style="font-size:9px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:2px">Due</div>'+
-                  '<div style="font-size:11px;font-weight:600;color:'+(isOverdue?'#791F1F':'#555')+'">'+
-                    (inv.due_date?inv.due_date:'—')+
                   '</div>'+
                 '</div>'+
                 '<div style="background:'+(inv.paid_at?'#EAF3DE':'#fff')+';border:.5px solid '+(inv.paid_at?'#639922':'#e5e3de')+';border-radius:6px;padding:5px 8px">'+
@@ -3652,6 +3649,13 @@ async function saveV(){
     var ds=oldDates[i];
     if(newDates.indexOf(ds)===-1&&calRows[ds]){
       calRows[ds].approved=calRows[ds].approved.filter(function(x){return x!==savedId;});
+      // Also remove vendor from tent assignments for this date
+      if(calRows[ds].tent_assignments){
+        var ta=calRows[ds].tent_assignments;
+        Object.keys(ta).forEach(function(spotId){
+          if(ta[spotId]===savedId)delete ta[spotId];
+        });
+      }
       await saveCalRow(ds);
     }
   }
@@ -3944,6 +3948,18 @@ async function renderPayments(){
       renderPayments();
     });
   });
+
+  // Invoice column sort via event delegation
+  var invTable=el.querySelector('table');
+  if(invTable){
+    invTable.addEventListener('click',function(e){
+      var th=e.target.closest('[data-inv-sort]');
+      if(!th)return;
+      var col=th.dataset.invSort;
+      if(invSortCol===col)invSortDir*=-1;else{invSortCol=col;invSortDir=1;}
+      renderPayments();
+    });
+  }
 
   // Edit vendor from payments table
   // Row click opens vendor form
@@ -4849,8 +4865,19 @@ function renderCommsGroups(){
     var g=vendorGroups.find(function(x){return x.id===b.dataset.emailGroup;});if(!g)return;
     var members=vendors.filter(function(v){return(g.member_ids||[]).indexOf(v.id)>-1&&v.email;});
     if(!members.length){alert('No members with email addresses in this group.');return;}
-    var bccList=members.map(function(v){return v.email;}).join(',');
-    sendEmail(bccList,'Message from Elevation Bend Farmers Market','');
+    // Switch to compose tab and pre-fill group
+    commsView='compose';
+    renderComms();
+    // Pre-select this group in the recipient dropdown
+    var sel=document.getElementById('cRecipSel');
+    if(sel){
+      // Find and select the group option
+      Array.from(sel.options).forEach(function(opt){
+        if(opt.value==='group:'+g.id)sel.value='group:'+g.id;
+      });
+    }
+    var subj=document.getElementById('cSubject');
+    if(subj)subj.focus();
   });});
 }
 
@@ -4918,7 +4945,7 @@ function renderManage(){
         return'<div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:.5px solid #f0ede6;gap:12px">'+
           '<label style="font-size:12px;font-weight:500;color:#1a1a1a;flex:1">'+row[1]+'</label>'+
           '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px;color:#888">$</span>'+
-          '<input type="number" id="fee_'+row[0]+'" value="'+(fees[row[0]]||0)+'" min="0" step="1" style="width:80px;border:.5px solid #d0cec7;border-radius:6px;padding:5px 8px;font-size:13px;font-family:inherit;text-align:right"></div>'+
+          '<input type="number" id="fee_'+row[0]+'" value="'+(fees[row[0]]||'')+'" min="0" step="1" placeholder="0" style="width:80px;border:.5px solid #d0cec7;border-radius:6px;padding:5px 8px;font-size:13px;font-family:inherit;text-align:right"></div>'+
         '</div>';
       }).join('')+
       '<div style="margin-top:1rem;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'+
@@ -5090,7 +5117,7 @@ function renderManage(){
                 website:colByName(row,'website and/or social media links')||colByName(row,'website'),
                 social:colByName(row,'website and/or social media links')||colByName(row,'social'),
                 category:cat,
-                booth_size:mapBoothSize(colByName(row,'booth size requested')||colByName(row,'booth size')),
+                booth_size:mapBoothSize(colByName(row,'booth size requested')||colByName(row,'booth size'))||"10'x10'",
                 products:colByName(row,'please describe your products in detail (include ingredients/materials, sourcing, and what makes your product unique)')||colByName(row,'products'),
                 notes:colByName(row,'anything else we should know about you or your business?')||colByName(row,'notes'),
                 licenses:colByName(row,'do you hold all required licenses and permits for your products?')||colByName(row,'licenses'),
@@ -5103,13 +5130,15 @@ function renderManage(){
                 why_join:colByName(row,'why do you want to be part of elevation farmers market?')||colByName(row,'why join'),
                 values:colByName(row,'what values guide your business?')||colByName(row,'values'),
                 additional_info:colByName(row,'anything else we should know about you or your business?')||colByName(row,'additional info'),
-                price_range:[],
-                photos:[],
-                food_docs:[],
-                selected_dates:[],
-                contract_received:false,
-                payment_received:false,
-                booth_fee:0,
+                price_range:existing?(existing.priceRange||[]):[],
+                photos:existing?(existing.photos||[]):[],
+                food_docs:existing?(existing.foodDocs||[]):[],
+                selected_dates:existing?(existing.selectedDates||[]):[],
+                contract_received:existing?existing.contractReceived||false:false,
+                payment_received:existing?existing.paymentReceived||false:false,
+                booth_fee:existing?existing.boothFee||0:0,
+                status:existing?existing.status||appStatus:appStatus,
+                vendor_status:existing?existing.vendorStatus||vs:vs,
                 modified_at:nowISO()
               };
               var subDate=colByName(row,'submission date');
