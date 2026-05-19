@@ -2953,13 +2953,16 @@ function openAddLayoutModal(isRow){
 }
 // ── REPORTS ───────────────────────────────────────────────────────────────
 function renderReports(){
-  var el=document.getElementById('main-content');var dates=getMarketDates();
+  var el=document.getElementById('main-content');
+  var dates=getMarketDates();
+  // For schedule report, only show dates that have vendors assigned
+  var scheduleDates=dates.filter(function(ds){return getApproved(ds).length>0;});
   el.innerHTML=
     '<div style="display:flex;gap:6px;margin-bottom:.85rem;flex-wrap:wrap">'+
       '<button class="'+(reportType==='summary'?'btn-p':'btn-s')+'" id="rptSumBtn">Vendor summary</button>'+
       '<button class="'+(reportType==='schedule'?'btn-p':'btn-s')+'" id="rptSchBtn">Market day schedule</button>'+
     '</div>'+
-    '<div id="reportContent">'+(reportType==='summary'?renderSummaryReport():renderScheduleReport(dates))+'</div>';
+    '<div id="reportContent">'+(reportType==='summary'?renderSummaryReport():renderScheduleReport(scheduleDates))+'</div>';
 
   document.getElementById('rptSumBtn').addEventListener('click',function(){reportType='summary';reportSortCol='';renderReports();});
   document.getElementById('rptSchBtn').addEventListener('click',function(){reportType='schedule';reportSortCol='';renderReports();});
@@ -2973,7 +2976,7 @@ function renderReports(){
       var col=th.dataset.sortCol;
       if(reportSortCol===col)reportSortDir*=-1;
       else{reportSortCol=col;reportSortDir=1;}
-      rc.innerHTML=reportType==='summary'?renderSummaryReport():renderScheduleReport(dates);
+      rc.innerHTML=reportType==='summary'?renderSummaryReport():renderScheduleReport(scheduleDates);
       attachReportClicks();
       return;
     }
@@ -3445,8 +3448,7 @@ function openForm(id){
   var fInv=document.getElementById('fInvoiceBtn');
   if(fInv){fInv.addEventListener('click',async function(){
     await loadInvoices();
-    var vendorInvoices=invoices.filter(function(i){return i.vendor_id===id;});
-    var cc=catColor(v.category);
+    var vendorInvoices=invoices.filter(function(i){return i.vendor_id===id;});    var cc=catColor(v.category);
     document.getElementById('modal-area').innerHTML=
       '<div class="overlay" id="fInvOverlay"><div class="modal md" style="max-height:90vh;overflow-y:auto">'+
       '<div class="mtitle">📄 Invoices — '+esc(v.businessName||'Vendor')+'</div>'+
@@ -3594,7 +3596,8 @@ function openForm(id){
     var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='← Back to vendor';
     canBtn.addEventListener('click',function(){openForm(id||eId);});
     var newBtn=document.createElement('button');newBtn.className='btn-p';newBtn.textContent='+ Create new invoice';
-    newBtn.addEventListener('click',function(){
+    newBtn.addEventListener('click',async function(){
+      await loadInvoices();
       openInvoiceModal(id);
     });
     foot.appendChild(canBtn);foot.appendChild(newBtn);
@@ -3792,7 +3795,7 @@ async function renderPayments(){
       '<thead><tr>'+
         invThSort('number','Invoice #')+
         invThSort('vendor','Vendor')+
-        '<th>Category</th>'+
+        invThSort('category','Category')+
         '<th>Dates</th>'+
         invThSort('amount','Amount')+
         invThSort('status','Status')+
@@ -4223,6 +4226,11 @@ function sortInvoices(list){
       var va=vendors.find(function(x){return x.id===a.vendor_id;});
       var vb=vendors.find(function(x){return x.id===b.vendor_id;});
       av=(va&&va.businessName)||'';bv=(vb&&vb.businessName)||'';
+    }
+    else if(invSortCol==='category'){
+      var va2=vendors.find(function(x){return x.id===a.vendor_id;});
+      var vb2=vendors.find(function(x){return x.id===b.vendor_id;});
+      av=(va2&&va2.category)||'';bv=(vb2&&vb2.category)||'';
     }
     else if(invSortCol==='amount'){av=parseFloat(a.total||0);bv=parseFloat(b.total||0);return(av-bv)*invSortDir;}
     else if(invSortCol==='status'){
