@@ -3060,16 +3060,14 @@ function renderScheduleReport(dates){
     dates.map(function(ds){return'<option value="'+ds+'"'+(ds===selDate?' selected':'')+'>'+ds+'</option>';}).join('')+'</select></div>';
   var att=getApproved(selDate).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
   var ta=getTentAssignments(selDate);
-  // Build vendor→spot map from layout cache
+  // Build vendor→spot map from in-memory layoutSpots if available
   var vendorSpotMap={};
-  if(layoutCache[selDate]){
-    var cachedSpots=layoutCache[selDate];
-    Object.keys(ta).forEach(function(spotId){
-      var vid=ta[spotId];
-      var spot=cachedSpots.find(function(s){return s.id===spotId;});
-      if(spot)vendorSpotMap[vid]='Spot '+spot.num+(spot.size?' ('+spot.size+')':'');
-    });
-  }
+  var spotsForDate=(typeof layoutSpots!=='undefined'&&layoutDate===selDate)?layoutSpots:[];
+  Object.keys(ta).forEach(function(spotId){
+    var vid=ta[spotId];
+    var spot=spotsForDate.find(function(s){return s.id===spotId;});
+    if(spot)vendorSpotMap[vid]='Spot '+spot.num+(spot.size?' ('+spot.size+')':'');
+  });
   if(!att.length)return dateOpts+'<div class="empty">No vendors scheduled for this date.</div>';
   var sorted=sortVendors(att,reportSortCol);
   return dateOpts+
