@@ -1693,15 +1693,24 @@ async function autoAssign(){
     // Load layouts for previous dates from Supabase
     if(prevDates.length){
       var{data:prevLayouts}=await sb.from('layouts').select('date,spots').in('date',prevDates);
-      // Build vendorId -> spotId map from most recent to oldest
+      // Build vendorId -> spotId map from most recent to oldest (from layout spots with vendorId set)
       (prevLayouts||[]).sort(function(a,b){return b.date.localeCompare(a.date);}).forEach(function(layout){
         (layout.spots||[]).forEach(function(sp){
           if(sp.vendorId&&!lastSpot[sp.vendorId])lastSpot[sp.vendorId]=sp.id;
         });
       });
     }
-    // Also check in-memory calRows tent_assignments as additional source
+    // Check in-memory calRows tent_assignments as primary source (most reliable)
+    // Check ALL previous dates, most recent first
     prevDates.forEach(function(d){
+      var ta=getTentAssignments(d);
+      Object.keys(ta).forEach(function(sid){
+        var vid=ta[sid];
+        if(vid&&!lastSpot[vid])lastSpot[vid]=sid;
+      });
+    });
+    // Also check ALL market dates (not just last 5) for tent_assignments
+    getMarketDates().filter(function(d){return d!==tentViewDate;}).sort().reverse().forEach(function(d){
       var ta=getTentAssignments(d);
       Object.keys(ta).forEach(function(sid){
         var vid=ta[sid];
@@ -3062,7 +3071,8 @@ async function openLoadLayoutModal(){
     item.addEventListener('click',async function(){
       var srcSpots=JSON.parse(item.dataset.spots);
       clearLayoutCanvas();
-      srcSpots.forEach(function(s){addLayoutSpot({id:uid(),num:s.num,size:s.size,x:s.x,y:s.y,w:s.w,h:s.h,vendorId:'',vendorName:'',vendorCat:'',vendorInactive:false});});
+      // Preserve original spot IDs so returning vendor auto-assign works
+      srcSpots.forEach(function(s){addLayoutSpot({id:s.id,num:s.num,size:s.size,x:s.x,y:s.y,w:s.w,h:s.h,vendorId:'',vendorName:'',vendorCat:'',vendorInactive:false});});
       // Save to Supabase so auto-assign can find spots
       if(layoutDate){
         await sb.from('layouts').upsert({date:layoutDate,spots:JSON.stringify(layoutSpots),modified_at:new Date().toISOString()});
