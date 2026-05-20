@@ -822,9 +822,25 @@ async function setSt(id,val){await sb.from('vendors').update({status:val}).eq('i
 async function setVs(id,val){await sb.from('vendors').update({vendor_status:val}).eq('id',id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}var v=vendors.find(function(x){return x.id===id;});if(v){v.vendorStatus=val;v.modifiedAt=nowISO();}render();}
 async function delV(id){if(!confirm('Remove this vendor?'))return;await sb.from('vendors').delete().eq('id',id);vendors=vendors.filter(function(v){return v.id!==id;});render();}
 // ── CALENDAR ─────────────────────────────────────────────────────────────
+var calView='calendar'; // 'calendar' or 'matrix'
+
 function renderCalendar(){
   var el=document.getElementById('main-content');
   var full=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  // Sub-tab nav
+  var subnav='<div style="display:flex;gap:6px;margin-bottom:.85rem">'+
+    '<button class="'+(calView==='calendar'?'btn-p':'btn-s')+'" id="calViewBtn">📅 Calendar</button>'+
+    '<button class="'+(calView==='matrix'?'btn-p':'btn-s')+'" id="matrixViewBtn">📊 Scheduling Matrix</button>'+
+  '</div>';
+
+  if(calView==='matrix'){
+    el.innerHTML=subnav+buildSchedulingMatrix();
+    document.getElementById('calViewBtn').addEventListener('click',function(){calView='calendar';renderCalendar();});
+    document.getElementById('matrixViewBtn').addEventListener('click',function(){calView='matrix';renderCalendar();});
+    wireSchedulingMatrix();
+    return;
+  }
   var ds2=['Su','Mo','Tu','We','Th','Fr','Sa'];
   var first=new Date(cY,cM,1),last=new Date(cY,cM+1,0),tod=today();
   var cells='';
@@ -835,13 +851,150 @@ function renderCalendar(){
     var cls='cday'+(ac?' has-vendors':'')+(ds===tod?' ctoday':'')+(ds===selectedCalDay?' selected-day':'');
     cells+='<div class="'+cls+'" data-date="'+ds+'">'+d+(ac?'<span class="day-count">'+ac+'v</span>':'')+'</div>';
   }
-  el.innerHTML='<div style="display:flex;gap:10px;margin-bottom:.65rem;font-size:10px;color:#888;flex-wrap:wrap"><span><span style="width:9px;height:9px;background:#EAF3DE;border:1px solid #639922;border-radius:2px;display:inline-block;margin-right:3px;vertical-align:middle"></span>Vendors scheduled</span><span style="color:#ccc">Click date to manage · '+eligibleVendors().length+' eligible (Approved + Active)</span></div>'+
+  el.innerHTML=subnav+
+    '<div style="display:flex;gap:10px;margin-bottom:.65rem;font-size:10px;color:#888;flex-wrap:wrap"><span><span style="width:9px;height:9px;background:#EAF3DE;border:1px solid #639922;border-radius:2px;display:inline-block;margin-right:3px;vertical-align:middle"></span>Vendors scheduled</span><span style="color:#ccc">Click date to manage · '+eligibleVendors().length+' eligible (Approved + Active)</span></div>'+
     '<div class="cal-wrap"><div class="cal-nav"><button class="btn-s" style="padding:5px 10px" id="calPrev">‹</button><span>'+full[cM]+' '+cY+'</span><button class="btn-s" style="padding:5px 10px" id="calNext">›</button></div><div class="cal-grid" id="calGrid">'+ds2.map(function(d){return'<div class="chd">'+d+'</div>';}).join('')+cells+'</div></div>'+
     (selectedCalDay?buildDayPanel(selectedCalDay):'');
+  document.getElementById('calViewBtn').addEventListener('click',function(){calView='calendar';renderCalendar();});
+  document.getElementById('matrixViewBtn').addEventListener('click',function(){calView='matrix';renderCalendar();});
   document.getElementById('calPrev').addEventListener('click',function(){cM--;if(cM<0){cM=11;cY--;}renderCalendar();});
   document.getElementById('calNext').addEventListener('click',function(){cM++;if(cM>11){cM=0;cY++;}renderCalendar();});
   document.getElementById('calGrid').addEventListener('click',function(e){var cell=e.target.closest('[data-date]');if(cell){selectedCalDay=selectedCalDay===cell.dataset.date?'':cell.dataset.date;renderCalendar();}});
 }
+function buildSchedulingMatrix(){
+  var dates=getMarketDates();
+  if(!dates.length)return'<div class="empty">No market dates configured yet.</div>';
+  var sorted=vendors.slice().sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
+  if(!sorted.length)return'<div class="empty">No vendors yet.</div>';
+
+  var html=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'+
+      '<div style="display:flex;gap:6px">'+
+        '<button class="btn-s" id="matrixScrollLeft" style="font-size:16px;padding:4px 12px">‹</button>'+
+        '<button class="btn-s" id="matrixScrollRight" style="font-size:16px;padding:4px 12px">›</button>'+
+      '</div>'+
+      '<button class="btn-s" id="matrixExportBtn">↓ Export CSV</button>'+
+    '</div>'+
+    '<div style="overflow-x:auto" id="matrixScroller"><table class="report-table" style="min-width:100%"><thead><tr>'+
+    '<th style="min-width:180px;position:sticky;left:0;background:#f8f7f4;z-index:2">Vendor</th>'+
+    '<th style="min-width:60px;position:sticky;left:180px;background:#f8f7f4;z-index:2">Status</th>'+
+    dates.map(function(ds){
+      var parts=ds.split('-');var m=parseInt(parts[1])-1;var d=parseInt(parts[2]);
+      var mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m];
+      return'<th style="min-width:54px;text-align:center;font-size:10px;white-space:nowrap">'+mn+'<br><strong>'+d+'</strong></th>';
+    }).join('')+
+  '</tr></thead><tbody>';
+
+  sorted.forEach(function(v){
+    var av=avc(v.businessName||'?');
+    html+='<tr style="cursor:pointer" data-open-vendor="'+v.id+'">'+
+      '<td style="position:sticky;left:0;background:#fff;z-index:1;min-width:180px">'+
+        '<div style="display:flex;align-items:center;gap:7px">'+
+          '<div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+          '<div>'+
+            '<div style="font-weight:600;font-size:12px">'+esc(v.businessName||'—')+'</div>'+
+            (v.months?'<div style="font-size:13px;font-weight:600;color:#555;margin-top:2px">'+esc(v.months)+'</div>':'')+
+          '</div>'+
+        '</div>'+
+      '</td>'+
+      '<td style="position:sticky;left:180px;background:#fff;z-index:1" onclick="event.stopPropagation()">'+
+        '<select data-set-st="'+v.id+'" style="font-size:10px;padding:2px 4px;border:.5px solid #d0cec7;border-radius:5px;font-family:inherit;cursor:pointer;font-weight:600;background:'+(v.status==='approved'?'#EAF3DE':v.status==='waitlist'?'#FEF9C3':'#FDECEA')+';color:'+(v.status==='approved'?'#27500A':v.status==='waitlist'?'#A16207':'#9B3A2E')+'">'+
+          '<option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option>'+
+          '<option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option>'+
+          '<option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option>'+
+        '</select>'+
+      '</td>'+
+      dates.map(function(ds){
+        var isOn=getApproved(ds).indexOf(v.id)>-1||getWaitlist(ds).indexOf(v.id)>-1;
+        return'<td style="text-align:center;padding:4px 2px;'+(isOn?'background:#EAF3DE':'')+'" onclick="event.stopPropagation()">'+
+          '<input type="checkbox" '+
+            'data-matrix-vendor="'+v.id+'" '+
+            'data-matrix-date="'+ds+'" '+
+            (isOn?'checked':'')+
+            ' style="width:16px;height:16px;accent-color:#27500A;cursor:pointer">'+
+        '</td>';
+      }).join('')+
+    '</tr>';
+  });
+
+  html+='</tbody></table></div>';
+  return html;
+}
+
+function wireSchedulingMatrix(){
+  var dates=getMarketDates();
+  var sorted=vendors.slice().sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
+
+  // Scroll buttons
+  var scroller=document.getElementById('matrixScroller');
+  var scrollL=document.getElementById('matrixScrollLeft');
+  var scrollR=document.getElementById('matrixScrollRight');
+  if(scrollL&&scroller)scrollL.addEventListener('click',function(){scroller.scrollBy({left:-300,behavior:'smooth'});});
+  if(scrollR&&scroller)scrollR.addEventListener('click',function(){scroller.scrollBy({left:300,behavior:'smooth'});});
+
+  // Row click opens vendor form
+  document.querySelectorAll('[data-open-vendor]').forEach(function(row){
+    row.addEventListener('click',function(e){
+      if(e.target.closest('[data-set-st],[data-matrix-vendor]'))return;
+      openForm(row.dataset.openVendor);
+    });
+  });
+
+  // Export CSV
+  var expBtn=document.getElementById('matrixExportBtn');
+  if(expBtn)expBtn.addEventListener('click',function(){
+    var rows=[['Business Name','Status','Preferred Months'].concat(dates)];
+    sorted.forEach(function(v){
+      rows.push([
+        v.businessName||'',
+        v.status||'pending',
+        v.months||''
+      ].concat(dates.map(function(ds){
+        return(getApproved(ds).indexOf(v.id)>-1||getWaitlist(ds).indexOf(v.id)>-1)?'✓':'';
+      })));
+    });
+    downloadCSV('eb-scheduling-matrix-'+today()+'.csv',rows);
+  });
+
+  // Status dropdowns
+  document.querySelectorAll('[data-set-st]').forEach(function(sel){
+    sel.addEventListener('change',function(){
+      var v=sel.value;
+      sel.style.background=v==='approved'?'#EAF3DE':v==='waitlist'?'#FEF9C3':'#FDECEA';
+      sel.style.color=v==='approved'?'#27500A':v==='waitlist'?'#A16207':'#9B3A2E';
+      setSt(sel.dataset.setSt,v);
+    });
+  });
+
+  // Date checkboxes
+  document.querySelectorAll('[data-matrix-vendor]').forEach(function(cb){
+    cb.addEventListener('change',async function(){
+      var vid=cb.dataset.matrixVendor;
+      var ds=cb.dataset.matrixDate;
+      var v=vendors.find(function(x){return x.id===vid;});
+      if(!v)return;
+      if(!calRows[ds])calRows[ds]={date:ds,approved:[],waitlist:[],tent_assignments:{}};
+      if(cb.checked){
+        if(calRows[ds].approved.indexOf(vid)===-1)calRows[ds].approved.push(vid);
+        if(!v.selectedDates)v.selectedDates=[];
+        if(v.selectedDates.indexOf(ds)===-1)v.selectedDates.push(ds);
+      } else {
+        calRows[ds].approved=calRows[ds].approved.filter(function(x){return x!==vid;});
+        calRows[ds].waitlist=(calRows[ds].waitlist||[]).filter(function(x){return x!==vid;});
+        v.selectedDates=(v.selectedDates||[]).filter(function(x){return x!==ds;});
+        if(calRows[ds].tent_assignments){
+          Object.keys(calRows[ds].tent_assignments).forEach(function(sid){
+            if(calRows[ds].tent_assignments[sid]===vid)delete calRows[ds].tent_assignments[sid];
+          });
+        }
+      }
+      cb.closest('td').style.background=cb.checked?'#EAF3DE':'';
+      await saveCalRow(ds);
+      await sb.from('vendors').update({selected_dates:v.selectedDates,modified_at:nowISO()}).eq('id',vid);
+    });
+  });
+}
+
 function buildDayPanel(ds){
   var appV=getApproved(ds).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
   var wlV=getWaitlist(ds).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
