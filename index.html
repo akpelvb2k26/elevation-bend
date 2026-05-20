@@ -610,7 +610,8 @@ async function saveVendorDB(data,id){
 }
 async function saveCalRow(ds){
   var row=calRows[ds];
-  if(!row||(!row.approved.length&&!row.waitlist.length&&!Object.keys(row.tent_assignments||{}).length)){await sb.from('calendar').delete().eq('date',ds);delete calRows[ds];}
+  var hasTents=row&&Object.keys(row.tent_assignments||{}).length>0;
+  if(!row||(!row.approved.length&&!row.waitlist.length&&!hasTents)){await sb.from('calendar').delete().eq('date',ds);delete calRows[ds];}
   else{await sb.from('calendar').upsert({date:ds,approved_vendors:row.approved||[],waitlist_vendors:row.waitlist||[],tent_assignments:row.tent_assignments||{}});}
 }
 async function initTentsDB(){
@@ -1716,7 +1717,22 @@ async function autoAssign(){
 
   // Load layout spots for this date
   var layoutSpotList=await ensureLayoutCache(tentViewDate);
-  if(!layoutSpotList.length){alert('No spots defined for this date.\nGo to the Layout tab and define spots first.');return;}
+  if(!layoutSpotList.length){
+    // Try to find most recent previous layout and copy it
+    var prevDates=getMarketDates().filter(function(d){return d<tentViewDate;}).sort().reverse();
+    var copied=false;
+    for(var pi=0;pi<prevDates.length;pi++){
+      var{data:prevLayout}=await sb.from('layouts').select('spots').eq('date',prevDates[pi]).maybeSingle();
+      if(prevLayout&&prevLayout.spots&&prevLayout.spots.length){
+        var srcSpots=typeof prevLayout.spots==='string'?JSON.parse(prevLayout.spots):prevLayout.spots;
+        await sb.from('layouts').upsert({date:tentViewDate,spots:JSON.stringify(srcSpots),modified_at:nowISO()});
+        layoutSpotList=srcSpots;
+        copied=true;
+        break;
+      }
+    }
+    if(!copied){alert('No spots defined for this date and no previous layout found.\nGo to the Layout tab and define spots first.');return;}
+  }
 
   // Build adjacency map using real XY positions
   var ADJACENT_THRESHOLD=120; // spots within 120px gap are considered adjacent
@@ -1812,9 +1828,38 @@ async function autoAssign(){
   });
 
   // Save assignments to calRows and Supabase
-  if(!calRows[tentViewDate])calRows[tentViewDate]={approved:getApproved(tentViewDate),waitlist:[],tent_assignments:{}};
+  if(!calRows[tentViewDate])calRows[tentViewDate]={approved:[],waitlist:[],tent_assignments:{}};
+  // Make sure approved list is populated
+  v4d.forEach(function(v){if(calRows[tentViewDate].approved.indexOf(v.id)===-1)calRows[tentViewDate].approved.push(v.id);});
   calRows[tentViewDate].tent_assignments=assignment;
   await saveCalRow(tentViewDate);
+
+  // Also write vendor assignments back into layouts.spots so the Layout tab
+  // always renders the correct vendors regardless of session state.
+  try{
+    var updatedSpots=layoutSpotList.map(function(sp){
+      var vid=assignment[sp.id]||'';
+      var v=vid?vendors.find(function(x){return x.id===vid;}):null;
+      return Object.assign({},sp,{
+        vendorId:vid,
+        vendorName:v?v.businessName:'',
+        vendorCat:v?v.category:'',
+        vendorInactive:v&&v.vendorStatus==='inactive'
+      });
+    });
+    await sb.from('layouts').upsert({date:tentViewDate,spots:updatedSpots,modified_at:nowISO()});
+    // Sync in-memory layoutSpots if Layout tab is on same date
+    if(layoutDate===tentViewDate){
+      updatedSpots.forEach(function(sp){
+        var lsp=layoutSpots.find(function(s){return s.id===sp.id;});
+        if(lsp){lsp.vendorId=sp.vendorId;lsp.vendorName=sp.vendorName;lsp.vendorCat=sp.vendorCat;lsp.vendorInactive=sp.vendorInactive;}
+      });
+    }
+  }catch(e){console.warn('Could not write assignments back to layouts.spots:',e);}
+
+  // Sync layoutDate so the Layout tab opens on the same date
+  layoutDate=tentViewDate;
+
   refreshLayoutColors(tentViewDate);
   clearLayoutCache(tentViewDate);
   // Refresh whichever is visible
