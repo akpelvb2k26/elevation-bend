@@ -950,7 +950,7 @@ function wireSchedulingMatrix(){
         v.status||'pending',
         v.months||''
       ].concat(dates.map(function(ds){
-        return(getApproved(ds).indexOf(v.id)>-1||getWaitlist(ds).indexOf(v.id)>-1)?'✓':'';
+        return(getApproved(ds).indexOf(v.id)>-1||getWaitlist(ds).indexOf(v.id)>-1)?'X':'';
       })));
     });
     downloadCSV('eb-scheduling-matrix-'+today()+'.csv',rows);
