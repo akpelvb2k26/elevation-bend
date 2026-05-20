@@ -384,7 +384,11 @@ function getMarketDates(){
   }
   return Object.keys(dateSet).sort();
 }
-function getApproved(ds){return(calRows[ds]&&calRows[ds].approved)||[];}
+function getApproved(ds){
+  var fromCal=(calRows[ds]&&calRows[ds].approved)||[];
+  var extra=vendors.filter(function(v){return(v.selectedDates||[]).indexOf(ds)>-1&&fromCal.indexOf(v.id)===-1;}).map(function(v){return v.id;});
+  return fromCal.concat(extra);
+}
 function getWaitlist(ds){return(calRows[ds]&&calRows[ds].waitlist)||[];}
 function getTentAssignments(ds){return(calRows[ds]&&calRows[ds].tent_assignments)||{};}
 function eligibleVendors(){return vendors.filter(function(v){return v.status==='approved'&&(v.vendorStatus||'active')==='active';}).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});}
@@ -866,10 +870,17 @@ function renderCalendar(){
   document.getElementById('calNext').addEventListener('click',function(){cM++;if(cM>11){cM=0;cY++;}renderCalendar();});
   document.getElementById('calGrid').addEventListener('click',function(e){var cell=e.target.closest('[data-date]');if(cell){selectedCalDay=selectedCalDay===cell.dataset.date?'':cell.dataset.date;renderCalendar();}});
 }
+var matrixSortCol='name',matrixSortDir=1;
+
 function buildSchedulingMatrix(){
   var dates=getMarketDates();
   if(!dates.length)return'<div class="empty">No market dates configured yet.</div>';
-  var sorted=vendors.slice().sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
+  var sorted=vendors.slice().sort(function(a,b){
+    var av,bv;
+    if(matrixSortCol==='status'){var so={approved:0,waitlist:1,pending:2};av=so[a.status||'pending']||2;bv=so[b.status||'pending']||2;return(av-bv)*matrixSortDir;}
+    av=(a.businessName||'').toLowerCase();bv=(b.businessName||'').toLowerCase();
+    return av.localeCompare(bv)*matrixSortDir;
+  });
   if(!sorted.length)return'<div class="empty">No vendors yet.</div>';
 
   var html=
@@ -884,8 +895,9 @@ function buildSchedulingMatrix(){
     '<div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 220px)" id="matrixScroller">'+
     '<table class="report-table" style="min-width:100%;border-collapse:separate;border-spacing:0">'+
     '<thead><tr>'+
-    '<th style="min-width:180px;position:sticky;top:0;left:0;background:#f8f7f4;z-index:4">Vendor</th>'+
-    '<th style="min-width:60px;position:sticky;top:0;left:180px;background:#f8f7f4;z-index:4">Status</th>'+
+    '<th style="min-width:180px;position:sticky;top:0;left:0;background:#f8f7f4;z-index:4"><button data-matrix-sort="name" style="background:none;border:none;font:inherit;cursor:pointer;font-size:12px;font-weight:700;padding:0;display:flex;align-items:center;gap:4px;color:'+(matrixSortCol==='name'?'#1a1a1a':'#555')+'">Vendor <span style="color:'+(matrixSortCol==='name'?'#1a1a1a':'#bbb')+'">'+(matrixSortCol==='name'?(matrixSortDir===1?'↑':'↓'):'↕')+'</span></button></th>'+
+    '<th style="min-width:80px;position:sticky;top:0;left:180px;background:#f8f7f4;z-index:4"><button data-matrix-sort="status" style="background:none;border:none;font:inherit;cursor:pointer;font-size:12px;font-weight:700;padding:0;display:flex;align-items:center;gap:4px;color:'+(matrixSortCol==='status'?'#1a1a1a':'#555')+'">Status <span style="color:'+(matrixSortCol==='status'?'#1a1a1a':'#bbb')+'">'+(matrixSortCol==='status'?(matrixSortDir===1?'↑':'↓'):'↕')+'</span></button></th>'+
+    
     dates.map(function(ds){
       var parts=ds.split('-');var m=parseInt(parts[1])-1;var d=parseInt(parts[2]);
       var mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m];
@@ -939,6 +951,10 @@ function wireSchedulingMatrix(){
   var scrollR=document.getElementById('matrixScrollRight');
   if(scrollL&&scroller)scrollL.addEventListener('click',function(){scroller.scrollBy({left:-300,behavior:'smooth'});});
   if(scrollR&&scroller)scrollR.addEventListener('click',function(){scroller.scrollBy({left:300,behavior:'smooth'});});
+
+  // Column sort via event delegation
+  var matrixTable=document.querySelector('#matrixScroller table');
+  if(matrixTable){matrixTable.addEventListener('click',function(e){var btn=e.target.closest('[data-matrix-sort]');if(!btn)return;var col=btn.dataset.matrixSort;if(matrixSortCol===col)matrixSortDir*=-1;else{matrixSortCol=col;matrixSortDir=1;}renderCalendar();});}
 
   // Row click opens vendor form
   document.querySelectorAll('[data-open-vendor]').forEach(function(row){
@@ -1426,6 +1442,15 @@ function renderTents(){
         });
       });
 
+      // Assignment column sort
+      document.querySelectorAll('[data-assign-sort]').forEach(function(th){
+        th.addEventListener('click',function(){
+          var col=th.dataset.assignSort;
+          if(assignSortCol===col)assignSortDir*=-1;else{assignSortCol=col;assignSortDir=1;}
+          renderTents();
+        });
+      });
+
       // Send layout to individual vendor
       document.querySelectorAll('[data-send-layout-vendor]').forEach(function(btn){
         btn.addEventListener('click',async function(){
@@ -1453,10 +1478,17 @@ function renderTents(){
   }
 }
 
+var assignSortCol='name',assignSortDir=1;
+
 function buildAssignContent(spots,approvedVendors){
   if(!approvedVendors)approvedVendors=getApproved(tentViewDate).map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean);
   var ta=getTentAssignments(tentViewDate);
   var occ=spots.filter(function(s){return ta[s.id];}).length;
+
+  function asTh(col,label){
+    var active=assignSortCol===col;var dir=active?(assignSortDir===1?'↑':'↓'):'↕';
+    return'<th data-assign-sort="'+col+'"><button style="background:none;border:none;font:inherit;cursor:pointer;font-size:12px;font-weight:700;padding:0;display:flex;align-items:center;gap:4px;color:'+(active?'#1a1a1a':'#555')+'">'+label+' <span style="color:'+(active?'#1a1a1a':'#bbb')+'">'+dir+'</span></button></th>';
+  }
 
   // Load sent_vendors from layouts table asynchronously and update UI
   sb.from('layouts').select('sent_vendors').eq('date',tentViewDate).maybeSingle().then(function(res){
@@ -1479,6 +1511,18 @@ function buildAssignContent(spots,approvedVendors){
     if(sp)vendorSpot[vid]='Spot '+sp.num+(sp.size?' ('+sp.size+')':'');
   });
 
+  // Sort approvedVendors
+  approvedVendors=approvedVendors.slice().sort(function(a,b){
+    var av,bv;
+    if(assignSortCol==='category'){av=a.category||'';bv=b.category||'';}
+    else if(assignSortCol==='booth'){av=a.boothSize||'';bv=b.boothSize||'';}
+    else if(assignSortCol==='elec'){av=a.electricity||'';bv=b.electricity||'';}
+    else if(assignSortCol==='spot'){av=vendorSpot[a.id]||'';bv=vendorSpot[b.id]||'';}
+    else if(assignSortCol==='sent'){av=a.layoutSentAt||'';bv=b.layoutSentAt||'';}
+    else{av=a.businessName||'';bv=b.businessName||'';}
+    return av.localeCompare(bv)*assignSortDir;
+  });
+
   var catLegend='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:.75rem;padding:.75rem 1rem;background:#fff;border:.5px solid #e5e3de;border-radius:8px">'+
     Object.entries(CAT_COLORS).map(function(e){return'<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 14px;border-radius:20px;background:'+e[1].bg+';color:'+e[1].text+';border:.5px solid '+e[1].border+';font-size:13px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;background:'+e[1].dot+';display:inline-block;flex-shrink:0"></span>'+esc(e[0])+'</span>';}).join('')+'</div>';
 
@@ -1492,7 +1536,7 @@ function buildAssignContent(spots,approvedVendors){
           '<button class="btn-g" id="sendLayoutAllBtn" style="font-size:11px;padding:4px 12px">📤 Send layout to all</button>'+
         '</div>'+
         '<div style="overflow-x:auto"><table class="report-table">'+
-          '<thead><tr><th>Vendor</th><th>Category</th><th>Booth Size</th><th>Spot Assignment</th><th>Layout Sent</th><th>Action</th></tr></thead>'+
+          '<thead><tr>'+asTh('name','Vendor')+asTh('category','Category')+asTh('booth','Booth Size')+asTh('elec','⚡ Elec.')+asTh('spot','Spot Assignment')+asTh('sent','Layout Sent')+'<th>Action</th></tr></thead>'+
           '<tbody>'+
           approvedVendors.map(function(v){
             var cc=catColor(v.category);
@@ -1509,6 +1553,7 @@ function buildAssignContent(spots,approvedVendors){
               '</div></td>'+
               '<td>'+catBadge(v.category)+'</td>'+
               '<td>'+esc(v.boothSize||'—')+'</td>'+
+              '<td style="text-align:center">'+(v.electricity==='Yes'?'<span style="color:#A16207;font-weight:700;font-size:13px">⚡</span>':'<span style="color:#ccc">—</span>')+'</td>'+
               '<td>'+(isAssigned
                 ?'<span style="background:#EAF3DE;color:#27500A;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">⛺ '+esc(spotLabel)+'</span>'
                 :'<span style="background:#FAEEDA;color:#633806;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">⚠️ No spot</span>')+
@@ -1872,6 +1917,39 @@ function attachDocUploadHandlers(vendorId){
 }
 
 // ── FILLABLE CONTRACT PDF ─────────────────────────────────────────────────
+function generateVendorProfilePDF(v){
+  var cc=catColor(v.category);var av=avc(v.businessName||'?');
+  var dates=(v.selectedDates||[]).sort();var vInvoices=invoices.filter(function(i){return i.vendor_id===v.id;});
+  function row(label,val){if(!val||val==='—')return'';return'<tr><td style="font-weight:600;color:#555;padding:6px 12px;width:160px;vertical-align:top;font-size:13px;border-bottom:1px solid #f0ede6">'+label+'</td><td style="padding:6px 12px;vertical-align:top;font-size:13px;border-bottom:1px solid #f0ede6">'+val+'</td></tr>';}
+  function section(title){return'<tr><td colspan="2" style="background:#f8f7f4;padding:8px 12px;font-size:11px;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.08em">'+title+'</td></tr>';}
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vendor Profile — '+esc(v.businessName||'Vendor')+'</title>'+
+    '<style>body{font-family:-apple-system,Arial,sans-serif;margin:0;padding:0;color:#1a1a1a}@media print{.no-print{display:none}}table{width:100%;border-collapse:collapse}</style></head><body>'+
+    '<div style="background:'+cc.bg+';border-bottom:4px solid '+cc.border+';padding:24px 32px;display:flex;align-items:center;gap:20px">'+
+      '<div style="width:56px;height:56px;border-radius:50%;background:'+cc.dot+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+      '<div><div style="font-size:26px;font-weight:900;color:'+cc.text+'">'+esc(v.businessName||'—')+'</div><div style="font-size:14px;color:'+cc.text+';opacity:.8;margin-top:2px">'+esc(v.category||'')+'</div></div>'+
+      '<div style="margin-left:auto;text-align:right"><div style="font-size:11px;color:'+cc.text+';font-weight:700;text-transform:uppercase">Status</div>'+
+        '<div style="font-size:18px;font-weight:900;color:'+cc.text+'">'+(v.status||'pending').charAt(0).toUpperCase()+(v.status||'pending').slice(1)+'</div>'+
+        '<div style="font-size:11px;color:'+cc.text+';opacity:.7;margin-top:4px">Generated '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+'</div></div>'+
+    '</div>'+
+    '<div class="no-print" style="padding:12px 32px;background:#fff;border-bottom:1px solid #e5e3de">'+
+      '<button onclick="window.print()" style="background:#27500A;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">🖨 Print / Save as PDF</button>'+
+      '<button onclick="window.close()" style="background:#f0ede6;color:#555;border:none;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-left:8px">✕ Close</button>'+
+    '</div>'+
+    '<div style="padding:24px 32px"><table>'+
+      section('Contact Information')+row('Contact Name',esc(v.contactName||''))+row('Email',esc(v.email||''))+row('Phone',esc(v.phone||''))+row('Website',esc(v.website||''))+
+      section('Business Details')+row('Products',esc(v.products||''))+row('Locally Produced',esc(v.local||''))+row('Why Join',esc(v.whyJoin||''))+row('Values',esc(v.values||''))+row('Additional Info',esc(v.additionalInfo||''))+
+      section('Booth & Setup')+row('Booth Size',esc(v.boothSize||''))+row('Own Tent & Display',esc(v.ownSetup||''))+row('Electricity Needed',esc(v.electricity||''))+row('Attendance',esc(v.attendance||''))+row('Preferred Months',esc(v.months||''))+
+      section('Compliance')+row('Licenses & Permits',esc(v.licenses||''))+row('Liability Insurance',esc(v.liability||''))+row('Contract Received',v.contractReceived?'✅ Yes':'No')+row('Payment Received',v.paymentReceived?'✅ Yes':'No')+
+      (dates.length?section('Scheduled Market Dates')+'<tr><td colspan="2" style="padding:8px 12px">'+dates.map(function(d){return'<span style="display:inline-block;background:#EAF3DE;color:#27500A;border:1px solid #639922;border-radius:20px;padding:3px 10px;margin:2px;font-size:12px;font-weight:600">'+d+'</span>';}).join('')+'</td></tr>':'')+
+      (vInvoices.length?section('Invoices')+'<tr><td colspan="2" style="padding:0"><table style="width:100%;border-collapse:collapse"><tr style="background:#f8f7f4"><th style="padding:6px 12px;text-align:left;font-size:11px">Invoice #</th><th style="padding:6px 12px;text-align:left;font-size:11px">Status</th><th style="padding:6px 12px;text-align:right;font-size:11px">Amount</th><th style="padding:6px 12px;text-align:left;font-size:11px">Sent</th><th style="padding:6px 12px;text-align:left;font-size:11px">Paid</th></tr>'+vInvoices.map(function(inv){return'<tr style="border-top:1px solid #f0ede6"><td style="padding:6px 12px;font-size:12px;font-weight:600">'+esc(inv.invoice_number||'')+'</td><td style="padding:6px 12px;font-size:12px">'+esc(inv.status||'')+'</td><td style="padding:6px 12px;font-size:12px;text-align:right">$'+parseFloat(inv.total||0).toFixed(2)+'</td><td style="padding:6px 12px;font-size:12px">'+(inv.sent_at?new Date(inv.sent_at).toLocaleDateString():'—')+'</td><td style="padding:6px 12px;font-size:12px">'+(inv.paid_at?new Date(inv.paid_at).toLocaleDateString():'—')+'</td></tr>';}).join('')+'</table></td></tr>':'')+
+      (v.notes?section('Internal Notes')+row('Notes',esc(v.notes)):'')+
+    '</table></div>'+
+    '<div style="padding:16px 32px;border-top:1px solid #e5e3de;font-size:10px;color:#aaa;text-align:center">Elevation Bend Farmers Market · Bend, Oregon · Confidential vendor profile</div>'+
+    '</body></html>';
+  var win=window.open('','_blank','width=900,height=700');
+  if(win){win.document.write(html);win.document.close();}
+}
+
 function generateContractPDF(v){
   var win=window.open('','_blank','width=800,height=1000,scrollbars=yes');
   var dates=(v.selectedDates||[]).sort().join(', ')||'— to be confirmed';
@@ -2265,7 +2343,8 @@ function renderLayout(){
     '<button class="btn-s" id="lClearSelBtn" style="display:none">✕ Deselect</button>'+
     '<button class="btn-danger" id="lDelSelBtn" style="display:none">🗑 Remove selected</button>'+
     '<button class="btn-s" id="lSnapBtn">Snap: <span id="lSnapLabel">on</span></button>'+
-    '<button class="btn-p" id="saveLayoutBtn" style="margin-left:auto">💾 Save layout for date</button></div>'+
+    '<button class="btn-p" id="saveLayoutBtn" style="margin-left:auto">💾 Save layout for date</button>'+
+    '<button class="btn-danger" id="deleteLayoutBtn" onclick="deleteCurrentLayout()" title="Delete layout for this date">🗑 Delete layout</button></div>'+
     '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:.65rem .85rem;background:#fff;border:.5px solid #e5e3de;border-radius:10px;margin-bottom:.5rem">'+
       '<span style="font-size:13px;font-weight:800;color:#1a1a1a;margin-right:4px;align-self:center">Vendor Types:</span>'+
       Object.keys(CAT_COLORS).map(function(cat){var c=CAT_COLORS[cat];return'<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;background:'+c.bg+';color:'+c.text+';border:1.5px solid '+c.border+'">'+
@@ -2528,6 +2607,21 @@ function updateLayoutBadge(state){
   else{el.classList.add('badge-empty');el.textContent='No layout for this date';}
 }
 function markLayoutUnsaved(){layoutUnsaved=true;updateLayoutBadge('unsaved');}
+async function deleteCurrentLayout(){
+  if(!layoutDate){alert('No date selected.');return;}
+  if(!confirm('Delete the layout for '+layoutDate+'?\nThis will remove all spots and assignments for this date.'))return;
+  var btn=document.getElementById('deleteLayoutBtn');
+  if(btn){btn.disabled=true;btn.textContent='Deleting…';}
+  await sb.from('layouts').delete().eq('date',layoutDate);
+  try{localStorage.removeItem('eb_layout_'+layoutDate);}catch(e){}
+  if(window._layoutCache)delete window._layoutCache[layoutDate];
+  if(calRows[layoutDate]){calRows[layoutDate].tent_assignments={};await saveCalRow(layoutDate);}
+  clearLayoutCanvas();layoutSpots=[];
+  updateLayoutStats();updateLayoutToolbar();
+  if(btn){btn.disabled=false;btn.textContent='🗑 Delete layout';}
+  alert('Layout for '+layoutDate+' deleted.');
+}
+
 function updateLayoutToolbar(){
   var has=layoutSelectedIds.size>0;
   var cs=document.getElementById('lClearSelBtn');if(cs)cs.style.display=(has||layoutSelectMode)?'':'none';
@@ -3281,10 +3375,27 @@ function renderScheduleReport(dates){
       }).join('')+
     '</tbody></table></div></div>';
 }
+var wlSortCol='name',wlSortDir=1;
+
 function renderWaitlist(){
   var el=document.getElementById('main-content');
-  var wl=vendors.filter(function(v){return v.status==='waitlist';}).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
+  var wl=vendors.filter(function(v){return v.status==='waitlist';}).slice().sort(function(a,b){
+    var av,bv;
+    if(wlSortCol==='category'){av=a.category||'';bv=b.category||'';}
+    else if(wlSortCol==='contact'){av=a.contactName||'';bv=b.contactName||'';}
+    else if(wlSortCol==='booth'){av=a.boothSize||'';bv=b.boothSize||'';}
+    else if(wlSortCol==='applied'){av=a.createdAt||'';bv=b.createdAt||'';}
+    else if(wlSortCol==='status'){av=a.vendorStatus||'';bv=b.vendorStatus||'';}
+    else{av=a.businessName||'';bv=b.businessName||'';}
+    return av.localeCompare(bv)*wlSortDir;
+  });
   if(!wl.length){el.innerHTML='<div class="empty">No vendors on waitlist.</div>';return;}
+
+  function wlTh(col,label){
+    var active=wlSortCol===col;var dir=active?(wlSortDir===1?'↑':'↓'):'↕';
+    return'<th style="padding:10px;text-align:left;background:#f8f7f4" data-wl-sort="'+col+'">'+
+      '<button style="background:none;border:none;font:inherit;cursor:pointer;font-size:12px;font-weight:700;padding:0;text-transform:uppercase;color:'+(active?'#1a1a1a':'#555')+'">'+label+' <span style="color:'+(active?'#1a1a1a':'#bbb')+'">'+dir+'</span></button></th>';
+  }
 
   var rows=wl.map(function(v){
     var cc=catColor(v.category);
@@ -3321,14 +3432,14 @@ function renderWaitlist(){
       '<table style="width:100%;border-collapse:collapse;min-width:800px">'+
         '<thead>'+
           '<tr style="background:#f8f7f4;border-bottom:.5px solid #e5e3de">'+
-            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase;white-space:nowrap">Business</th>'+
-            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase">Category</th>'+
-            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase">Contact</th>'+
-            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase">Booth</th>'+
-            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase;white-space:nowrap">Dates Requested</th>'+
-            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase">Applied</th>'+
-            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase">Status</th>'+
-            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase">Actions</th>'+
+            wlTh('name','Business')+
+            wlTh('category','Category')+
+            wlTh('contact','Contact')+
+            wlTh('booth','Booth')+
+            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase;white-space:nowrap;background:#f8f7f4">Dates Requested</th>'+
+            wlTh('applied','Applied')+
+            wlTh('status','Status')+
+            '<th style="padding:10px;text-align:left;font-size:12px;font-weight:700;color:#555;text-transform:uppercase;background:#f8f7f4">Actions</th>'+
           '</tr>'+
         '</thead>'+
         '<tbody>'+rows+'</tbody>'+
@@ -3337,11 +3448,13 @@ function renderWaitlist(){
 
   el.querySelectorAll('[data-approve]').forEach(function(b){b.addEventListener('click',function(){setSt(b.dataset.approve,'approved');});});
   el.querySelectorAll('[data-edit]').forEach(function(row){row.addEventListener('click',function(e){if(e.target.closest('[data-approve]'))return;openForm(row.dataset.edit);});});
+  el.querySelectorAll('[data-wl-sort]').forEach(function(th){th.addEventListener('click',function(){var col=th.dataset.wlSort;if(wlSortCol===col)wlSortDir*=-1;else{wlSortCol=col;wlSortDir=1;}renderWaitlist();});});
 }
 function openExportModal(){
   if(!vendors.length){alert('No vendor data to export.');return;}
   function mkRow(id,icon,title,sub){return'<div style="display:flex;align-items:center;gap:10px;padding:.75rem;border:.5px solid #e5e3de;border-radius:10px;cursor:pointer;background:#fff;margin-bottom:6px" id="'+id+'"><div style="font-size:22px;flex-shrink:0">'+icon+'</div><div><div style="font-size:12px;font-weight:600">'+title+'</div>'+(sub?'<div style="font-size:10px;color:#888">'+sub+'</div>':'')+'</div></div>';}
   document.getElementById('modal-area').innerHTML='<div class="overlay" id="exportOverlay"><div class="modal md"><div class="mtitle">↓ Export data</div>'+
+    mkRow('exportBackupBtn','💾','Complete backup — JSON','Vendors, invoices, calendar, layouts — fully restorable')+
     mkRow('exportFullBtn','📊','Full vendor report — with invoices','Vendors + selected dates + invoice sent/paid status')+
     mkRow('exportVendorsBtn','👥','All vendors — full details','Every field, contract, payment, dates')+
     mkRow('exportApprovedBtn','✅','Approved vendors only','')+
@@ -3350,6 +3463,7 @@ function openExportModal(){
     mkRow('exportCalBtn','📅','Market dates schedule','')+
     '<div class="mfoot" id="exportFoot"></div></div></div>';
   document.getElementById('exportOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
+  document.getElementById('exportBackupBtn').addEventListener('click',exportCompleteBackup);
   document.getElementById('exportFullBtn').addEventListener('click',exportFullVendorReport);
   document.getElementById('exportVendorsBtn').addEventListener('click',function(){exportVendorsCSV('all');});
   document.getElementById('exportApprovedBtn').addEventListener('click',function(){exportVendorsCSV('approved');});
@@ -3359,6 +3473,44 @@ function openExportModal(){
   var cb=document.createElement('button');cb.className='btn-s';cb.textContent='Close';cb.addEventListener('click',closeMod);
   document.getElementById('exportFoot').appendChild(cb);
 }
+async function exportCompleteBackup(){
+  var btn=document.getElementById('exportBackupBtn');
+  if(btn){var d=btn.querySelector('div div');if(d)d.textContent='Loading…';}
+  var{data:vData}=await sb.from('vendors').select('*');
+  var{data:iData}=await sb.from('invoices').select('*');
+  var{data:cData}=await sb.from('calendar').select('*');
+  var{data:lData}=await sb.from('layouts').select('*');
+  var{data:gData}=await sb.from('vendor_groups').select('*');
+  var backup={version:'1.0',created:new Date().toISOString(),environment:IS_LIVE?'live':'dev',vendors:vData||[],invoices:iData||[],calendar:cData||[],layouts:lData||[],vendor_groups:gData||[]};
+  var json=JSON.stringify(backup,null,2);
+  var blob=new Blob([json],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='eb-backup-'+today()+'.json';
+  a.style.display='none';document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);
+  closeMod();
+  alert('✅ Backup saved! '+((vData||[]).length)+' vendors, '+((iData||[]).length)+' invoices.');
+}
+
+async function restoreCompleteBackup(file){
+  try{
+    var text=await file.text();
+    var backup=JSON.parse(text);
+    if(!backup.version||!backup.vendors){alert('Invalid backup file.');return;}
+    if(!confirm('Restore backup from '+new Date(backup.created).toLocaleString()+'?\n\nThis will OVERWRITE all current data. Are you sure?'))return;
+    var btn=document.getElementById('restoreBackupBtn');
+    if(btn){btn.disabled=true;btn.textContent='Restoring…';}
+    if(backup.vendors&&backup.vendors.length){for(var i=0;i<backup.vendors.length;i+=20){await sb.from('vendors').upsert(backup.vendors.slice(i,i+20));}}
+    if(backup.invoices&&backup.invoices.length){for(var i=0;i<backup.invoices.length;i+=20){await sb.from('invoices').upsert(backup.invoices.slice(i,i+20));}}
+    if(backup.calendar&&backup.calendar.length){for(var i=0;i<backup.calendar.length;i+=20){await sb.from('calendar').upsert(backup.calendar.slice(i,i+20));}}
+    if(backup.layouts&&backup.layouts.length){for(var i=0;i<backup.layouts.length;i+=10){await sb.from('layouts').upsert(backup.layouts.slice(i,i+10));}}
+    if(backup.vendor_groups&&backup.vendor_groups.length){for(var i=0;i<backup.vendor_groups.length;i+=20){await sb.from('vendor_groups').upsert(backup.vendor_groups.slice(i,i+20));}}
+    alert('✅ Restore complete! Reloading data…');
+    await loadData();render();
+    if(btn){btn.disabled=false;btn.textContent='📂 Restore from backup';}
+  }catch(e){alert('Error restoring backup: '+e.message);}
+}
+
 function downloadCSV(fn,rows){var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);}
 function exportFullVendorReport(){
   if(!vendors.length){alert('No vendor data to export.');return;}
@@ -3550,6 +3702,7 @@ function openForm(id){
         (id&&v.email?'<button class="btn-blue" id="fEmailBtn">📧 Email vendor</button>':'')+
         (id?'<button class="btn-g" id="fInvoiceBtn">📄 Invoice</button>':'')+
         (id?'<button class="btn-amber" id="fContractBtn">📋 Contract PDF</button>':'')+
+        (id?'<button class="btn-s" id="fProfileBtn">📄 Profile PDF</button>':'')+
         '<button class="btn-p" id="fSaveBtn">✓ Save vendor</button>'+
         '<button class="btn-s" id="fCancelBtn">Cancel</button>'+
       '</div>'+
@@ -3572,12 +3725,20 @@ function openForm(id){
   document.getElementById('fNextBtn').addEventListener('click',function(){goFormTab(formTab+1);this.blur();});
   var fo2=document.getElementById('formOverlay');
   if(fo2)fo2.querySelectorAll('.fsnb').forEach(function(b){b.addEventListener('click',function(){goFormTab(parseInt(b.dataset.ftab));});});
-  document.getElementById('fCancelBtn').addEventListener('click',closeMod);
+  var formDirty=false;
+  document.querySelectorAll('#formOverlay input,#formOverlay textarea,#formOverlay select').forEach(function(el){el.addEventListener('change',function(){formDirty=true;});el.addEventListener('input',function(){formDirty=true;});});
+  document.querySelectorAll('#formOverlay .ropt').forEach(function(lbl){lbl.addEventListener('click',function(){formDirty=true;});});
+  document.querySelectorAll('#formOverlay .dc').forEach(function(chip){chip.addEventListener('click',function(){formDirty=true;});});
+  function confirmDiscard(){if(!formDirty)return true;return confirm('You have unsaved changes. Discard them?');}
+  document.getElementById('fCancelBtn').addEventListener('click',function(){if(confirmDiscard())closeMod();});
+  document.getElementById('formOverlay').addEventListener('click',function(e){if(e.target===this){if(confirmDiscard())closeMod();}});
   document.getElementById('fSaveBtn').addEventListener('click',saveV);
 
   // Contract PDF button
   var fContract=document.getElementById('fContractBtn');
   if(fContract)fContract.addEventListener('click',function(){generateContractPDF(v);});
+  var fProfile=document.getElementById('fProfileBtn');
+  if(fProfile)fProfile.addEventListener('click',function(){generateVendorProfilePDF(v);});
 
   // Documents tab — load docs when tab 6 is clicked
   document.querySelectorAll('.fsnb').forEach(function(btn){
@@ -4354,8 +4515,10 @@ async function loadInvoices(){
 
 function feeForBoothSize(boothSize){
   var fees=loadFeeSchedule();
-  var map={"10'x10'":fees.t10x10,"20'x20'":fees.t20x20,"10'x20'":fees.t10x20,'Food truck / trailer':fees.ttruck};
-  return map[boothSize]||0;
+  if(!boothSize)return 0;
+  var n=boothSize.replace(/[\u2018\u2019\u201A\u201B]/g,"'").replace(/\s*[xX×]\s*/g,'x').trim();
+  var map={"10'x10'":fees.t10x10,"20'x20'":fees.t20x20,"10'x20'":fees.t10x20,"20'x10'":fees.t10x20,'Food truck / trailer':fees.ttruck,'Food truck':fees.ttruck};
+  return map[n]||map[boothSize]||0;
 }
 
 function invStatusBadge(status){
@@ -5083,6 +5246,16 @@ function renderManage(){
 
     // Import
     '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:4px">🔄 Restore from backup</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:.85rem;line-height:1.6">Restore all vendors, invoices, calendar, and layouts from a backup JSON file.</div>'+
+      '<div style="display:flex;gap:8px;align-items:center">'+
+        '<button class="btn-s" id="restoreBackupBtn">📂 Restore from backup</button>'+
+        '<input type="file" id="restoreFileInput" accept=".json,application/json" style="display:none">'+
+        '<span style="font-size:11px;color:#aaa">⚠️ This will overwrite all current data</span>'+
+      '</div>'+
+    '</div>'+
+
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
       '<div style="font-size:13px;font-weight:700;margin-bottom:4px">📥 Import vendors from CSV</div>'+
       '<div style="font-size:11px;color:#888;margin-bottom:.85rem;line-height:1.6">Upload a CSV file to bulk-add vendors. Existing vendors with the same email are updated, new ones are created.<br><br>'+
       '<strong>Required columns:</strong> Business Name, Contact Name, Email<br>'+
@@ -5184,6 +5357,12 @@ function renderManage(){
   document.getElementById('exportCalBtn2').addEventListener('click',exportCalCSV);
 
   // ── Download CSV template ───────────────────────────────────────────────
+  var restoreBtn=document.getElementById('restoreBackupBtn');
+  var restoreInput=document.getElementById('restoreFileInput');
+  if(restoreBtn&&restoreInput){
+    restoreBtn.addEventListener('click',function(){restoreInput.click();});
+    restoreInput.addEventListener('change',function(){if(restoreInput.files&&restoreInput.files[0])restoreCompleteBackup(restoreInput.files[0]);});
+  }
   document.getElementById('downloadTemplateBtn').addEventListener('click',function(){
     var rows=[
       ['Business Name','Contact Name','Email','Phone','Website','Social','Category','Booth Size','Status','Vendor Status','Products','Notes'],
