@@ -375,16 +375,13 @@ function closeMod(){document.getElementById('modal-area').innerHTML='';}
 function getMarketDates(){
   // Generate every Friday from 2026-04-03 through 2026-10-30
   var dateSet={};
-  var d=new Date('2026-04-03');
-  var end=new Date('2026-10-30');
+  var d=new Date(2026,3,3); // April 3 2026 (months are 0-indexed)
+  var end=new Date(2026,9,30); // October 30 2026
   while(d<=end){
     var ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     dateSet[ds]=true;
     d.setDate(d.getDate()+7);
   }
-  // Also include any dates from calRows or vendor selectedDates
-  Object.keys(calRows).forEach(function(ds){dateSet[ds]=true;});
-  vendors.forEach(function(v){(v.selectedDates||[]).forEach(function(ds){dateSet[ds]=true;});});
   return Object.keys(dateSet).sort();
 }
 function getApproved(ds){return(calRows[ds]&&calRows[ds].approved)||[];}
