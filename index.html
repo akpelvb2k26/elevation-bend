@@ -170,7 +170,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
 .vs-card-label{font-size:13px;font-weight:700}
 .toggle-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
 .toggle-card{border:1.5px solid #e5e3de;border-radius:8px;padding:10px;cursor:pointer;background:#fff;display:flex;align-items:center;gap:8px}
-.toggle-card.on-contract{border-color:#0C447C;background:#E6F1FB}
+.toggle-card.on-contract{border-color:#22c55e;background:#EAF3DE;color:#27500A}
 .toggle-card.on-payment{border-color:#27500A;background:#EAF3DE}
 .toggle-card input[type=checkbox]{display:none}
 .tc-label{font-size:13px;font-weight:700}
@@ -216,7 +216,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors</div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-21 Rev 2</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -313,6 +313,7 @@ var reportSortCol='',reportSortDir=1; // 1=asc, -1=desc
 var layoutDate='',layoutSpots=[],layoutUnsaved=false,layoutSelectedIds=new Set(),layoutSnapOn=true,layoutSelectMode=false,layoutViewMode='detail'; // 'detail' or 'summary'
 var csvData=[]; // global so it persists across renderManage() calls
 var formTab=0,formTotalTabs=7,formCompletedTabs=new Set();
+var formDirty=false;
 window._ep=[];
 
 var VSC={active:{label:'Active',dot:'#22c55e',text:'#15803d',tagCls:'tag-vs-active'},inwork:{label:'In-Work',dot:'#eab308',text:'#a16207',tagCls:'tag-vs-inwork'},inactive:{label:'Inactive',dot:'#9ca3af',text:'#6b7280',tagCls:'tag-vs-inactive'}};
@@ -494,7 +495,8 @@ async function ensureSchema(){
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS booth_fee NUMERIC DEFAULT 0",
     "CREATE TABLE IF NOT EXISTS vendor_groups (id TEXT PRIMARY KEY, name TEXT, member_ids TEXT[] DEFAULT '{}', created_at TIMESTAMPTZ DEFAULT NOW())",
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS selected_dates TEXT[] DEFAULT '{}'",
-    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS modified_at TIMESTAMPTZ DEFAULT NOW()"
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS modified_at TIMESTAMPTZ DEFAULT NOW()",
+    "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT ''"
   ];
   for(var i=0;i<sqls.length;i++){
     try{await sb.rpc('exec_sql',{sql:sqls[i]});}catch(e){/* rpc may not exist, ignore */}
@@ -655,11 +657,9 @@ function renderStats(){
   document.getElementById('stats-bar').innerHTML='<div class="stats">'+
     mkStat('all','Total',tot,'#1a1a1a')+
     mkStat('approved','Approved',app,'#27500A')+
-    mkStat('eligible','🟢 Eligible',eli,'#15803d')+
-    mkStat('waitlist','Waitlist',wl,'#633806')+
     mkStat('pending','Pending',vendors.filter(function(v){return v.status==='pending';}).length,'#a16207')+
+    mkStat('waitlist','Waitlist',wl,'#633806')+
     mkStat('contract','📄 Contracts',con,'#0C447C')+
-    mkStat('payment','💰 Payments',pay,'#27500A')+
     '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:10px;padding:.5rem .65rem"><div style="font-size:9px;color:#888;margin-bottom:1px;text-transform:uppercase;letter-spacing:.03em;font-weight:600">Dates</div><div style="font-size:16px;font-weight:700">'+dates+'</div></div>'+
   '</div>';
 }
@@ -732,7 +732,7 @@ function renderVendors(){
       vTh('vstatus','Status')+
       vTh('dates','Dates')+
       vTh('contract','Contract')+
-      vTh('modified','Modified')+
+      vTh('modified','Mod')+
       vTh('created','Created')+
     '</tr></thead>'+
     '<tbody>'+
@@ -760,9 +760,9 @@ function renderVendors(){
             '<button class="iBtn" data-del="'+v.id+'">🗑️</button>'+
           '</div>'+
         '</td>'+
-        '<td style="padding:8px 10px;font-size:12px">'+
-          '<div style="font-weight:600">'+esc(v.contactName||'—')+'</div>'+
-          '<div style="color:#888;font-size:11px">'+esc(v.email||'')+'</div>'+
+        '<td style="padding:8px 10px;font-size:12px;max-width:150px;width:130px">'+
+          '<div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(v.contactName||'—')+'</div>'+
+          '<div style="color:#888;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(v.email||'')+'</div>'+
         '</td>'+
         '<td style="padding:8px 10px">'+catBadge(v.category)+'</td>'+
         '<td style="padding:8px 10px">'+schedTag(v.status)+'</td>'+
@@ -863,7 +863,7 @@ function renderCalendar(){
     cells+='<div class="'+cls+'" data-date="'+ds+'">'+d+(ac?'<span class="day-count">'+ac+'v</span>':'')+'</div>';
   }
   el.innerHTML=subnav+
-    '<div style="display:flex;gap:10px;margin-bottom:.65rem;font-size:10px;color:#888;flex-wrap:wrap"><span><span style="width:9px;height:9px;background:#EAF3DE;border:1px solid #639922;border-radius:2px;display:inline-block;margin-right:3px;vertical-align:middle"></span>Vendors scheduled</span><span style="color:#ccc">Click date to manage · '+eligibleVendors().length+' eligible (Approved + Active)</span></div>'+
+    '<div style="display:flex;gap:10px;margin-bottom:.65rem;font-size:10px;color:#888;flex-wrap:wrap"><span><span style="width:9px;height:9px;background:#EAF3DE;border:1px solid #639922;border-radius:2px;display:inline-block;margin-right:3px;vertical-align:middle"></span>Vendors scheduled</span><span style="color:#ccc">Click date to manage · '+eligibleVendors().length+' approved &amp; active</span></div>'+
     '<div class="cal-wrap"><div class="cal-nav"><button class="btn-s" style="padding:5px 10px" id="calPrev">‹</button><span>'+full[cM]+' '+cY+'</span><button class="btn-s" style="padding:5px 10px" id="calNext">›</button></div><div class="cal-grid" id="calGrid">'+ds2.map(function(d){return'<div class="chd">'+d+'</div>';}).join('')+cells+'</div></div>'+
     (selectedCalDay?buildDayPanel(selectedCalDay):'');
   document.getElementById('calViewBtn').addEventListener('click',function(){calView='calendar';renderCalendar();});
@@ -1069,7 +1069,6 @@ function buildDayPanel(ds){
           vsTag(v.vendorStatus||'active')+catBadge(v.category)+
           (vendorTent[v.id]?'<span class="tag tgr">⛺ '+vendorTent[v.id]+'</span>':'<span style="font-size:10px;color:#aaa;padding:2px 6px">No spot</span>')+
           (v.contractReceived?'<span class="tag tag-contract">📄</span>':'')+
-          (v.paymentReceived?'<span class="tag tag-payment">💰</span>':'')+
         '</div>'+
       '</div>'+
       '<div style="font-size:11px;color:#aaa;flex-shrink:0">✏️</div>'+
@@ -2096,6 +2095,69 @@ function generateContractPDF(v){
     '<br><br><p style="font-size:11px;color:#888;text-align:center">Elevation Bend Farmers Market · Bend, Oregon · Generated '+today2+'</p>'+
     '</body></html>');
   win.document.close();
+}
+
+// ── SEND CONTRACT EMAIL ───────────────────────────────────────────────────
+async function sendContractEmail(v){
+  if(!v.email){alert('No email address on file for this vendor.');return;}
+  var dates=(v.selectedDates||[]).sort().join(', ')||'— to be confirmed';
+  var fee='$'+(v.boothFee||0).toFixed(2);
+  var today2=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Georgia,serif;max-width:680px;margin:0 auto;padding:32px;color:#1a1a1a;line-height:1.7">'+
+    '<div style="font-size:22px;font-weight:800;color:#27500A;margin-bottom:2px">Elevation Bend Farmers Market</div>'+
+    '<div style="font-size:13px;color:#888;margin-bottom:24px;border-bottom:2px solid #639922;padding-bottom:12px">Vendor Participation Agreement — 2026 Season</div>'+
+    '<p>Hi '+esc(v.contactName||v.businessName)+',</p>'+
+    '<p>Please review and sign the vendor participation agreement below for the 2026 market season. Once signed, please return a copy to us so we can mark your contract as received.</p>'+
+    '<hr style="border:.5px solid #e5e3de;margin:24px 0">'+
+    '<h2 style="color:#27500A;font-size:16px;margin-bottom:8px">1. Parties</h2>'+
+    '<p>This agreement is between <strong>Elevation Bend Farmers Market</strong> ("Market"), Bend, Oregon, and:</p>'+
+    '<table style="border-collapse:collapse;width:100%;margin-bottom:8px"><tr><td style="padding:6px 0;font-weight:600;width:140px">Business Name:</td><td style="border-bottom:1px solid #1a1a1a;padding:6px 4px">'+esc(v.businessName||'')+'</td></tr>'+
+    '<tr><td style="padding:6px 0;font-weight:600">Contact:</td><td style="border-bottom:1px solid #1a1a1a;padding:6px 4px">'+esc(v.contactName||'')+'</td></tr>'+
+    '<tr><td style="padding:6px 0;font-weight:600">Email:</td><td style="border-bottom:1px solid #1a1a1a;padding:6px 4px">'+esc(v.email||'')+'</td></tr>'+
+    '<tr><td style="padding:6px 0;font-weight:600">Phone:</td><td style="border-bottom:1px solid #1a1a1a;padding:6px 4px">'+esc(v.phone||'')+'</td></tr>'+
+    '<tr><td style="padding:6px 0;font-weight:600">Category:</td><td style="border-bottom:1px solid #1a1a1a;padding:6px 4px">'+esc(v.category||'')+'</td></tr></table>'+
+    '<h2 style="color:#27500A;font-size:16px;margin-bottom:8px">2. Market Dates</h2>'+
+    '<p>Vendor is approved to participate on the following dates (Fridays, 8am–1pm):</p>'+
+    '<div style="background:#f8f7f4;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:16px">'+esc(dates)+'</div>'+
+    '<h2 style="color:#27500A;font-size:16px;margin-bottom:8px">3. Booth Assignment</h2>'+
+    '<p><strong>Booth size:</strong> '+esc(v.boothSize||"10'x10'")+'</p>'+
+    '<p>Booth assignments are made by Market management and are subject to change. Vendor must set up within their assigned space only.</p>'+
+    '<h2 style="color:#27500A;font-size:16px;margin-bottom:8px">4. Fees</h2>'+
+    '<p><strong>Booth fee per market day:</strong> '+fee+'</p>'+
+    '<p>Fees are due no later than 7 days prior to each market date.</p>'+
+    '<h2 style="color:#27500A;font-size:16px;margin-bottom:8px">5. Products</h2>'+
+    '<p>Vendor agrees to sell only the products listed in their application:</p>'+
+    '<div style="background:#f8f7f4;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:16px">'+esc(v.products||'As described in vendor application')+'</div>'+
+    '<h2 style="color:#27500A;font-size:16px;margin-bottom:8px">6. Rules &amp; Responsibilities</h2>'+
+    '<ul style="font-size:13px;line-height:1.8"><li>Arrive no earlier than 6:30am and be set up by 7:45am</li><li>Remain open until 1:00pm unless otherwise authorized</li><li>Maintain a clean and professional booth appearance</li><li>Hold all required licenses, permits, and insurance</li><li>Comply with all applicable Oregon health and food safety regulations</li><li>Notify Market management at least 48 hours in advance of any absence</li></ul>'+
+    '<h2 style="color:#27500A;font-size:16px;margin-bottom:8px">7. Cancellation</h2>'+
+    '<p style="font-size:13px">Vendor may cancel individual dates with 48 hours notice. Fees for cancelled dates with less than 48 hours notice are non-refundable. The Market reserves the right to revoke participation for violations of this agreement.</p>'+
+    '<h2 style="color:#27500A;font-size:16px;margin-bottom:8px">8. Liability</h2>'+
+    '<p style="font-size:13px">Vendor agrees to carry general liability insurance of at least $1,000,000 per occurrence. The Market is not responsible for any loss, damage, theft, or injury arising from Vendor\'s participation.</p>'+
+    '<h2 style="color:#27500A;font-size:16px;margin-bottom:8px">9. Signatures</h2>'+
+    '<p style="font-size:13px">By signing below, both parties agree to the terms of this agreement.</p>'+
+    '<br><table style="width:100%;border-collapse:collapse"><tr>'+
+      '<td style="width:47%;vertical-align:top;padding-right:20px"><div style="border-bottom:1.5px solid #1a1a1a;margin-top:48px;margin-bottom:6px"></div><strong>Vendor Signature</strong><br><span style="font-size:12px;color:#888">Name &amp; Date</span></td>'+
+      '<td style="width:6%"></td>'+
+      '<td style="width:47%;vertical-align:top"><div style="border-bottom:1.5px solid #1a1a1a;margin-top:48px;margin-bottom:6px"></div><strong>Market Representative</strong><br><span style="font-size:12px;color:#888">Name &amp; Date</span></td>'+
+    '</tr></table>'+
+    '<br><div style="font-size:11px;color:#aaa;text-align:center;margin-top:32px;padding-top:16px;border-top:.5px solid #e5e3de">Elevation Bend Farmers Market · Bend, Oregon · '+today2+'</div>'+
+    '</body></html>';
+
+  var btn=document.getElementById('fSendContractBtn');
+  if(btn){btn.disabled=true;btn.textContent='Sending…';}
+  var ok=await sendEmailResend({
+    to:v.email,
+    subject:'Vendor Participation Agreement — Elevation Bend Farmers Market 2026',
+    html:html,
+    text:'Hi '+(v.contactName||v.businessName)+',\n\nPlease find attached your vendor participation agreement for the 2026 Elevation Bend Farmers Market season.\n\nMarket dates: '+dates+'\nBooth size: '+(v.boothSize||"10'x10'")+'\nFee per day: '+fee+'\n\nPlease sign and return a copy.\n\nThank you,\nElevation Bend Farmers Market'
+  });
+  if(btn){btn.disabled=false;btn.textContent='📧 Send Contract';}
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;right:24px;background:'+(ok?'#27500A':'#791F1F')+';color:#fff;padding:14px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+  t.textContent=ok?'✅ Contract sent to '+v.email:'❌ Send failed — check Resend config';
+  document.body.appendChild(t);
+  setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4000);
 }
 
 // ── LAYOUT PDF FOR A DATE ─────────────────────────────────────────────────
@@ -3659,6 +3721,7 @@ function exportCalCSV(){var allDates=getMarketDates();if(!allDates.length){alert
 function openForm(id){
   // Always sync selectedDates from calRows before opening so chips reflect current calendar state
   syncVendorDatesFromCalendar();
+  formDirty=false;
   eId=id||null;formTab=0;formCompletedTabs=new Set();
   var v=id?vendors.find(function(x){return x.id===id;}):{};if(!v)v={};
   window._ep=(v.photos||[]).slice();
@@ -3674,21 +3737,21 @@ function openForm(id){
         (v.electricity?'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#fef9c3;color:#a16207;border:.5px solid #eab308">⚡ Electricity: '+esc(v.electricity)+'</span>':'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f3f4f6;color:#6b7280;border:.5px solid #d0cec7">⚡ No electricity</span>')+
         (v.boothSize?'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#E6F1FB;color:#0C447C;border:.5px solid #378ADD">⛺ '+esc(v.boothSize)+'</span>':'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f3f4f6;color:#6b7280;border:.5px solid #d0cec7">⛺ No booth size set</span>')+
       '</div>':'')+
-      (id?'<div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:7px" id="vendorNavBtns">'+
+      (id?'<div style="display:flex;align-items:center;justify-content:center;margin-top:7px"><span id="fSchedBadge">'+schedTag(v.status||'pending')+'</span></div>':'')+
+      (id?'<div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:6px" id="vendorNavBtns">'+
         '<button id="vnFirst" title="First" style="font-size:18px;padding:6px 14px;border:.5px solid #d0cec7;border-radius:8px;background:#f8f7f4;cursor:pointer;font-family:inherit">⏮</button>'+
         '<button id="vnPrev" title="Previous" style="font-size:18px;padding:6px 14px;border:.5px solid #d0cec7;border-radius:8px;background:#f8f7f4;cursor:pointer;font-family:inherit">◀</button>'+
         '<button id="vnNext" title="Next" style="font-size:18px;padding:6px 14px;border:.5px solid #d0cec7;border-radius:8px;background:#f8f7f4;cursor:pointer;font-family:inherit">▶</button>'+
         '<button id="vnLast" title="Last" style="font-size:18px;padding:6px 14px;border:.5px solid #d0cec7;border-radius:8px;background:#f8f7f4;cursor:pointer;font-family:inherit">⏭</button>'+
       '</div>':'')+
       '<div style="font-size:11px;color:#888;margin-top:5px">Complete all sections · use tabs to navigate</div>'+
-      '<span id="fSchedBadge" style="position:absolute;top:50%;right:1.25rem;transform:translateY(-50%)">'+schedTag(v.status||'pending')+'</span>'+
     '</div>'+
     '<div class="progress-bar"><div class="progress-fill" id="fProgress" style="width:'+(100/formTotalTabs)+'%"></div></div>'+
     '<div class="vform-subnav" id="fSubnav">'+['Status','Business','Products','Licensing','Booth','General Info','Documents'].map(function(t,i){return'<button class="fsnb'+(i===0?' active':'')+'" data-ftab="'+i+'"><span class="fsnb-dot"></span>'+t+'</button>';}).join('')+'</div>'+
     // TAB 0
     '<div class="fpanel active" data-fpanel="0"><div class="fsec-title">Vendor status &amp; scheduling</div>'+
     '<div class="fg"><label>Vendor status</label><div class="vs-grid">'+['active','inwork','inactive'].map(function(k){var vc=VSC[k];return'<div class="vs-card'+(vs===k?' '+FVSC[k].cls:'')+'" data-fvs="'+k+'" id="fvsc-'+k+'"><div class="vs-card-dot" style="background:'+vc.dot+'"></div><div class="vs-card-label" style="color:'+(vs===k?FVSC[k].text:'#aaa')+'">'+vc.label+'</div><input type="radio" name="vendorStatus" value="'+k+'"'+(vs===k?' checked':'')+' style="display:none"></div>';}).join('')+'</div></div>'+
-    '<div class="fg"><label>Contract</label><div class="toggle-grid"><label class="toggle-card'+(v.contractReceived?' on-contract':'')+'" id="ftc-contract"><div style="font-size:18px">📄</div><div><div class="tc-label">Contract signed</div><div class="tc-sub">Signed on file</div></div><input type="checkbox" id="fcb-contract"'+(v.contractReceived?' checked':'')+'></label></div></div>'+
+    '<div class="fg"><label>Contract</label><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="toggle-grid" style="flex:1"><label class="toggle-card'+(v.contractReceived?' on-contract':'')+'" id="ftc-contract"><div style="font-size:18px">'+(v.contractReceived?'✅':'📄')+'</div><div><div class="tc-label" style="'+(v.contractReceived?'color:#27500A;font-weight:700':'')+'">Contract '+(v.contractReceived?'signed ✓':'not signed')+'</div><div class="tc-sub">'+(v.contractReceived?'On file':'Not yet received')+'</div></div><input type="checkbox" id="fcb-contract"'+(v.contractReceived?' checked':'')+'></label></div>'+(id?'<button type="button" id="fSendContractBtn" style="white-space:nowrap;font-size:12px;padding:8px 14px;border-radius:8px;border:.5px solid #378ADD;background:#E6F1FB;color:#0C447C;cursor:pointer;font-weight:600;font-family:inherit">📧 Send Contract</button>':'')+' <button type="button" id="fDownloadContractBtn" style="white-space:nowrap;font-size:12px;padding:8px 14px;border-radius:8px;border:.5px solid #d0cec7;background:#f8f7f4;color:#555;cursor:pointer;font-weight:600;font-family:inherit">📋 Download PDF</button></div></div>'+
     '<div class="fg"><label>Application status</label><select id="fAppStatus"><option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option><option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option><option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option></select></div>'+
     '<div class="fg"><label>Market dates attending <span style="font-weight:400;color:#aaa">— tap to select (Fridays Apr 1 – Nov 1, 2026)</span></label>'+
     '<div style="margin-bottom:6px;display:flex;gap:5px;flex-wrap:wrap">'+
@@ -3740,7 +3803,10 @@ function openForm(id){
     '<div class="fg"><label>General liability insurance?</label><div class="rg" id="rg_liability">'+rads('liability',['Yes','No (required prior to first market)'],v.liability,null,null)+'</div></div></div>'+
     // TAB 4
     '<div class="fpanel" data-fpanel="4"><div class="fsec-title">Booth &amp; setup requirements</div>'+
-    '<div class="fg" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><label style="min-width:140px;margin-bottom:0">Booth size</label><div class="rg" id="rg_boothSize" style="flex:1">'+rads('boothSize',["10'x10'","20'x20'",'Food truck / trailer'],v.boothSize,null,null)+'</div></div>'+
+    '<div class="fg"><label>Booth size</label><select id="sel_boothSize" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:14px;font-weight:600;font-family:inherit">'+
+      ['',"10'x10'","10'x20'","20'x20'","20'x30'",'Food truck / trailer','Trailer','Trailer only','VAN','Bouncy Houses','Other'].map(function(s){return'<option value="'+s+'"'+(v.boothSize===s?' selected':'')+'>'+( s||'— Select booth size —')+'</option>';}).join('')+
+      (v.boothSize&&['',"10'x10'","10'x20'","20'x20'","20'x30'",'Food truck / trailer','Trailer','Trailer only','VAN','Bouncy Houses','Other'].indexOf(v.boothSize)===-1?'<option value="'+esc(v.boothSize)+'" selected>'+esc(v.boothSize)+'</option>':'')+
+    '</select></div>'+
     '<div class="fg" style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap"><label style="min-width:140px;margin-bottom:0;padding-top:4px">Own tent &amp; display?</label><div class="rg" id="rg_ownSetup" style="flex:1">'+rads('ownSetup',['Yes','No','Partial (describe below)'],v.ownSetup,'Partial (describe below)',v.ownSetupComment)+'</div></div>'+
     '<div class="fg" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><label style="min-width:140px;margin-bottom:0">Electricity needed?</label><div class="rg" id="rg_electricity" style="flex:1">'+rads('electricity',['Yes','No'],v.electricity,null,null)+'</div></div>'+
     '<div class="fg" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><label style="min-width:140px;margin-bottom:0">Attendance frequency</label><div class="rg" id="rg_attendance" style="flex:1">'+rads('attendance',['Full Season','Monthly','Select dates only'],v.attendance,null,null)+'</div></div>'+
@@ -3782,8 +3848,8 @@ function openForm(id){
         (id?'<button class="btn-g" id="fInvoiceBtn">📄 Invoice</button>':'')+
         (id?'<button class="btn-amber" id="fContractBtn">📋 Contract PDF</button>':'')+
         (id?'<button class="btn-s" id="fProfileBtn">📄 Profile PDF</button>':'')+
-        '<button class="btn-p" id="fSaveBtn">✓ Save vendor</button>'+
-        '<button class="btn-s" id="fCancelBtn">Cancel</button>'+
+        '<button class="btn-p" id="fSaveBtn">Save vendor</button>'+
+        '<button class="btn-s" id="fCancelBtn">Close form</button>'+
       '</div>'+
     '</div></div>';
   document.getElementById('modal-area').innerHTML='<div class="overlay" id="formOverlay">'+html+'</div>';
@@ -3804,7 +3870,7 @@ function openForm(id){
   document.getElementById('fNextBtn').addEventListener('click',function(){goFormTab(formTab+1);this.blur();});
   var fo2=document.getElementById('formOverlay');
   if(fo2)fo2.querySelectorAll('.fsnb').forEach(function(b){b.addEventListener('click',function(){goFormTab(parseInt(b.dataset.ftab));});});
-  var formDirty=false;
+  formDirty=false;
   document.querySelectorAll('#formOverlay input,#formOverlay textarea,#formOverlay select').forEach(function(el){el.addEventListener('change',function(){formDirty=true;});el.addEventListener('input',function(){formDirty=true;});});
   document.querySelectorAll('#formOverlay .ropt').forEach(function(lbl){lbl.addEventListener('click',function(){formDirty=true;});});
   document.querySelectorAll('#formOverlay .dc').forEach(function(chip){chip.addEventListener('click',function(){formDirty=true;});});
@@ -3924,6 +3990,8 @@ function openForm(id){
                 (inv.status!=='paid'?'<button class="btn-blue" style="font-size:11px;padding:4px 10px" data-finv-send="'+inv.id+'">📧 Send</button>':'')+
                 (inv.status!=='paid'?'<button class="btn-p" style="font-size:11px;padding:4px 10px" data-finv-paid="'+inv.id+'">✓ Mark paid</button>':
                   '<button class="btn-s" style="font-size:11px;padding:4px 10px" data-finv-unpaid="'+inv.id+'">↩ Unmark</button>')+
+                (inv.status!=='paid'?'<button style="font-size:11px;padding:4px 10px;border-radius:6px;border:.5px solid #5B8BF5;background:#E8EEFF;color:#3050C8;cursor:pointer;font-family:inherit;font-weight:600" data-finv-venmo="'+inv.id+'">💸 Venmo</button>':
+                  (inv.payment_method?'<span style="font-size:10px;color:#888;font-weight:600">via '+esc(inv.payment_method)+'</span>':''))+
                 '<button class="btn-danger" style="font-size:11px;padding:4px 10px" data-finv-del="'+inv.id+'">Delete</button>'+
               '</div>'+
             '</div>';
@@ -3997,10 +4065,21 @@ function openForm(id){
       btn.addEventListener('click',async function(){
         var inv=invoices.find(function(x){return x.id===btn.dataset.finvPaid;});
         if(!inv)return;
-        await sb.from('invoices').update({status:'paid',paid_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
+        await sb.from('invoices').update({status:'paid',paid_at:nowISO(),payment_method:'',modified_at:nowISO()}).eq('id',inv.id);
         v.paymentReceived=true;
         await sb.from('vendors').update({payment_received:true}).eq('id',v.id);
-        inv.status='paid';inv.paid_at=nowISO();
+        inv.status='paid';inv.paid_at=nowISO();inv.payment_method='';
+        fInv.click();
+      });
+    });
+    document.querySelectorAll('[data-finv-venmo]').forEach(function(btn){
+      btn.addEventListener('click',async function(){
+        var inv=invoices.find(function(x){return x.id===btn.dataset.finvVenmo;});
+        if(!inv)return;
+        await sb.from('invoices').update({status:'paid',paid_at:nowISO(),payment_method:'Venmo',modified_at:nowISO()}).eq('id',inv.id);
+        v.paymentReceived=true;
+        await sb.from('vendors').update({payment_received:true}).eq('id',v.id);
+        inv.status='paid';inv.paid_at=nowISO();inv.payment_method='Venmo';
         fInv.click();
       });
     });
@@ -4027,10 +4106,34 @@ function openForm(id){
     foot.appendChild(canBtn);foot.appendChild(newBtn);
   });}
   // VS cards
-  document.querySelectorAll('[data-fvs]').forEach(function(card){card.addEventListener('click',function(){var k=card.dataset.fvs;['active','inwork','inactive'].forEach(function(x){var el=document.getElementById('fvsc-'+x);if(!el)return;el.className='vs-card';el.querySelector('.vs-card-label').style.color='#aaa';el.querySelector('input').checked=false;});card.className='vs-card '+FVSC[k].cls;card.querySelector('.vs-card-label').style.color=FVSC[k].text;card.querySelector('input').checked=true;});});
+  document.querySelectorAll('[data-fvs]').forEach(function(card){card.addEventListener('click',function(){var k=card.dataset.fvs;['active','inwork','inactive'].forEach(function(x){var el=document.getElementById('fvsc-'+x);if(!el)return;el.className='vs-card';el.querySelector('.vs-card-label').style.color='#aaa';el.querySelector('input').checked=false;});card.className='vs-card '+FVSC[k].cls;card.querySelector('.vs-card-label').style.color=FVSC[k].text;card.querySelector('input').checked=true;formDirty=true;});});
   // Toggle cards
-  var ftcc=document.getElementById('ftc-contract');if(ftcc)ftcc.addEventListener('click',function(){var cb=document.getElementById('fcb-contract');cb.checked=!cb.checked;this.classList.toggle('on-contract',cb.checked);});
+  var ftcc=document.getElementById('ftc-contract');
+  if(ftcc)ftcc.addEventListener('click',function(){
+    var cb=document.getElementById('fcb-contract');
+    cb.checked=!cb.checked;
+    this.classList.toggle('on-contract',cb.checked);
+    formDirty=true;
+    var icon=this.querySelector('.tc-label');
+    var sub=this.querySelector('.tc-sub');
+    var em=this.querySelector('div[style*="font-size:18px"]')||this.firstElementChild;
+    if(cb.checked){
+      if(em)em.textContent='✅';
+      if(icon){icon.textContent='Contract signed ✓';icon.style.color='#27500A';icon.style.fontWeight='700';}
+      if(sub)sub.textContent='On file';
+    }else{
+      if(em)em.textContent='📄';
+      if(icon){icon.textContent='Contract not signed';icon.style.color='';icon.style.fontWeight='';}
+      if(sub)sub.textContent='Not yet received';
+    }
+  });
   var ftcp=document.getElementById('ftc-payment');if(ftcp)ftcp.addEventListener('click',function(){var cb=document.getElementById('fcb-payment');cb.checked=!cb.checked;this.classList.toggle('on-payment',cb.checked);});
+  // Send Contract button
+  var fSendContract=document.getElementById('fSendContractBtn');
+  if(fSendContract)fSendContract.addEventListener('click',function(){sendContractEmail(v);});
+  // Download Contract PDF button
+  var fDownloadContract=document.getElementById('fDownloadContractBtn');
+  if(fDownloadContract)fDownloadContract.addEventListener('click',function(){generateContractPDF(v);});
   // App status
   var fas=document.getElementById('fAppStatus');if(fas)fas.addEventListener('change',function(){document.getElementById('fSchedBadge').innerHTML=schedTag(this.value);});
   // Date chips
@@ -4053,14 +4156,14 @@ async function saveV(){
   var contact=((document.getElementById('f_contact')||{}).value||'').trim();
   if(!biz||!contact){alert('Business name and primary contact are required (Business tab).');return;}
   var btn=document.getElementById('fSaveBtn');if(btn){btn.disabled=true;btn.textContent='Saving…';}
-  function resetBtn(){if(btn){btn.disabled=false;btn.textContent='✓ Save vendor';}}
+  function resetBtn(){if(btn){btn.disabled=false;btn.textContent='Save vendor';}}
   try{
   var cat=getR('category');
   var newDates=Array.from(document.querySelectorAll('#fDateChips .dc.on')).map(function(c){return c.dataset.ds||c.getAttribute('data-ds')||'';}).filter(function(d){return d&&d.length>0;});
   console.log('saveV newDates:', newDates, 'chips found:', document.querySelectorAll('#fDateChips .dc.on').length);
   var oldDates=eId?Object.keys(calRows).filter(function(ds){return(calRows[ds].approved||[]).indexOf(eId)>-1;}).sort():[];
   var currentV=eId?vendors.find(function(x){return x.id===eId;}):null;
-  var data={vendorStatus:getR('vendorStatus')||'active',status:((document.getElementById('fAppStatus')||{}).value||'pending'),contractReceived:!!((document.getElementById('fcb-contract')||{}).checked),paymentReceived:!!((document.getElementById('fcb-payment')||{}).checked),selectedDates:newDates,businessName:biz,contactName:contact,email:((document.getElementById('f_email')||{}).value||'').trim(),phone:((document.getElementById('f_phone')||{}).value||'').trim(),website:((document.getElementById('f_web')||{}).value||'').trim(),social:((document.getElementById('f_social')||{}).value||'').trim(),category:cat,categoryComment:cat==='Other'?((document.getElementById('cmt_category')||{}).value||''):'',products:((document.getElementById('f_products')||{}).value||'').trim(),productDesc:((document.getElementById('f_prodDesc')||{}).value||'').trim(),local:getR('local'),localComment:((document.getElementById('cmt_local')||{}).value||''),priceRange:Array.from(document.querySelectorAll('#priceChecks input:checked')).map(function(c){return c.value;}),licenses:getR('licenses'),licensesComment:((document.getElementById('cmt_licenses')||{}).value||''),foodDocs:Array.from(document.querySelectorAll('#fdChecks input:checked')).map(function(c){return c.value;}),liability:getR('liability'),boothSize:getR('boothSize'),ownSetup:getR('ownSetup'),ownSetupComment:((document.getElementById('cmt_ownSetup')||{}).value||''),electricity:getR('electricity'),attendance:getR('attendance'),months:((document.getElementById('f_months_status')||document.getElementById('f_months')||{}).value||'').trim(),whyJoin:((document.getElementById('f_whyJoin')||{}).value||'').trim(),values:((document.getElementById('f_values')||{}).value||'').trim(),additionalInfo:((document.getElementById('f_addl')||{}).value||'').trim(),notes:((document.getElementById('f_notes')||{}).value||'').trim(),boothFee:(currentV&&currentV.boothFee)||0,photos:[]};
+  var data={vendorStatus:(function(){var sel=document.querySelector('#formOverlay [data-fvs] input:checked');return sel?sel.value:'active';})()||'active',status:((document.getElementById('fAppStatus')||{}).value||'pending'),contractReceived:!!((document.getElementById('fcb-contract')||{}).checked),paymentReceived:!!((document.getElementById('fcb-payment')||{}).checked),selectedDates:newDates,businessName:biz,contactName:contact,email:((document.getElementById('f_email')||{}).value||'').trim(),phone:((document.getElementById('f_phone')||{}).value||'').trim(),website:((document.getElementById('f_web')||{}).value||'').trim(),social:((document.getElementById('f_social')||{}).value||'').trim(),category:cat,categoryComment:cat==='Other'?((document.getElementById('cmt_category')||{}).value||''):'',products:((document.getElementById('f_products')||{}).value||'').trim(),productDesc:((document.getElementById('f_prodDesc')||{}).value||'').trim(),local:getR('local'),localComment:((document.getElementById('cmt_local')||{}).value||''),priceRange:Array.from(document.querySelectorAll('#priceChecks input:checked')).map(function(c){return c.value;}),licenses:getR('licenses'),licensesComment:((document.getElementById('cmt_licenses')||{}).value||''),foodDocs:Array.from(document.querySelectorAll('#fdChecks input:checked')).map(function(c){return c.value;}),liability:getR('liability'),boothSize:((document.getElementById('sel_boothSize')||{}).value||''),ownSetup:getR('ownSetup'),ownSetupComment:((document.getElementById('cmt_ownSetup')||{}).value||''),electricity:getR('electricity'),attendance:getR('attendance'),months:((document.getElementById('f_months_status')||document.getElementById('f_months')||{}).value||'').trim(),whyJoin:((document.getElementById('f_whyJoin')||{}).value||'').trim(),values:((document.getElementById('f_values')||{}).value||'').trim(),additionalInfo:((document.getElementById('f_addl')||{}).value||'').trim(),notes:((document.getElementById('f_notes')||{}).value||'').trim(),boothFee:(currentV&&currentV.boothFee)||0,photos:[]};
   var savedId=await saveVendorDB(data,eId);
   if(!savedId){resetBtn();alert('Save failed — could not write vendor to database.');return;}
   // Sync calRows with the new date selection
@@ -4087,7 +4190,28 @@ async function saveV(){
     }
   }
   syncVendorDatesFromCalendar();
-  await loadData();closeMod();render();
+  // Update in-memory vendor so the list reflects the new state immediately
+  var savedV=vendors.find(function(x){return x.id===savedId;});
+  if(savedV){
+    savedV.vendorStatus=data.vendorStatus;
+    savedV.status=data.status;
+    savedV.businessName=data.businessName;
+    savedV.contactName=data.contactName;
+    savedV.email=data.email;
+    savedV.phone=data.phone;
+    savedV.category=data.category;
+    savedV.boothSize=data.boothSize;
+    savedV.electricity=data.electricity;
+    savedV.contractReceived=data.contractReceived;
+    savedV.paymentReceived=data.paymentReceived;
+    savedV.notes=data.notes;
+    savedV.modifiedAt=nowISO();
+  }
+  renderStats();
+  renderVendors();
+  // Stay on form — confirm saved and clear dirty flag
+  formDirty=false;
+  if(btn){btn.textContent='✅ Saved!';setTimeout(function(){btn.disabled=false;btn.textContent='Save vendor';},1800);}
   }catch(e){
     console.error('saveV error:',e);
     alert('Save failed: '+(e.message||'Unknown error')+'\n\nCheck the browser console for details.');
@@ -4248,6 +4372,8 @@ async function renderPayments(){
                 (inv.status!=='paid'?'<button class="btn-blue" style="font-size:12px;padding:6px 12px" data-inv-send="'+inv.id+'">Send</button>':'')+
                 (inv.status!=='paid'?'<button class="btn-p" style="font-size:12px;padding:6px 12px" data-inv-paid="'+inv.id+'">Mark Paid</button>':
                   '<button class="btn-s" style="font-size:12px;padding:6px 12px" data-inv-unpaid="'+inv.id+'">Unmark</button>')+
+                (inv.status!=='paid'?'<button style="font-size:12px;padding:6px 12px;border-radius:6px;border:.5px solid #5B8BF5;background:#E8EEFF;color:#3050C8;cursor:pointer;font-family:inherit;font-weight:600" data-inv-venmo="'+inv.id+'">💸 Venmo</button>':
+                  (inv.payment_method?'<span style="font-size:11px;color:#888;font-weight:600">via '+esc(inv.payment_method)+'</span>':''))+
                 '<button class="btn-danger" style="font-size:12px;padding:6px 12px" data-inv-del="'+inv.id+'">Delete</button>'+
               '</div>'+
             '</td>'+
@@ -4395,7 +4521,7 @@ async function renderPayments(){
   });
 
   // Stop row click from firing when clicking action buttons
-  el.querySelectorAll('[data-inv-pdf],[data-inv-send],[data-inv-paid],[data-inv-unpaid],[data-inv-del],[data-pay-edit]').forEach(function(btn){
+  el.querySelectorAll('[data-inv-pdf],[data-inv-send],[data-inv-paid],[data-inv-unpaid],[data-inv-del],[data-pay-edit],[data-inv-venmo]').forEach(function(btn){
     btn.addEventListener('click',function(e){e.stopPropagation();});
   });
 
@@ -4439,13 +4565,30 @@ async function renderPayments(){
       var inv=invoices.find(function(x){return x.id===btn.dataset.invPaid;});
       console.log('Mark paid clicked, inv:', inv&&inv.id, 'current status:', inv&&inv.status);
       if(!inv)return;
-      var res=await sb.from('invoices').update({status:'paid',paid_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
+      var res=await sb.from('invoices').update({status:'paid',paid_at:nowISO(),payment_method:'',modified_at:nowISO()}).eq('id',inv.id);
       console.log('Update result:', res.error, res.status);
-      inv.status='paid';inv.paid_at=nowISO();
+      inv.status='paid';inv.paid_at=nowISO();inv.payment_method='';
       var v=vendors.find(function(x){return x.id===inv.vendor_id;});
       if(v){v.paymentReceived=true;await sb.from('vendors').update({payment_received:true,modified_at:nowISO()}).eq('id',v.id);}
       await loadInvoices();
-      console.log('After loadInvoices, status:', invoices.find(function(x){return x.id===inv.id;})&&invoices.find(function(x){return x.id===inv.id;}).status);
+      renderPayments();
+    });
+  });
+
+  el.querySelectorAll('[data-inv-venmo]').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var inv=invoices.find(function(x){return x.id===btn.dataset.invVenmo;});
+      if(!inv)return;
+      btn.disabled=true;btn.textContent='Saving…';
+      var res=await sb.from('invoices').update({status:'paid',paid_at:nowISO(),payment_method:'Venmo',modified_at:nowISO()}).eq('id',inv.id);
+      if(res.error){
+        // Fallback if payment_method column doesn't exist yet
+        await sb.from('invoices').update({status:'paid',paid_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
+      }
+      inv.status='paid';inv.paid_at=nowISO();inv.payment_method='Venmo';
+      var v=vendors.find(function(x){return x.id===inv.vendor_id;});
+      if(v){v.paymentReceived=true;await sb.from('vendors').update({payment_received:true,modified_at:nowISO()}).eq('id',v.id);}
+      await loadInvoices();
       renderPayments();
     });
   });
@@ -4609,7 +4752,7 @@ function feeForBoothSize(boothSize){
   var fees=loadFeeSchedule();
   if(!boothSize)return 0;
   var n=boothSize.replace(/[\u2018\u2019\u201A\u201B]/g,"'").replace(/\s*[xX×]\s*/g,'x').trim();
-  var map={"10'x10'":fees.t10x10,"20'x20'":fees.t20x20,"10'x20'":fees.t10x20,"20'x10'":fees.t10x20,'Food truck / trailer':fees.ttruck,'Food truck':fees.ttruck};
+  var map={"10'x10'":fees.t10x10,"10'x20'":fees.t10x20,"20'x10'":fees.t10x20,"20'x20'":fees.t20x20,"20'x30'":fees.t20x30,"30'x10'":fees.t20x30,"Food truck / trailer":fees.ttruck,"Food truck":fees.ttruck,"Trailer":fees.ttrailer,"Trailer only":fees.ttraileronly,"VAN":fees.tvan,"Bouncy Houses":fees.tbouncy,"Other":fees.tother};
   return map[n]||map[boothSize]||0;
 }
 
@@ -5109,7 +5252,7 @@ function renderCommsCompose(){
 
     // Recipient selector
     '<div class="fg"><label>Send to</label>'+
-    '<select id="cRecipType" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit">'+
+    '<select id="cRecipType" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:10px 12px;font-size:16px;font-weight:700;font-family:inherit">'+
       '<option value="all">All vendors with email ('+allEmails.length+')</option>'+
       '<option value="approved">Approved vendors only</option>'+
       '<option value="unpaid">Unpaid approved vendors</option>'+
@@ -5322,8 +5465,9 @@ function renderCommsGroups(){
 var FEE_KEY='eb_booth_fee_schedule';
 
 function loadFeeSchedule(){
-  try{var r=localStorage.getItem(FEE_KEY);return r?JSON.parse(r):{t10x10:0,t20x20:0,t10x20:0,ttruck:0};}
-  catch(e){return{t10x10:0,t20x20:0,t10x20:0,ttruck:0};}
+  var def={t10x10:0,t10x20:0,t20x20:0,t20x30:0,ttruck:0,ttrailer:0,ttraileronly:0,tvan:0,tbouncy:0,tother:0};
+  try{var r=localStorage.getItem(FEE_KEY);return r?Object.assign(def,JSON.parse(r)):def;}
+  catch(e){return def;}
 }
 function saveFeeSchedule(s){try{localStorage.setItem(FEE_KEY,JSON.stringify(s));}catch(e){}}
 
@@ -5385,7 +5529,7 @@ function renderManage(){
     '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
       '<div style="font-size:13px;font-weight:700;margin-bottom:4px">Booth fee schedule</div>'+
       '<div style="font-size:11px;color:#888;margin-bottom:1rem">Default fees by spot size. Click Apply to bulk-set fees for all approved unpaid vendors.</div>'+
-      [['t10x10',"10'×10' Standard"],['t20x20',"20'×20' Double"],['t10x20',"10'×20' Tall"],['ttruck','Food truck / trailer']].map(function(row){
+      [['t10x10',"10'x10'"],['t10x20',"10'x20'"],['t20x20',"20'x20'"],['t20x30',"20'x30'"],['ttruck','Food truck / trailer'],['ttrailer','Trailer'],['ttraileronly','Trailer only'],['tvan','VAN'],['tbouncy','Bouncy Houses'],['tother','Other']].map(function(row){
         return'<div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:.5px solid #f0ede6;gap:12px">'+
           '<label style="font-size:12px;font-weight:500;color:#1a1a1a;flex:1">'+row[1]+'</label>'+
           '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px;color:#888">$</span>'+
@@ -5431,8 +5575,7 @@ function renderManage(){
         '<div class="stat"><div class="sl">Market dates</div><div class="sv">'+getMarketDates().length+'</div></div>'+
         '<div class="stat"><div class="sl">Total vendors</div><div class="sv">'+vendors.length+'</div></div>'+
         '<div class="stat"><div class="sl">Approved</div><div class="sv" style="color:#27500A">'+vendors.filter(function(v){return v.status==='approved';}).length+'</div></div>'+
-        '<div class="stat"><div class="sl">Contracts</div><div class="sv" style="color:#0C447C">'+vendors.filter(function(v){return v.contractReceived;}).length+'</div></div>'+
-        '<div class="stat"><div class="sl">Payments</div><div class="sv" style="color:#27500A">'+vendors.filter(function(v){return v.paymentReceived;}).length+'</div></div>'+
+        '<div class="stat"><div class="sl">Contract Signed</div><div class="sv" style="color:#0C447C">'+vendors.filter(function(v){return v.contractReceived;}).length+'</div></div>'+
         '<div class="stat"><div class="sl">Fees expected</div><div class="sv" style="font-size:13px">$'+vendors.filter(function(v){return v.status==='approved';}).reduce(function(s,v){return s+(v.boothFee||0);},0).toFixed(2)+'</div></div>'+
         '<div class="stat"><div class="sl">Fees collected</div><div class="sv" style="color:#27500A;font-size:13px">$'+vendors.filter(function(v){return v.paymentReceived;}).reduce(function(s,v){return s+(v.boothFee||0);},0).toFixed(2)+'</div></div>'+
       '</div>'+
@@ -5535,12 +5678,14 @@ function renderManage(){
             }
             function mapBoothSize(raw){
               if(!raw)return'';
-              var r=raw.replace(/['']/g,"'").replace(/\s+/g,' ').trim();
-              if(r.indexOf("10' x 20'")>-1||r.indexOf("10'x20'")>-1)return"10'x20'";
-              if(r.indexOf("20' x 20'")>-1||r.indexOf("20'x20'")>-1)return"20'x20'";
-              if(r.indexOf("10' x 10'")>-1||r.indexOf("10'x10'")>-1)return"10'x10'";
-              if(r.indexOf('truck')>-1||r.indexOf('trailer')>-1)return'Food truck / trailer';
-              return r;
+              var r=raw.replace(/['']/g,"'").replace(/\s+/g,' ').trim().toLowerCase();
+              if(r.indexOf('truck')>-1||r.indexOf('trailer')>-1||r==='van')return'Food truck / trailer';
+              var d=r.replace(/'/g,'').replace(/\s*x\s*/gi,'x').replace(/\s+/g,'');
+              if(d.indexOf('10x20')>-1)return"10'x20'";
+              if(d.indexOf('20x30')>-1||d.indexOf('30x10')>-1)return"20'x30'";
+              if(d.indexOf('20x20')>-1)return"20'x20'";
+              if(d.indexOf('10x10')>-1||d==='1010')return"10'x10'";
+              return raw.trim();
             }
             var CAT_VALID=['Farm / Produce Grower','Rancher / Eggs / Meat / Dairy','Baked Goods','Specialty Food / Packaged Goods','Prepared Food Vendor','Artisan / Maker','Flowers / Plants / Herbal Goods','Other'];
             var newRows=[],updatedIds=[],skipped=0;
@@ -5557,17 +5702,19 @@ function renderManage(){
               var vs=colByName(row,'vendor status');
               if(['active','inwork','inactive'].indexOf(vs)===-1)vs='active';
               var existing=null;
-              if(email)existing=vendors.find(function(v){return v.email&&v.email.toLowerCase()===email.toLowerCase();});
-              if(!existing)existing=vendors.find(function(v){return v.businessName&&v.businessName.toLowerCase()===bizName.toLowerCase();});
+              // Match by business name first (most reliable since emails may be bulk-updated)
+              existing=vendors.find(function(v){return v.businessName&&v.businessName.toLowerCase()===bizName.toLowerCase();});
+              // Only fall back to email match if email looks unique (not a shared/admin email)
+              if(!existing&&email){var emailCount=vendors.filter(function(v){return v.email&&v.email.toLowerCase()===email.toLowerCase();}).length;if(emailCount===1)existing=vendors.find(function(v){return v.email&&v.email.toLowerCase()===email.toLowerCase();});}
               var rowId=existing?existing.id:uid();
               var dbRow={
                 id:rowId,
                 status:appStatus,
                 vendor_status:vs,
                 business_name:bizName,
-                contact_name:colByName(row,'primary contact name')||colByName(row,'contact name')||colByName(row,'contact'),
-                email:email,
-                phone:colByName(row,'phone'),
+                contact_name:colByName(row,'primary contact name')||colByName(row,'contact name')||colByName(row,'contact')||(existing?existing.contactName||'':''),
+                email:email||(existing?existing.email||'':''),
+                phone:colByName(row,'phone')||(existing?existing.phone||'':''),
                 website:colByName(row,'website and/or social media links')||colByName(row,'website'),
                 social:colByName(row,'website and/or social media links')||colByName(row,'social'),
                 category:cat,
@@ -5588,7 +5735,7 @@ function renderManage(){
                 photos:existing?(existing.photos||[]):[],
                 food_docs:existing?(existing.foodDocs||[]):[],
                 selected_dates:existing?(existing.selectedDates||[]):[],
-                contract_received:existing?existing.contractReceived||false:(colByName(row,'contract signed')||colByName(row,'contract received')||colByName(row,'insurance')?true:false),
+                contract_received:(function(){var raw=colByName(row,'contract signed')||colByName(row,'contract received')||colByName(row,'insurance')||'';var v=raw.trim().toLowerCase();if(!v||v==='no'||v==='false'||v==='0')return existing?existing.contractReceived||false:false;return true;}()),
                 payment_received:existing?existing.paymentReceived||false:false,
                 booth_fee:existing?existing.boothFee||0:0,
                 status:existing?existing.status||appStatus:appStatus,
@@ -5735,12 +5882,12 @@ function renderManage(){
 
   // ── Fee schedule buttons ──────────────────────────────────────────────
   document.getElementById('saveFeesBtn').addEventListener('click',function(){
-    var s={t10x10:parseFloat(document.getElementById('fee_t10x10').value)||0,t20x20:parseFloat(document.getElementById('fee_t20x20').value)||0,t10x20:parseFloat(document.getElementById('fee_t10x20').value)||0,ttruck:parseFloat(document.getElementById('fee_ttruck').value)||0};
+    var s={t10x10:parseFloat(document.getElementById('fee_t10x10').value)||0,t10x20:parseFloat(document.getElementById('fee_t10x20').value)||0,t20x20:parseFloat(document.getElementById('fee_t20x20').value)||0,t20x30:parseFloat(document.getElementById('fee_t20x30').value)||0,ttruck:parseFloat(document.getElementById('fee_ttruck').value)||0,ttrailer:parseFloat(document.getElementById('fee_ttrailer').value)||0,ttraileronly:parseFloat(document.getElementById('fee_ttraileronly').value)||0,tvan:parseFloat(document.getElementById('fee_tvan').value)||0,tbouncy:parseFloat(document.getElementById('fee_tbouncy').value)||0,tother:parseFloat(document.getElementById('fee_tother').value)||0};
     saveFeeSchedule(s);
     var btn=document.getElementById('saveFeesBtn');btn.textContent='✅ Saved!';setTimeout(function(){btn.textContent='💾 Save schedule';},1500);
   });
   document.getElementById('applyFeesBtn').addEventListener('click',async function(){
-    var s={t10x10:parseFloat(document.getElementById('fee_t10x10').value)||0,t20x20:parseFloat(document.getElementById('fee_t20x20').value)||0,t10x20:parseFloat(document.getElementById('fee_t10x20').value)||0,ttruck:parseFloat(document.getElementById('fee_ttruck').value)||0};
+    var s={t10x10:parseFloat(document.getElementById('fee_t10x10').value)||0,t10x20:parseFloat(document.getElementById('fee_t10x20').value)||0,t20x20:parseFloat(document.getElementById('fee_t20x20').value)||0,t20x30:parseFloat(document.getElementById('fee_t20x30').value)||0,ttruck:parseFloat(document.getElementById('fee_ttruck').value)||0,ttrailer:parseFloat(document.getElementById('fee_ttrailer').value)||0,ttraileronly:parseFloat(document.getElementById('fee_ttraileronly').value)||0,tvan:parseFloat(document.getElementById('fee_tvan').value)||0,tbouncy:parseFloat(document.getElementById('fee_tbouncy').value)||0,tother:parseFloat(document.getElementById('fee_tother').value)||0};
     saveFeeSchedule(s);
     var approved=vendors.filter(function(v){return v.status==='approved'&&!v.paymentReceived;});
     if(!approved.length){alert('No approved unpaid vendors to update.');return;}
