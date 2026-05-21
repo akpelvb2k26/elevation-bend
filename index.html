@@ -716,6 +716,7 @@ function renderVendors(){
   }
 
   var sorted=sortVendorList(allV);
+  window._vendorNavList=sorted.map(function(v){return v.id;});
   var html=
     '<div style="display:flex;gap:8px;align-items:center;margin-bottom:.65rem;flex-wrap:wrap">'+
       '<input id="vSearchInput" type="text" placeholder="🔍 Search by business or contact name…" value="'+(window._vSearch||'')+'" style="flex:1;min-width:200px;border:.5px solid #d0cec7;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">'+
@@ -739,10 +740,10 @@ function renderVendors(){
       var vs=v.vendorStatus||'active';
       var cc=catColor(v.category);
       return'<tr style="border-bottom:.5px solid #f0ede6;cursor:pointer" data-edit="'+v.id+'">'+
-        '<td style="padding:8px 10px">'+
+        '<td style="padding:8px 10px;max-width:200px;width:180px">'+
           '<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">'+
             '<div style="width:28px;height:28px;border-radius:50%;background:'+cc.bg+';color:'+cc.text+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
-            '<div style="font-size:13px;font-weight:700;white-space:nowrap">'+esc(v.businessName||'—')+'</div>'+
+            '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px" title="'+esc(v.businessName||'')+'">'+esc(v.businessName||'—')+'</div>'+
           '</div>'+
           '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" onclick="event.stopPropagation()">'+
             '<select data-set-st="'+v.id+'" style="font-size:11px;padding:3px 6px;border:.5px solid #d0cec7;border-radius:6px;font-family:inherit;cursor:pointer;font-weight:600;background:'+(v.status==='approved'?'#EAF3DE':v.status==='waitlist'?'#FEF9C3':'#FDECEA')+';color:'+(v.status==='approved'?'#27500A':v.status==='waitlist'?'#A16207':'#9B3A2E')+'">'+
@@ -1060,6 +1061,9 @@ function buildDayPanel(ds){
           (wasInactive?'<span style="font-size:9px;font-weight:500;background:#FCEBEB;color:#791F1F;padding:1px 6px;border-radius:20px;margin-left:6px;vertical-align:middle">Now inactive</span>':'')+
         '</div>'+
         '<div style="font-size:11px;color:#888;margin-top:2px">'+esc(v.contactName||'')+(v.phone?' · '+esc(v.phone):'')+'</div>'+
+        ((v.electricity||v.boothSize)?'<div style="font-size:10px;color:#888;margin-top:2px">'+
+          (v.boothSize?'⛺ '+esc(v.boothSize):'')+(v.boothSize&&v.electricity?' · ':'')+(v.electricity?'<span style="color:#dc2626;font-weight:600">⚡ '+esc(v.electricity)+'</span>':'')+
+        '</div>':'')+
         '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">'+
           (isWL?'<span class="sched-waitlist">Waitlist</span>':'<span class="sched-approved">Approved</span>')+
           vsTag(v.vendorStatus||'active')+catBadge(v.category)+
@@ -1734,6 +1738,26 @@ async function autoAssign(){
     if(!copied){alert('No spots defined for this date and no previous layout found.\nGo to the Layout tab and define spots first.');return;}
   }
 
+  // If there are fewer spots than vendors, auto-generate additional 10x10 spots in a grid
+  var needed=v4d.length-layoutSpotList.length;
+  if(needed>0){
+    var sw=LSIZES['10x10'].w,sh=LSIZES['10x10'].h,gap=10;
+    var cols=Math.ceil(Math.sqrt(v4d.length));
+    var maxY=layoutSpotList.reduce(function(m,s){return Math.max(m,s.y+(s.h||sh));},0);
+    if(maxY>0)maxY+=gap*2;
+    var startNum=layoutSpotList.reduce(function(m,s){return Math.max(m,s.num||0);},0)+1;
+    for(var ni=0;ni<needed;ni++){
+      var col=ni%cols,row=Math.floor(ni/cols);
+      layoutSpotList.push({
+        id:uid(),num:startNum+ni,size:'10x10',
+        x:col*(sw+gap),y:maxY+row*(sh+gap),
+        w:sw,h:sh,vendorId:'',vendorName:'',vendorCat:'',vendorInactive:false
+      });
+    }
+    await sb.from('layouts').upsert({date:tentViewDate,spots:JSON.stringify(layoutSpotList),modified_at:nowISO()});
+    clearLayoutCache(tentViewDate);
+  }
+
   // Build adjacency map using real XY positions
   var ADJACENT_THRESHOLD=120; // spots within 120px gap are considered adjacent
   function spotsAdjacent(a,b){
@@ -1984,7 +2008,7 @@ function generateVendorProfilePDF(v){
       section('Contact Information')+row('Contact Name',esc(v.contactName||''))+row('Email',esc(v.email||''))+row('Phone',esc(v.phone||''))+row('Website',esc(v.website||''))+
       section('Business Details')+row('Products',esc(v.products||''))+row('Locally Produced',esc(v.local||''))+row('Why Join',esc(v.whyJoin||''))+row('Values',esc(v.values||''))+row('Additional Info',esc(v.additionalInfo||''))+
       section('Booth & Setup')+row('Booth Size',esc(v.boothSize||''))+row('Own Tent & Display',esc(v.ownSetup||''))+row('Electricity Needed',esc(v.electricity||''))+row('Attendance',esc(v.attendance||''))+row('Preferred Months',esc(v.months||''))+
-      section('Compliance')+row('Licenses & Permits',esc(v.licenses||''))+row('Liability Insurance',esc(v.liability||''))+row('Contract Received',v.contractReceived?'✅ Yes':'No')+row('Payment Received',v.paymentReceived?'✅ Yes':'No')+
+      section('Compliance')+row('Licenses & Permits',esc(v.licenses||''))+row('Liability Insurance',esc(v.liability||''))+row('Contract Signed',v.contractReceived?'✅ Yes':'No')+row('Payment Received',v.paymentReceived?'✅ Yes':'No')+
       (dates.length?section('Scheduled Market Dates')+'<tr><td colspan="2" style="padding:8px 12px">'+dates.map(function(d){return'<span style="display:inline-block;background:#EAF3DE;color:#27500A;border:1px solid #639922;border-radius:20px;padding:3px 10px;margin:2px;font-size:12px;font-weight:600">'+d+'</span>';}).join('')+'</td></tr>':'')+
       (vInvoices.length?section('Invoices')+'<tr><td colspan="2" style="padding:0"><table style="width:100%;border-collapse:collapse"><tr style="background:#f8f7f4"><th style="padding:6px 12px;text-align:left;font-size:11px">Invoice #</th><th style="padding:6px 12px;text-align:left;font-size:11px">Status</th><th style="padding:6px 12px;text-align:right;font-size:11px">Amount</th><th style="padding:6px 12px;text-align:left;font-size:11px">Sent</th><th style="padding:6px 12px;text-align:left;font-size:11px">Paid</th></tr>'+vInvoices.map(function(inv){return'<tr style="border-top:1px solid #f0ede6"><td style="padding:6px 12px;font-size:12px;font-weight:600">'+esc(inv.invoice_number||'')+'</td><td style="padding:6px 12px;font-size:12px">'+esc(inv.status||'')+'</td><td style="padding:6px 12px;font-size:12px;text-align:right">$'+parseFloat(inv.total||0).toFixed(2)+'</td><td style="padding:6px 12px;font-size:12px">'+(inv.sent_at?new Date(inv.sent_at).toLocaleDateString():'—')+'</td><td style="padding:6px 12px;font-size:12px">'+(inv.paid_at?new Date(inv.paid_at).toLocaleDateString():'—')+'</td></tr>';}).join('')+'</table></td></tr>':'')+
       (v.notes?section('Internal Notes')+row('Notes',esc(v.notes)):'')+
@@ -2884,17 +2908,17 @@ function renderLayoutSpot(sp){
       var cb=document.getElementById('lspot-close-btn');if(cb)cb.addEventListener('click',function(){var p=document.getElementById('lspot-popup');if(p)p.remove();});
     });
   } else {
-    // Detail: full vendor info
+    // Detail: vendor name → size → Spot XXX
     el.innerHTML=
       '<button class="lspot-del" title="Remove from this date only">×</button>'+
-      '<div class="lspot-num">Spot '+sp.num+'</div>'+
-      '<div class="lspot-size">'+dims.label+'</div>'+
       (sp.vendorName
         ?'<div class="lspot-vendor" style="color:'+lcc.text+'">'+esc(sp.vendorName)+'</div>'+
           (sp.vendorInactive
             ?'<div style="font-size:8px;color:#791F1F;font-weight:600">⚠️ Inactive</div>'
             :'<div class="lspot-cat">'+esc(sp.vendorCat)+'</div>')
-        :'<div style="font-size:9px;color:#aaa;margin-top:6px;text-align:center">click to assign</div>');
+        :'<div style="font-size:9px;color:#aaa;margin-top:6px;text-align:center">click to assign</div>')+
+      '<div class="lspot-size">'+dims.label+'</div>'+
+      '<div style="font-size:8px;font-weight:700;color:'+lcc.text+';opacity:.55;text-align:center;margin-top:2px;letter-spacing:.06em">SPOT '+sp.num+'</div>';
   }
 
   document.getElementById('layoutCanvas').appendChild(el);
@@ -3646,7 +3670,17 @@ function openForm(id){
   var html='<div class="modal xl" style="padding:0;overflow-y:auto;max-height:95vh;display:flex;flex-direction:column">'+
     '<div style="padding:.85rem 1.25rem;border-bottom:.5px solid #e5e3de;text-align:center;position:relative">'+
       '<div style="font-size:22px;font-weight:800;color:#1a1a1a;letter-spacing:-.02em">'+(id?esc(v.businessName||'Vendor'):'New vendor application')+'</div>'+
-      '<div style="font-size:11px;color:#888;margin-top:3px">Complete all sections · use tabs to navigate</div>'+
+      (id?'<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:5px;flex-wrap:wrap">'+
+        (v.electricity?'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#fef9c3;color:#a16207;border:.5px solid #eab308">⚡ Electricity: '+esc(v.electricity)+'</span>':'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f3f4f6;color:#6b7280;border:.5px solid #d0cec7">⚡ No electricity</span>')+
+        (v.boothSize?'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#E6F1FB;color:#0C447C;border:.5px solid #378ADD">⛺ '+esc(v.boothSize)+'</span>':'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f3f4f6;color:#6b7280;border:.5px solid #d0cec7">⛺ No booth size set</span>')+
+      '</div>':'')+
+      (id?'<div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:7px" id="vendorNavBtns">'+
+        '<button id="vnFirst" title="First" style="font-size:18px;padding:6px 14px;border:.5px solid #d0cec7;border-radius:8px;background:#f8f7f4;cursor:pointer;font-family:inherit">⏮</button>'+
+        '<button id="vnPrev" title="Previous" style="font-size:18px;padding:6px 14px;border:.5px solid #d0cec7;border-radius:8px;background:#f8f7f4;cursor:pointer;font-family:inherit">◀</button>'+
+        '<button id="vnNext" title="Next" style="font-size:18px;padding:6px 14px;border:.5px solid #d0cec7;border-radius:8px;background:#f8f7f4;cursor:pointer;font-family:inherit">▶</button>'+
+        '<button id="vnLast" title="Last" style="font-size:18px;padding:6px 14px;border:.5px solid #d0cec7;border-radius:8px;background:#f8f7f4;cursor:pointer;font-family:inherit">⏭</button>'+
+      '</div>':'')+
+      '<div style="font-size:11px;color:#888;margin-top:5px">Complete all sections · use tabs to navigate</div>'+
       '<span id="fSchedBadge" style="position:absolute;top:50%;right:1.25rem;transform:translateY(-50%)">'+schedTag(v.status||'pending')+'</span>'+
     '</div>'+
     '<div class="progress-bar"><div class="progress-fill" id="fProgress" style="width:'+(100/formTotalTabs)+'%"></div></div>'+
@@ -3654,7 +3688,7 @@ function openForm(id){
     // TAB 0
     '<div class="fpanel active" data-fpanel="0"><div class="fsec-title">Vendor status &amp; scheduling</div>'+
     '<div class="fg"><label>Vendor status</label><div class="vs-grid">'+['active','inwork','inactive'].map(function(k){var vc=VSC[k];return'<div class="vs-card'+(vs===k?' '+FVSC[k].cls:'')+'" data-fvs="'+k+'" id="fvsc-'+k+'"><div class="vs-card-dot" style="background:'+vc.dot+'"></div><div class="vs-card-label" style="color:'+(vs===k?FVSC[k].text:'#aaa')+'">'+vc.label+'</div><input type="radio" name="vendorStatus" value="'+k+'"'+(vs===k?' checked':'')+' style="display:none"></div>';}).join('')+'</div></div>'+
-    '<div class="fg"><label>Contract</label><div class="toggle-grid"><label class="toggle-card'+(v.contractReceived?' on-contract':'')+'" id="ftc-contract"><div style="font-size:18px">📄</div><div><div class="tc-label">Contract received</div><div class="tc-sub">Signed on file</div></div><input type="checkbox" id="fcb-contract"'+(v.contractReceived?' checked':'')+'></label></div></div>'+
+    '<div class="fg"><label>Contract</label><div class="toggle-grid"><label class="toggle-card'+(v.contractReceived?' on-contract':'')+'" id="ftc-contract"><div style="font-size:18px">📄</div><div><div class="tc-label">Contract signed</div><div class="tc-sub">Signed on file</div></div><input type="checkbox" id="fcb-contract"'+(v.contractReceived?' checked':'')+'></label></div></div>'+
     '<div class="fg"><label>Application status</label><select id="fAppStatus"><option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option><option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option><option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option></select></div>'+
     '<div class="fg"><label>Market dates attending <span style="font-weight:400;color:#aaa">— tap to select (Fridays Apr 1 – Nov 1, 2026)</span></label>'+
     '<div style="margin-bottom:6px;display:flex;gap:5px;flex-wrap:wrap">'+
@@ -3778,6 +3812,19 @@ function openForm(id){
   document.getElementById('fCancelBtn').addEventListener('click',function(){if(confirmDiscard())closeMod();});
   document.getElementById('formOverlay').addEventListener('click',function(e){if(e.target===this){if(confirmDiscard())closeMod();}});
   document.getElementById('fSaveBtn').addEventListener('click',saveV);
+
+  // Vendor navigation buttons
+  var navList=window._vendorNavList||[];
+  var navIdx=navList.indexOf(id||'');
+  function navTo(newId){if(!newId)return;if(confirmDiscard())openForm(newId);}
+  var vnFirst=document.getElementById('vnFirst');
+  var vnPrev=document.getElementById('vnPrev');
+  var vnNext=document.getElementById('vnNext');
+  var vnLast=document.getElementById('vnLast');
+  if(vnFirst){vnFirst.disabled=navIdx<=0;vnFirst.addEventListener('click',function(){navTo(navList[0]);});}
+  if(vnPrev){vnPrev.disabled=navIdx<=0;vnPrev.addEventListener('click',function(){navTo(navList[navIdx-1]);});}
+  if(vnNext){vnNext.disabled=navIdx<0||navIdx>=navList.length-1;vnNext.addEventListener('click',function(){navTo(navList[navIdx+1]);});}
+  if(vnLast){vnLast.disabled=navIdx<0||navIdx>=navList.length-1;vnLast.addEventListener('click',function(){navTo(navList[navList.length-1]);});}
 
   // Contract PDF button
   var fContract=document.getElementById('fContractBtn');
@@ -5435,7 +5482,9 @@ function renderManage(){
           return;
         }
         var headers=csvData[0].map(function(h){return(h||'').trim().toLowerCase();});
-        var hasBizCol=headers.some(function(h){return h.indexOf('business')>-1||h.indexOf('farm name')>-1;});
+        var hasBizCol=headers.some(function(h){return h.indexOf('business')>-1||h.indexOf('farm name')>-1||h==='ma'||h==='name'||h==='vendor name';});
+        // Also accept first column as business name if it has data
+        if(!hasBizCol&&csvData.length>1&&csvData[1][0]){hasBizCol=true;}
         if(!hasBizCol){
           statusEl.innerHTML='<span style="color:#791F1F">Missing required column: "Business Name" or "Business / Farm Name". Found columns: '+csvData[0].slice(0,5).join(', ')+'</span>';
           return;
@@ -5465,10 +5514,12 @@ function renderManage(){
 
             // Find business name column index once
             var bizIdx=-1;
-            var bizCandidates=['business / farm name','business name','businessname','farm name'];
+            var bizCandidates=['business / farm name','business name','businessname','farm name','ma','name','vendor name'];
             for(var bi=0;bi<bizCandidates.length;bi++){var bi2=getColIdx(bizCandidates[bi]);if(bi2>-1){bizIdx=bi2;break;}}
             // If still not found, try partial match
             if(bizIdx===-1){for(var bi=0;bi<hdrs.length;bi++){if(hdrs[bi].indexOf('business')>-1||hdrs[bi].indexOf('farm name')>-1){bizIdx=bi;break;}}}
+            // Last resort: use first column
+            if(bizIdx===-1)bizIdx=0;
 
             function mapCategory(raw){
               if(!raw)return'Other';
@@ -5514,7 +5565,7 @@ function renderManage(){
                 status:appStatus,
                 vendor_status:vs,
                 business_name:bizName,
-                contact_name:colByName(row,'primary contact name')||colByName(row,'contact name'),
+                contact_name:colByName(row,'primary contact name')||colByName(row,'contact name')||colByName(row,'contact'),
                 email:email,
                 phone:colByName(row,'phone'),
                 website:colByName(row,'website and/or social media links')||colByName(row,'website'),
@@ -5537,7 +5588,7 @@ function renderManage(){
                 photos:existing?(existing.photos||[]):[],
                 food_docs:existing?(existing.foodDocs||[]):[],
                 selected_dates:existing?(existing.selectedDates||[]):[],
-                contract_received:existing?existing.contractReceived||false:false,
+                contract_received:existing?existing.contractReceived||false:(colByName(row,'contract signed')||colByName(row,'contract received')||colByName(row,'insurance')?true:false),
                 payment_received:existing?existing.paymentReceived||false:false,
                 booth_fee:existing?existing.boothFee||0:0,
                 status:existing?existing.status||appStatus:appStatus,
