@@ -216,7 +216,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-21 Rev 2</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-21 Rev 3</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -831,7 +831,39 @@ function renderVendors(){
 }
 async function setSt(id,val){await sb.from('vendors').update({status:val}).eq('id',id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}var v=vendors.find(function(x){return x.id===id;});if(v){v.status=val;v.modifiedAt=nowISO();}render();}
 async function setVs(id,val){await sb.from('vendors').update({vendor_status:val}).eq('id',id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}var v=vendors.find(function(x){return x.id===id;});if(v){v.vendorStatus=val;v.modifiedAt=nowISO();}render();}
-async function delV(id){if(!confirm('Remove this vendor?'))return;await sb.from('vendors').delete().eq('id',id);vendors=vendors.filter(function(v){return v.id!==id;});render();}
+function loadArchive(){try{var r=localStorage.getItem(ARCHIVE_KEY);return r?JSON.parse(r):[];}catch(e){return[];}}
+function saveArchive(a){try{localStorage.setItem(ARCHIVE_KEY,JSON.stringify(a));}catch(e){}}
+async function delV(id){
+  if(!confirm('Remove this vendor? A backup will be saved so they can be restored later.'))return;
+  var v=vendors.find(function(x){return x.id===id;});
+  if(v){
+    // Collect all associated data
+    var vCalDates=Object.keys(calRows).filter(function(ds){
+      var r=calRows[ds];return(r.approved||[]).indexOf(id)>-1||(r.waitlist||[]).indexOf(id)>-1;
+    });
+    var vInvoices=invoices.filter(function(inv){return inv.vendor_id===id;});
+    var vTentAssignments={};
+    Object.keys(calRows).forEach(function(ds){
+      var ta=calRows[ds].tent_assignments||{};
+      Object.keys(ta).forEach(function(sid){if(ta[sid]===id)vTentAssignments[ds]=sid;});
+    });
+    var archived={
+      archivedAt:nowISO(),
+      vendor:v,
+      calendarDates:vCalDates,
+      tentAssignments:vTentAssignments,
+      invoices:vInvoices
+    };
+    var archive=loadArchive();
+    // Remove any previous archive entry for same vendor id
+    archive=archive.filter(function(a){return a.vendor.id!==id;});
+    archive.unshift(archived);
+    saveArchive(archive);
+  }
+  await sb.from('vendors').delete().eq('id',id);
+  vendors=vendors.filter(function(v){return v.id!==id;});
+  render();
+}
 // ── CALENDAR ─────────────────────────────────────────────────────────────
 var calView='calendar'; // 'calendar' or 'matrix'
 
@@ -840,16 +872,37 @@ function renderCalendar(){
   var full=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   // Sub-tab nav
-  var subnav='<div style="display:flex;gap:6px;margin-bottom:.85rem">'+
+  var subnav='<div style="display:flex;gap:6px;margin-bottom:.85rem;flex-wrap:wrap">'+
     '<button class="'+(calView==='calendar'?'btn-p':'btn-s')+'" id="calViewBtn">📅 Calendar</button>'+
-    '<button class="'+(calView==='matrix'?'btn-p':'btn-s')+'" id="matrixViewBtn">📊 Scheduling Matrix</button>'+
+    '<button class="'+(calView==='matrix'?'btn-p':'btn-s')+'" id="matrixViewBtn">📊 Scheduling</button>'+
+    '<button class="'+(calView==='paid'?'btn-p':'btn-s')+'" id="paidViewBtn">✅ Paid</button>'+
+    '<button class="'+(calView==='outstanding'?'btn-p':'btn-s')+'" id="outViewBtn">⚠️ Outstanding</button>'+
   '</div>';
 
   if(calView==='matrix'){
     el.innerHTML=subnav+buildSchedulingMatrix();
     document.getElementById('calViewBtn').addEventListener('click',function(){calView='calendar';renderCalendar();});
     document.getElementById('matrixViewBtn').addEventListener('click',function(){calView='matrix';renderCalendar();});
+    document.getElementById('paidViewBtn').addEventListener('click',function(){calView='paid';renderCalendar();});
+    document.getElementById('outViewBtn').addEventListener('click',function(){calView='outstanding';renderCalendar();});
     wireSchedulingMatrix();
+    return;
+  }
+  if(calView==='paid'||calView==='outstanding'){
+    if(calView==='outstanding')loadInvoices().then(function(){
+      el.innerHTML=subnav+buildPaymentMatrix(false);
+      document.getElementById('calViewBtn').addEventListener('click',function(){calView='calendar';renderCalendar();});
+      document.getElementById('matrixViewBtn').addEventListener('click',function(){calView='matrix';renderCalendar();});
+      document.getElementById('paidViewBtn').addEventListener('click',function(){calView='paid';renderCalendar();});
+      document.getElementById('outViewBtn').addEventListener('click',function(){calView='outstanding';renderCalendar();});
+    });
+    else{
+      el.innerHTML=subnav+buildPaymentMatrix(true);
+      document.getElementById('calViewBtn').addEventListener('click',function(){calView='calendar';renderCalendar();});
+      document.getElementById('matrixViewBtn').addEventListener('click',function(){calView='matrix';renderCalendar();});
+      document.getElementById('paidViewBtn').addEventListener('click',function(){calView='paid';renderCalendar();});
+      document.getElementById('outViewBtn').addEventListener('click',function(){calView='outstanding';renderCalendar();});
+    }
     return;
   }
   var ds2=['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -868,6 +921,8 @@ function renderCalendar(){
     (selectedCalDay?buildDayPanel(selectedCalDay):'');
   document.getElementById('calViewBtn').addEventListener('click',function(){calView='calendar';renderCalendar();});
   document.getElementById('matrixViewBtn').addEventListener('click',function(){calView='matrix';renderCalendar();});
+  document.getElementById('paidViewBtn').addEventListener('click',function(){calView='paid';renderCalendar();});
+  document.getElementById('outViewBtn').addEventListener('click',function(){calView='outstanding';renderCalendar();});
   document.getElementById('calPrev').addEventListener('click',function(){cM--;if(cM<0){cM=11;cY--;}renderCalendar();});
   document.getElementById('calNext').addEventListener('click',function(){cM++;if(cM>11){cM=0;cY++;}renderCalendar();});
   document.getElementById('calGrid').addEventListener('click',function(e){var cell=e.target.closest('[data-date]');if(cell){selectedCalDay=selectedCalDay===cell.dataset.date?'':cell.dataset.date;renderCalendar();}});
@@ -940,6 +995,98 @@ function buildSchedulingMatrix(){
   });
 
   html+='</tbody></table></div></div>';
+  return html;
+}
+
+function buildPaymentMatrix(showPaid){
+  var dates=getMarketDates();
+  if(!dates.length)return'<div class="empty">No market dates configured yet.</div>';
+
+  // Build lookup: vendor+date -> invoice status
+  function getInvStatus(vid,ds){
+    var inv=invoices.filter(function(i){return i.vendor_id===vid&&i.dates&&i.dates.indexOf(ds)>-1;})
+      .sort(function(a,b){return(b.created_at||'').localeCompare(a.created_at||'');});
+    return inv[0]||null;
+  }
+
+  var sorted;
+  if(showPaid){
+    sorted=vendors.filter(function(v){
+      return dates.some(function(ds){return getApproved(ds).indexOf(v.id)>-1;});
+    }).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
+  } else {
+    // Outstanding: only vendors with at least one sent/draft (unpaid) invoice
+    sorted=vendors.filter(function(v){
+      return invoices.some(function(i){return i.vendor_id===v.id&&(i.status==='sent'||i.status==='draft');});
+    }).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
+  }
+
+  if(!sorted.length)return'<div class="empty">'+(showPaid?'No paid invoices yet.':'No outstanding invoices.')+'</div>';
+
+  var html=
+    '<div style="font-size:11px;color:#888;margin-bottom:.5rem">'+
+      (showPaid?'✅ Green = paid for that date · click vendor row to open their record':'⚠️ Vendors with sent/draft invoices not yet paid · click row to open vendor form')+
+    '</div>'+
+    '<div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 220px)">'+
+    '<table class="report-table" style="min-width:100%;border-collapse:separate;border-spacing:0">'+
+    '<thead><tr>'+
+    '<th style="min-width:180px;position:sticky;top:0;left:0;background:#f8f7f4;z-index:4">Vendor</th>'+
+    '<th style="min-width:70px;position:sticky;top:0;left:180px;background:#f8f7f4;z-index:4">Booth</th>'+
+    dates.map(function(ds){
+      var parts=ds.split('-');var m=parseInt(parts[1])-1;var d=parseInt(parts[2]);
+      var mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m];
+      return'<th style="min-width:54px;text-align:center;font-size:10px;white-space:nowrap;position:sticky;top:0;background:#f8f7f4;z-index:3">'+mn+'<br><strong>'+d+'</strong></th>';
+    }).join('')+
+    '</tr></thead><tbody>';
+
+  sorted.forEach(function(v){
+    var av=avc(v.businessName||'?');
+    var rowCells=dates.map(function(ds){
+      var inv=getInvStatus(v.id,ds);
+      var isScheduled=getApproved(ds).indexOf(v.id)>-1;
+      if(showPaid&&!isScheduled)return'<td style="text-align:center;background:#fafafa;color:#ddd;font-size:11px">–</td>';
+      var isPaid=inv&&inv.status==='paid';
+      var isSent=inv&&inv.status==='sent';
+      var isDraft=inv&&inv.status==='draft';
+
+      if(showPaid){
+        if(!isScheduled)return'<td style="text-align:center;background:#fafafa;color:#ddd;font-size:11px">–</td>';
+        if(isPaid){
+          var method=inv.payment_method?'<div style="font-size:8px;color:#27500A;font-weight:700">'+esc(inv.payment_method)+'</div>':'';
+          return'<td style="text-align:center;background:#EAF3DE;padding:4px 2px">'+
+            '<div style="font-size:13px">✅</div>'+method+'</td>';
+        } else {
+          return'<td style="text-align:center;background:#f8f7f4;color:#ccc;font-size:11px">·</td>';
+        }
+      } else {
+        // Outstanding: only show dates covered by a sent/draft invoice
+        if(!inv||inv.status==='paid') return'<td style="text-align:center;background:#fafafa;color:#ddd;font-size:11px">–</td>';
+        if(isSent) return'<td style="text-align:center;background:#FCEBEB;padding:4px 2px"><div style="font-size:10px;font-weight:700;color:#791F1F">📧</div><div style="font-size:8px;color:#791F1F;font-weight:600">Sent</div></td>';
+        if(isDraft) return'<td style="text-align:center;background:#FCEBEB;padding:4px 2px"><div style="font-size:10px;font-weight:700;color:#791F1F">📄</div><div style="font-size:8px;color:#791F1F;font-weight:600">Draft</div></td>';
+        return'<td style="text-align:center;background:#fafafa;color:#ddd;font-size:11px">–</td>';
+      }
+    }).join('');
+
+    html+='<tr style="cursor:pointer" data-open-vendor="'+v.id+'">'+
+      '<td style="position:sticky;left:0;background:#fff;z-index:1;min-width:180px">'+
+        '<div style="display:flex;align-items:center;gap:7px">'+
+          '<div style="width:26px;height:26px;border-radius:50%;background:'+av.bg+';color:'+av.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+          '<div style="font-weight:600;font-size:12px">'+esc(v.businessName||'—')+'</div>'+
+        '</div>'+
+      '</td>'+
+      '<td style="position:sticky;left:180px;background:#fff;z-index:1;font-size:11px;color:#888;min-width:70px">'+esc(v.boothSize||'—')+'</td>'+
+      rowCells+
+    '</tr>';
+  });
+
+  html+='</tbody></table></div>';
+
+  setTimeout(function(){
+    document.querySelectorAll('[data-open-vendor]').forEach(function(row){
+      row.addEventListener('click',function(){openForm(row.dataset.openVendor);});
+    });
+  },0);
+
   return html;
 }
 
@@ -1030,27 +1177,16 @@ function buildDayPanel(ds){
   var assigned=Object.keys(ta).filter(function(k){return ta[k];}).length;
   var unassigned=appV.length-assigned;
 
-  var header=
-    '<div class="day-report-header">'+
-      '<div>'+
-        '<div style="font-size:14px;font-weight:700">📅 '+ds+'</div>'+
-        '<div style="font-size:11px;color:#888;margin-top:2px">'+
-          total+' vendor'+(total!==1?'s':'')+' · '+
-          appV.length+' approved · '+wlV.length+' waitlisted'+
-        '</div>'+
-        // Spot assignment summary
-        (appV.length?
-          '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'+
-            '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">⛺ '+assigned+' spot'+(assigned!==1?'s':'')+' assigned</span>'+
-            (unassigned>0?'<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806;font-weight:600">⚠️ '+unassigned+' unassigned</span>':'<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">✓ All spots assigned</span>')+
-          '</div>':'')+
-      '</div>'+
-      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">'+
-        '<button class="btn-blue" id="manageDayBtn">+ Manage vendors</button>'+
-        '<button class="btn-s" style="font-size:11px" id="exportDayBtn">↓ Export</button>'+
-        '<button class="btn-s" style="font-size:11px" id="closeDayBtn">✕</button>'+
-      '</div>'+
-    '</div>';
+  // Payment buckets — invoice counts as paid for this date if it covers ds and status=paid
+  var paidV=[],outstandingV=[];
+  appV.concat(wlV).forEach(function(v){
+    var inv=invoices.filter(function(i){
+      return i.vendor_id===v.id&&i.dates&&i.dates.indexOf(ds)>-1;
+    }).sort(function(a,b){return(b.created_at||'').localeCompare(a.created_at||'');});
+    var latest=inv[0]||null;
+    if(latest&&latest.status==='paid') paidV.push({v:v,inv:latest});
+    else outstandingV.push({v:v,inv:latest});
+  });
 
   function vcard(v,isWL){
     var cc=catColor(v.category);var wasInactive=v.vendorStatus==='inactive';
@@ -1058,7 +1194,7 @@ function buildDayPanel(ds){
       '<div class="dvc-avatar" style="background:'+cc.bg+';color:'+cc.text+';border:1.5px solid '+cc.border+'">'+ini(v.businessName||'?')+'</div>'+
       '<div style="flex:1;min-width:0">'+
         '<div style="font-size:13px;font-weight:600">'+esc(v.businessName||'Unnamed')+
-          (wasInactive?'<span style="font-size:9px;font-weight:500;background:#FCEBEB;color:#791F1F;padding:1px 6px;border-radius:20px;margin-left:6px;vertical-align:middle">Now inactive</span>':'')+
+          (wasInactive?'<span style="font-size:9px;font-weight:500;background:#FCEBEB;color:#791F1F;padding:1px 6px;border-radius:20px;margin-left:6px;vertical-align:middle">Inactive</span>':'')+
         '</div>'+
         '<div style="font-size:11px;color:#888;margin-top:2px">'+esc(v.contactName||'')+(v.phone?' · '+esc(v.phone):'')+'</div>'+
         ((v.electricity||v.boothSize)?'<div style="font-size:10px;color:#888;margin-top:2px">'+
@@ -1071,23 +1207,94 @@ function buildDayPanel(ds){
           (v.contractReceived?'<span class="tag tag-contract">📄</span>':'')+
         '</div>'+
       '</div>'+
-      '<div style="font-size:11px;color:#aaa;flex-shrink:0">✏️</div>'+
     '</div>';
   }
 
-  var cards='';
-  if(!total)cards='<div style="padding:1.25rem;text-align:center;color:#aaa;font-size:12px">No vendors yet.<br><button class="btn-p" style="margin-top:.75rem;font-size:11px" id="addVendorDayBtn">+ Add vendors</button></div>';
-  else{
-    if(appV.length)cards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-bottom:.5px solid #e5e3de">Approved ('+appV.length+')</div>'+appV.map(function(v){return vcard(v,false);}).join('');
-    if(wlV.length)cards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-top:.5px solid #e5e3de">Waitlist ('+wlV.length+')</div>'+wlV.map(function(v){return vcard(v,true);}).join('');
+  function payCard(item,isPaid){
+    var v=item.v,inv=item.inv;
+    var cc=catColor(v.category);
+    var fee=inv?inv.total||0:feeForBoothSize(v.boothSize||'');
+    var badge=isPaid
+      ?'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#EAF3DE;color:#27500A">✅ Paid'+(inv&&inv.payment_method?' · '+esc(inv.payment_method):'')+'</span>'
+      :inv
+        ?inv.status==='sent'
+          ?'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#E8EEFF;color:#3050C8">📧 Sent</span>'
+          :'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#f0ede6;color:#888">📄 Draft</span>'
+        :'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FAEEDA;color:#633806">⚠️ No invoice</span>';
+    return'<div class="day-vendor-card" data-vid="'+v.id+'">'+
+      '<div class="dvc-avatar" style="background:'+cc.bg+';color:'+cc.text+';border:1.5px solid '+cc.border+'">'+ini(v.businessName||'?')+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:13px;font-weight:600">'+esc(v.businessName||'')+'</div>'+
+        '<div style="font-size:10px;color:#888;margin-top:2px">'+esc(v.boothSize||'—')+'</div>'+
+        '<div style="margin-top:4px">'+badge+'</div>'+
+      '</div>'+
+      '<div style="font-size:13px;font-weight:700;color:'+(isPaid?'#27500A':'#a16207');+'flex-shrink:0">'+(fee?'$'+fee.toFixed(2):'—')+'</div>'+
+    '</div>';
   }
 
-  var panel='<div class="day-report">'+header+cards+'</div>';
+  var schedCards='';
+  if(!total)schedCards='<div style="padding:1.25rem;text-align:center;color:#aaa;font-size:12px">No vendors yet.<br><button class="btn-p" style="margin-top:.75rem;font-size:11px" id="addVendorDayBtn">+ Add vendors</button></div>';
+  else{
+    if(appV.length)schedCards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-bottom:.5px solid #e5e3de">Approved ('+appV.length+')</div>'+appV.map(function(v){return vcard(v,false);}).join('');
+    if(wlV.length)schedCards+='<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;background:#f8f7f4;border-top:.5px solid #e5e3de">Waitlist ('+wlV.length+')</div>'+wlV.map(function(v){return vcard(v,true);}).join('');
+  }
+
+  var totalPaid=paidV.reduce(function(s,x){return s+(x.inv?x.inv.total||0:0);},0);
+  var totalOwed=outstandingV.reduce(function(s,x){return s+(x.inv?x.inv.total||0:0);},0);
+
+  var paidCards=paidV.length
+    ?'<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#27500A;text-transform:uppercase;background:#EAF3DE;border-bottom:.5px solid #c5e0a8">Paid · $'+totalPaid.toFixed(2)+'</div>'+paidV.map(function(x){return payCard(x,true);}).join('')
+    :'<div style="padding:1.25rem;text-align:center;color:#aaa;font-size:12px">No paid vendors yet.</div>';
+
+  var outCards=outstandingV.length
+    ?'<div style="padding:.45rem 1rem;font-size:10px;font-weight:700;color:#a16207;text-transform:uppercase;background:#FAEEDA;border-bottom:.5px solid #f0cfa0">Outstanding · $'+totalOwed.toFixed(2)+'</div>'+outstandingV.map(function(x){return payCard(x,false);}).join('')
+    :'<div style="padding:1.25rem;text-align:center;color:#aaa;font-size:12px">No outstanding invoices.</div>';
+
+  var tabBtn='flex:1;padding:7px 4px;font-size:11px;font-weight:700;font-family:inherit;border:none;border-bottom:2px solid transparent;cursor:pointer;background:#f8f7f4;color:#888';
+  var tabBtnActive='flex:1;padding:7px 4px;font-size:11px;font-weight:700;font-family:inherit;border:none;border-bottom:2px solid #27500A;cursor:pointer;background:#fff;color:#27500A';
+
+  var panel='<div class="day-report">'+
+    '<div class="day-report-header">'+
+      '<div>'+
+        '<div style="font-size:14px;font-weight:700">📅 '+ds+'</div>'+
+        '<div style="font-size:11px;color:#888;margin-top:2px">'+total+' vendor'+(total!==1?'s':'')+' · '+appV.length+' approved · '+wlV.length+' waitlisted</div>'+
+        (appV.length?
+          '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'+
+            '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">⛺ '+assigned+' spot'+(assigned!==1?'s':'')+' assigned</span>'+
+            (unassigned>0?'<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806;font-weight:600">⚠️ '+unassigned+' unassigned</span>':'<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">✓ All spots assigned</span>')+
+          '</div>':'')+'</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">'+
+        '<button class="btn-blue" id="manageDayBtn">+ Manage</button>'+
+        '<button class="btn-s" style="font-size:11px" id="exportDayBtn">↓ CSV</button>'+
+        '<button class="btn-s" style="font-size:11px" id="closeDayBtn">✕</button>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;border-bottom:1px solid #e5e3de;background:#f8f7f4" id="dayTabs">'+
+      '<button style="'+tabBtnActive+'" data-daytab="sched">📋 Scheduled ('+total+')</button>'+
+      '<button style="'+tabBtn+'" data-daytab="paid">✅ Paid ('+paidV.length+')</button>'+
+      '<button style="'+tabBtn+'" data-daytab="out">⚠️ Outstanding ('+outstandingV.length+')</button>'+
+    '</div>'+
+    '<div id="dayTabSched">'+schedCards+'</div>'+
+    '<div id="dayTabPaid" style="display:none">'+paidCards+'</div>'+
+    '<div id="dayTabOut" style="display:none">'+outCards+'</div>'+
+  '</div>';
+
   setTimeout(function(){
+    // Tab switching
+    document.querySelectorAll('[data-daytab]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        document.querySelectorAll('[data-daytab]').forEach(function(b){b.style=tabBtn;});
+        btn.style=tabBtnActive;
+        document.getElementById('dayTabSched').style.display='none';
+        document.getElementById('dayTabPaid').style.display='none';
+        document.getElementById('dayTabOut').style.display='none';
+        var which=btn.dataset.daytab;
+        document.getElementById('dayTab'+which.charAt(0).toUpperCase()+which.slice(1)).style.display='';
+      });
+    });
     var mb=document.getElementById('manageDayBtn');if(mb)mb.addEventListener('click',function(){openDayManage(ds);});
     var cb=document.getElementById('closeDayBtn');if(cb)cb.addEventListener('click',function(){selectedCalDay='';renderCalendar();});
     var ab=document.getElementById('addVendorDayBtn');if(ab)ab.addEventListener('click',function(){openDayManage(ds);});
-    // Jump to Layout tab for this date
     var sl=document.getElementById('sendLayoutBtn');if(sl)sl.addEventListener('click',function(){sendLayoutToVendors(ds);});
     var gl=document.getElementById('goLayoutBtn');if(gl)gl.addEventListener('click',function(){
       layoutDate=ds;tab='layout';
@@ -1095,14 +1302,12 @@ function buildDayPanel(ds){
       document.querySelector('[data-tab="layout"]').classList.add('active');
       closeMod();render();
     });
-    // Jump to Assignments tab for this date
     var ga=document.getElementById('goAssignBtn');if(ga)ga.addEventListener('click',function(){
       tentViewDate=ds;tab='tents';
       document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('active');});
       document.querySelector('[data-tab="tents"]').classList.add('active');
       closeMod();render();
     });
-    // Export day attendees as CSV
     var ex=document.getElementById('exportDayBtn');if(ex)ex.addEventListener('click',function(){
       var rows=[['Business Name','Contact','Email','Phone','Category','Vendor Status','Spot','Contract','Payment']];
       appV.forEach(function(v){rows.push([v.businessName||'',v.contactName||'',v.email||'',v.phone||'',v.category||'',v.vendorStatus||'active',vendorTent[v.id]||'Unassigned',v.contractReceived?'Yes':'No',v.paymentReceived?'Yes':'No']);});
@@ -1112,9 +1317,9 @@ function buildDayPanel(ds){
   },0);
   return panel;
 }
-function openDayManage(ds){
+function openDayManage(ds,startTab){
+  var activeTab=startTab||'schedule';
   var da=getApproved(ds);
-  // Show ALL vendors regardless of status
   var approved=vendors.filter(function(v){return v.status==='approved';}).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
   var waitlisted=vendors.filter(function(v){return v.status==='waitlist';}).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
   var pending=vendors.filter(function(v){return v.status==='pending';}).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
@@ -1140,9 +1345,65 @@ function openDayManage(ds){
     '</label>';
   }
 
+  function mkPaymentView(){
+    var scheduled=da.map(function(id){return vendors.find(function(x){return x.id===id;});}).filter(Boolean).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});
+    if(!scheduled.length)return'<div style="font-size:12px;color:#aaa;padding:1rem;text-align:center">No vendors scheduled for this date.</div>';
+
+    var paid=[],outstanding=[];
+    scheduled.forEach(function(v){
+      var inv=invoices.filter(function(i){return i.vendor_id===v.id&&i.dates&&i.dates.indexOf(ds)>-1;}).sort(function(a,b){return(b.created_at||'').localeCompare(a.created_at||'');});
+      var latestInv=inv[0]||null;
+      if(latestInv&&latestInv.status==='paid') paid.push({v:v,inv:latestInv});
+      else outstanding.push({v:v,inv:latestInv});
+    });
+
+    var totalPaid=paid.reduce(function(s,x){return s+(x.inv?x.inv.total||0:0);},0);
+    var totalOwed=outstanding.reduce(function(s,x){return s+(x.inv?x.inv.total||0:0);},0);
+    var fees=loadFeeSchedule();
+
+    function payRow(item,isPaid){
+      var v=item.v,inv=item.inv;
+      var cc=catColor(v.category);
+      var fee=inv?inv.total||0:feeForBoothSize(v.boothSize||'');
+      var badge=isPaid
+        ?'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#EAF3DE;color:#27500A">✅ Paid'+(inv&&inv.payment_method?' · '+esc(inv.payment_method):'')+'</span>'
+        :inv
+          ?inv.status==='sent'
+            ?'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#E8EEFF;color:#3050C8">📧 Invoice sent</span>'
+            :'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#f0ede6;color:#888">📄 Draft</span>'
+          :'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FAEEDA;color:#633806">⚠️ No invoice</span>';
+      return'<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:.5px solid #f0ede6">'+
+        '<div style="width:26px;height:26px;border-radius:50%;background:'+cc.bg+';color:'+cc.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(v.businessName||'')+'</div>'+
+          '<div style="font-size:10px;color:#888">'+esc(v.boothSize||'—')+'</div>'+
+        '</div>'+
+        '<div style="text-align:right;flex-shrink:0">'+
+          badge+
+          '<div style="font-size:11px;font-weight:700;color:'+(isPaid?'#27500A':'#a16207');+'margin-top:2px">'+(fee?'$'+fee.toFixed(2):'—')+'</div>'+
+        '</div>'+
+      '</div>';
+    }
+
+    return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;padding:.6rem .75rem;background:#f8f7f4;border-radius:10px;flex-wrap:wrap;gap:6px">'+
+      '<span style="font-size:12px;font-weight:700;color:#27500A">✅ Paid: '+paid.length+' · $'+totalPaid.toFixed(2)+'</span>'+
+      '<span style="font-size:12px;font-weight:700;color:#a16207">⚠️ Outstanding: '+outstanding.length+' · $'+totalOwed.toFixed(2)+'</span>'+
+    '</div>'+
+    (paid.length?'<div style="font-size:9px;font-weight:700;color:#27500A;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Paid</div>'+paid.map(function(x){return payRow(x,true);}).join(''):'')+
+    (outstanding.length?'<div style="font-size:9px;font-weight:700;color:#a16207;text-transform:uppercase;letter-spacing:.05em;margin:'+(paid.length?'12px':'0')+' 0 4px">Outstanding</div>'+outstanding.map(function(x){return payRow(x,false);}).join(''):'')+
+    '<div style="font-size:10px;color:#aaa;margin-top:10px;text-align:center">Go to Invoices tab to send or mark payments</div>';
+  }
+
+  var activeTab='schedule';
+
   document.getElementById('modal-area').innerHTML=
     '<div class="overlay" id="dmOverlay"><div class="modal md">'+
-    '<div class="mtitle">📅 '+ds+' — Schedule vendors</div>'+
+    '<div class="mtitle">📅 '+ds+'</div>'+
+    '<div style="display:flex;gap:0;margin-bottom:.85rem;border:.5px solid #d0cec7;border-radius:8px;overflow:hidden">'+
+      '<button id="dmTabSched" style="flex:1;padding:7px;font-size:12px;font-weight:700;font-family:inherit;border:none;cursor:pointer;background:#27500A;color:#fff">📋 Schedule</button>'+
+      '<button id="dmTabPay" style="flex:1;padding:7px;font-size:12px;font-weight:700;font-family:inherit;border:none;cursor:pointer;background:#f8f7f4;color:#888">💰 Payments</button>'+
+    '</div>'+
+    '<div id="dmSchedPanel">'+
     (allShown.length===0
       ?'<div class="notice warn">⚠️ No vendors found. Add vendors in the Vendors tab first.</div>'
       :'<div style="font-size:11px;color:#888;margin-bottom:.65rem">'+approved.length+' approved vendor'+(approved.length!==1?'s':'')+' · '+da.length+' currently scheduled. Check all attending this date.</div>'+
@@ -1152,14 +1413,39 @@ function openDayManage(ds){
           '<button type="button" id="dmClrAll" style="font-size:13px;font-weight:700;padding:7px 14px;border-radius:20px;border:.5px solid #d0cec7;background:#f8f7f4;cursor:pointer;font-family:inherit">Clear all</button>'+
           '<span id="dmCount" style="font-size:10px;color:#888;margin-left:4px;line-height:2">'+da.length+' selected</span>'+
         '</div>'+
-        '<div style="max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:3px" id="vendorList">'+
+        '<div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:3px" id="vendorList">'+
           (approved.length?'<div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:4px 2px">Approved</div>'+approved.map(mkRow).join(''):'')+ 
           (waitlisted.length?'<div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:8px 2px 4px">Waitlist</div>'+waitlisted.map(mkRow).join(''):'')+ 
           (pending.length?'<div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:8px 2px 4px">Pending</div>'+pending.map(mkRow).join(''):'')+
         '</div>')+
+    '</div>'+
+    '<div id="dmPayPanel" style="display:none;max-height:380px;overflow-y:auto">'+mkPaymentView()+'</div>'+
     '<div class="mfoot" id="dmFoot"></div></div></div>';
 
+  // Tab switching
+  document.getElementById('dmTabSched').addEventListener('click',function(){
+    activeTab='schedule';
+    this.style.background='#27500A';this.style.color='#fff';
+    document.getElementById('dmTabPay').style.background='#f8f7f4';document.getElementById('dmTabPay').style.color='#888';
+    document.getElementById('dmSchedPanel').style.display='';
+    document.getElementById('dmPayPanel').style.display='none';
+    document.getElementById('dmFoot').style.display='';
+  });
+  document.getElementById('dmTabPay').addEventListener('click',function(){
+    activeTab='payment';
+    this.style.background='#27500A';this.style.color='#fff';
+    document.getElementById('dmTabSched').style.background='#f8f7f4';document.getElementById('dmTabSched').style.color='#888';
+    document.getElementById('dmSchedPanel').style.display='none';
+    document.getElementById('dmPayPanel').style.display='';
+    document.getElementById('dmFoot').style.display='none';
+  });
+
   document.getElementById('dmOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
+
+  // Initialize to correct starting tab
+  if(activeTab==='payments'){
+    document.getElementById('dmTabPay').click();
+  }
 
   var s=document.getElementById('vendorSearch');
   if(s){
@@ -3983,6 +4269,7 @@ function openForm(id){
                   '<div style="font-size:11px;font-weight:600;color:'+(inv.paid_at?'#27500A':'#aaa')+'">'+
                     (inv.paid_at?'✅ '+fmtDate(inv.paid_at):'—')+
                   '</div>'+
+                  (inv.paid_at&&inv.payment_method?'<div style="font-size:9px;font-weight:700;color:#3050C8;margin-top:2px">💸 via '+esc(inv.payment_method)+'</div>':'')+
                 '</div>'+
               '</div>'+
               '<div style="display:flex;gap:5px;flex-wrap:wrap">'+
@@ -4091,6 +4378,7 @@ function openForm(id){
         var{error}=await sb.from('invoices').delete().eq('id',id);
         if(error){alert('Error deleting: '+error.message);return;}
         invoices=invoices.filter(function(x){return x.id!==id;});
+        if(tab==='calendar')renderCalendar();
         fInv.click();
       });
     });
@@ -4349,7 +4637,7 @@ async function renderPayments(){
         invThSort('status','Status')+
         invThSort('sent','📧 Sent')+
         invThSort('paid','✅ Paid')+
-        '<th>Payment Link</th>'+
+        ''+
       '</tr></thead>'+
       '<tbody>'+
       (invoices.length
@@ -4389,9 +4677,7 @@ async function renderPayments(){
             '<td style="font-size:12px;font-weight:'+(inv.paid_at?'700':'400')+';color:'+(inv.paid_at?'#27500A':'#aaa')+';white-space:nowrap">'+
               (inv.paid_at?'✅ '+fmtDateMDY(inv.paid_at):'—')+
             '</td>'+
-            '<td>'+
-              (inv.stripe_payment_link?'<a href="'+esc(inv.stripe_payment_link)+'" target="_blank" style="font-size:11px;color:#378ADD;text-decoration:none;white-space:nowrap">🔗 Pay link ↗</a>':'<span style="color:#aaa;font-size:11px">—</span>')+
-            '</td>'+
+
           '</tr>';
         }).join('')
         :'<tr><td colspan="10" style="text-align:center;color:#aaa;padding:2rem;font-size:12px">No invoices yet. Click + New invoice to get started.</td></tr>')+
@@ -4611,6 +4897,7 @@ async function renderPayments(){
       var{error}=await sb.from('invoices').delete().eq('id',id);
       if(error){alert('Error deleting: '+error.message);return;}
       invoices=invoices.filter(function(x){return x.id!==id;});
+      if(tab==='calendar')renderCalendar();
       renderPayments();
     });
   });
@@ -4757,29 +5044,10 @@ function feeForBoothSize(boothSize){
 }
 
 function invStatusBadge(status){
-  if(status==='paid'){
-    return'<div style="display:flex;align-items:center;gap:6px">'+
-      '<div style="width:18px;height:18px;border-radius:4px;background:#27500A;flex-shrink:0"></div>'+
-      '<span style="font-size:12px;font-weight:800;color:#27500A">✅ PAID</span>'+
-    '</div>';
-  }
-  if(status==='overdue'){
-    return'<div style="display:flex;align-items:center;gap:6px">'+
-      '<div style="width:18px;height:18px;border-radius:4px;background:#791F1F;flex-shrink:0"></div>'+
-      '<span style="font-size:12px;font-weight:800;color:#791F1F">⚠️ OVERDUE</span>'+
-    '</div>';
-  }
-  if(status==='sent'){
-    return'<div style="display:flex;align-items:center;gap:6px">'+
-      '<div style="width:18px;height:18px;border-radius:4px;background:#c0392b;flex-shrink:0"></div>'+
-      '<span style="font-size:12px;font-weight:800;color:#c0392b">📧 UNPAID</span>'+
-    '</div>';
-  }
-  // draft
-  return'<div style="display:flex;align-items:center;gap:6px">'+
-    '<div style="width:18px;height:18px;border-radius:4px;background:#c0392b;flex-shrink:0"></div>'+
-    '<span style="font-size:12px;font-weight:800;color:#888">📝 DRAFT</span>'+
-  '</div>';
+  if(status==='paid')return'<span style="font-size:12px;font-weight:800;color:#27500A">✅ PAID</span>';
+  if(status==='overdue')return'<span style="font-size:12px;font-weight:800;color:#791F1F">⚠️ OVERDUE</span>';
+  if(status==='sent')return'<span style="font-size:12px;font-weight:800;color:#c0392b">📧 UNPAID</span>';
+  return'<span style="font-size:12px;font-weight:800;color:#888">📝 DRAFT</span>';
 }
 
 function invThSort(col,label){
@@ -4856,7 +5124,7 @@ async function renderInvoiceSection(){
         invThSort('vendor','Vendor')+
         '<th>Dates</th>'+
         invThSort('amount','Amount')+
-        '<th>Payment Link</th>'+
+        ''+
         invThSort('status','Status')+
         invThSort('sent','📧 Sent')+
         invThSort('due','Due')+
@@ -4882,7 +5150,7 @@ async function renderInvoiceSection(){
             '<td>'+
               (inv.stripe_payment_link
                 ?'<a href="'+esc(inv.stripe_payment_link)+'" target="_blank" style="font-size:11px;color:#378ADD;text-decoration:none;display:inline-flex;align-items:center;gap:3px">🔗 Pay link ↗</a>'+
-                  '<div style="font-size:9px;color:#aaa;word-break:break-all;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(inv.stripe_payment_link)+'">'+esc(inv.stripe_payment_link)+'</div>'
+                  ''
                 :'<span style="font-size:11px;color:#aaa">—</span>')+
             '</td>'+
             '<td>'+invStatusBadge(displayStatus)+'</td>'+
@@ -5023,6 +5291,28 @@ function openInvoiceModal(vendorId){
     vDates.sort();
   }
   var feePerDate=v?feeForBoothSize(v.boothSize):0;
+  // If fee is 0 and booth size isn't recognized, fall back to t10x10 fee
+  if(!feePerDate){var fs=loadFeeSchedule();feePerDate=fs.t10x10||0;}
+
+  // Find the most recently assigned tent spot size for this vendor
+  var assignedBoothSize=v?v.boothSize||'':'' ;
+  if(vendorId){
+    vDates.forEach(function(ds){
+      if(calRows[ds]&&calRows[ds].tent_assignments){
+        Object.keys(calRows[ds].tent_assignments).forEach(function(sid){
+          if(calRows[ds].tent_assignments[sid]===vendorId){
+            var lc=window._layoutCache&&window._layoutCache[ds];
+            if(lc){var sp=lc.find(function(s){return s.id===sid;});if(sp&&sp.size){assignedBoothSize=sp.size;}}
+          }
+        });
+      }
+    });
+    var spotFee=feeForBoothSize(assignedBoothSize);
+    if(spotFee)feePerDate=spotFee;
+  }
+
+  var boothSizeOptions=["10'x10'","10'x20'","20'x20'","20'x30'",'Food truck / trailer','Trailer','Trailer only','VAN','Bouncy Houses','Other'];
+  if(assignedBoothSize&&boothSizeOptions.indexOf(assignedBoothSize)===-1)boothSizeOptions.unshift(assignedBoothSize);
 
   document.getElementById('modal-area').innerHTML=
     '<div class="overlay" id="invModalOverlay"><div class="modal md" style="max-height:90vh;overflow-y:auto;min-width:480px">'+
@@ -5031,7 +5321,7 @@ function openInvoiceModal(vendorId){
     // Vendor + booth info strip
     (v?'<div style="background:#f8f7f4;border-radius:8px;padding:.65rem .85rem;margin-bottom:.85rem;font-size:12px">'+
       '<span style="font-weight:700">'+esc(v.businessName)+'</span>'+
-      (v.boothSize?' · '+esc(v.boothSize):'')+'</div>':'')+
+      (assignedBoothSize?' · <span style="font-weight:600">'+esc(assignedBoothSize)+'</span>':'')+'</div>':'')+
 
     // Vendor selector if no vendor pre-selected
     (!v?'<div class="fg"><label>Vendor</label>'+
@@ -5099,13 +5389,14 @@ function openInvoiceModal(vendorId){
     var sel=Array.from(document.querySelectorAll('#invDateList input:checked')).map(function(c){return c.value;});
     if(!sel.length){alert('Select at least one date.');return;}
     var fee=parseFloat(document.getElementById('inv_fee').value)||0;
+    var vv=vendors.find(function(x){return x.id===vid;})||{};
+    var selectedBoothSize=assignedBoothSize||vv.boothSize||'standard';
     var notes=((document.getElementById('inv_notes')||{}).value||'').trim();
     var total=sel.length*fee;
-    var vv=vendors.find(function(x){return x.id===vid;})||{};
     var row={
       id:uid(),vendor_id:vid,invoice_number:nextInvoiceNumber(),
       dates:sel,
-      line_items:sel.map(function(d){return{date:d,description:'Booth fee ('+(vv.boothSize||'standard')+')',amount:fee};}),
+      line_items:sel.map(function(d){return{date:d,description:'Booth fee ('+selectedBoothSize+')',amount:fee};}),
       subtotal:total,total:total,status:'draft',
       due_date:null,stripe_payment_link:'',notes:notes,
       created_at:nowISO(),modified_at:nowISO()
@@ -5114,10 +5405,15 @@ function openInvoiceModal(vendorId){
     var{error}=await sb.from('invoices').insert(row);
     if(error){alert('Error creating invoice: '+error.message);saveBtn.disabled=false;saveBtn.textContent='Create invoice';return;}
     invoices.unshift(row);
-    await loadInvoices(); // sync global array
-    alert('✅ Invoice '+row.invoice_number+' created for $'+total.toFixed(2)+'.');
-    // Return to vendor form if opened from vendor
-    if(vendorId){openForm(vendorId);}else{closeMod();}
+    await loadInvoices();
+    saveBtn.textContent='✅ Created!';
+    if(vendorId){
+      await openForm(vendorId);
+      setTimeout(function(){
+        var fInvBtn=document.getElementById('fInvoiceBtn');
+        if(fInvBtn)fInvBtn.click();
+      },300);
+    }else{closeMod();}
   });
   foot.appendChild(canBtn);foot.appendChild(saveBtn);
 }
@@ -5463,6 +5759,7 @@ function renderCommsGroups(){
 // Fees are stored in localStorage and applied as defaults when setting booth fees.
 
 var FEE_KEY='eb_booth_fee_schedule';
+var ARCHIVE_KEY='eb_archived_vendors';
 
 function loadFeeSchedule(){
   var def={t10x10:0,t10x20:0,t20x20:0,t20x30:0,ttruck:0,ttrailer:0,ttraileronly:0,tvan:0,tbouncy:0,tother:0};
@@ -5522,6 +5819,13 @@ function renderManage(){
         '<button class="btn-s" id="exportCalBtn2" style="text-align:left;display:flex;align-items:center;gap:8px"><span style="font-size:16px">📅</span><div><div style="font-weight:600">Calendar schedule</div><div style="font-size:10px;font-weight:400;opacity:.7">All dates and vendor lists</div></div></button>'+
       '</div>'+
     '</div>'+
+    '</div>'+
+
+    // ── Archived Vendors ───────────────────────────────────────────────────
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem;margin-bottom:.85rem">'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:4px">🗃 Archived Vendors</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:.85rem">Vendors removed from the system. Click Restore to add them back with all their calendar dates and invoices.</div>'+
+      '<div id="archivedVendorsContainer"></div>'+
     '</div>'+
 
     // ── Booth fee schedule ─────────────────────────────────────────────────
@@ -5763,17 +6067,32 @@ function renderManage(){
             statusEl.innerHTML='<span style="color:#a16207">⏳ Saving '+newRows.length+' vendors…</span>';
             console.log('Import: attempting to save',newRows.length,'rows');
             console.log('Sample row:', JSON.stringify(newRows[0]));
+            var newOnly=newRows.filter(function(r){return updatedIds.indexOf(r.id)===-1;});
+            var existingOnly=newRows.filter(function(r){return updatedIds.indexOf(r.id)>-1;});
             var CHUNK=5,errors=0,errorMsg='';
-            for(var c=0;c<newRows.length;c+=CHUNK){
-              var chunk=newRows.slice(c,c+CHUNK);
-              var res=await sb.from('vendors').upsert(chunk);
-              if(res.error){console.error('Chunk error:',res.error,'sample row:',JSON.stringify(chunk[0]));errorMsg=res.error.message;errors++;}
-              statusEl.innerHTML='<span style="color:#a16207">⏳ Saved '+(Math.min(c+CHUNK,newRows.length))+' / '+newRows.length+'…</span>';
+            // Update existing vendors
+            for(var c=0;c<existingOnly.length;c+=CHUNK){
+              var chunk=existingOnly.slice(c,c+CHUNK);
+              var res=await sb.from('vendors').upsert(chunk,{onConflict:'id'});
+              if(res.error){console.error('Update chunk error:',res.error);errorMsg=res.error.message;errors++;}
+              statusEl.innerHTML='<span style="color:#a16207">⏳ Updating '+(Math.min(c+CHUNK,existingOnly.length))+'/'+existingOnly.length+'…</span>';
+            }
+            // Insert new vendors
+            for(var c=0;c<newOnly.length;c+=CHUNK){
+              var chunk=newOnly.slice(c,c+CHUNK);
+              var res=await sb.from('vendors').insert(chunk);
+              if(res.error){
+                console.error('Insert chunk error:',res.error,'sample:',JSON.stringify(chunk[0]));
+                // Fallback to upsert if insert fails
+                res=await sb.from('vendors').upsert(chunk,{onConflict:'id'});
+                if(res.error){errorMsg=res.error.message;errors++;}
+              }
+              statusEl.innerHTML='<span style="color:#a16207">⏳ Adding new '+(Math.min(c+CHUNK,newOnly.length))+'/'+newOnly.length+'…</span>';
             }
             var created=newRows.length-updatedIds.length,updated=updatedIds.length;
             runBtn.disabled=false;runBtn.textContent='📥 Import vendors';
             if(errors){
-              statusEl.innerHTML='<span style="color:#791F1F">⚠️ Error: '+esc(errorMsg)+'</span>';
+              statusEl.innerHTML='<span style="color:#791F1F">⚠️ '+errors+' chunk error(s): '+esc(errorMsg)+' — check browser console for details</span>';
             } else {
               statusEl.innerHTML='<span style="color:#27500A;font-weight:600">✅ Done! Created: '+created+' · Updated: '+updated+' · Skipped: '+skipped+'</span>';
               csvData=[];
@@ -5897,6 +6216,69 @@ function renderManage(){
     for(var i=0;i<approved.length;i++){var v=approved[i];var fee=sizeMap[v.boothSize]||0;if(fee>0){await sb.from('vendors').update({booth_fee:fee}).eq('id',v.id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',v.id);}catch(e){}v.boothFee=fee;updated++;}}
     alert('✅ Updated '+updated+' vendor'+(updated!==1?'s':'')+'.');renderManage();
   });
+
+  // ── Archived Vendors section ───────────────────────────────────────────
+  (function renderArchived(){
+    var archive=loadArchive();
+    var container=document.getElementById('archivedVendorsContainer');
+    if(!container)return;
+    if(!archive.length){
+      container.innerHTML='<div style="font-size:12px;color:#aaa;padding:.5rem 0">No archived vendors.</div>';
+      return;
+    }
+    container.innerHTML=archive.map(function(entry,idx){
+      var v=entry.vendor||{};
+      var cc=catColor(v.category||'');
+      return'<div style="display:flex;align-items:center;gap:10px;padding:.75rem;border:.5px solid #e5e3de;border-radius:10px;background:#fff;margin-bottom:6px">'+
+        '<div style="width:32px;height:32px;border-radius:50%;background:'+cc.bg+';color:'+cc.text+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13px;font-weight:700">'+esc(v.businessName||'Unknown')+'</div>'+
+          '<div style="font-size:11px;color:#888">'+esc(v.category||'')+(v.email?' · '+esc(v.email):'')+'</div>'+
+          '<div style="font-size:10px;color:#aaa">Removed '+fmtDate(entry.archivedAt)+' · '+entry.calendarDates.length+' date'+(entry.calendarDates.length!==1?'s':'')+' · '+entry.invoices.length+' invoice'+(entry.invoices.length!==1?'s':'')+'</div>'+
+        '</div>'+
+        '<button data-restore-idx="'+idx+'" style="font-size:11px;padding:5px 12px;border-radius:6px;border:.5px solid #22c55e;background:#EAF3DE;color:#27500A;cursor:pointer;font-weight:600;font-family:inherit">↩ Restore</button>'+
+      '</div>';
+    }).join('');
+
+    container.querySelectorAll('[data-restore-idx]').forEach(function(btn){
+      btn.addEventListener('click',async function(){
+        var idx=parseInt(btn.dataset.restoreIdx);
+        var archive=loadArchive();
+        var entry=archive[idx];
+        if(!entry)return;
+        var v=entry.vendor;
+        btn.disabled=true;btn.textContent='Restoring…';
+        // Restore vendor to Supabase
+        var row=Object.assign({},v);
+        delete row.selectedDates; // managed via calendar
+        await sb.from('vendors').upsert(row);
+        vendors=vendors.filter(function(x){return x.id!==v.id;});
+        vendors.push(v);
+        // Restore calendar dates
+        entry.calendarDates.forEach(function(ds){
+          if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};
+          if(calRows[ds].approved.indexOf(v.id)===-1)calRows[ds].approved.push(v.id);
+        });
+        for(var i=0;i<entry.calendarDates.length;i++){await saveCalRow(entry.calendarDates[i]);}
+        // Restore tent assignments
+        Object.keys(entry.tentAssignments||{}).forEach(function(ds){
+          if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};
+          calRows[ds].tent_assignments[entry.tentAssignments[ds]]=v.id;
+          saveCalRow(ds);
+        });
+        // Restore invoices
+        for(var i=0;i<entry.invoices.length;i++){
+          await sb.from('invoices').upsert(entry.invoices[i]);
+          if(!invoices.find(function(x){return x.id===entry.invoices[i].id;}))invoices.push(entry.invoices[i]);
+        }
+        // Remove from archive
+        archive.splice(idx,1);
+        saveArchive(archive);
+        renderManage();
+        renderStats();
+      });
+    });
+  })();
 }
 
 // ── CSV parser (handles quoted fields) ────────────────────────────────────
