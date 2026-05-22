@@ -123,6 +123,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
 .sched-approved{background:#EAF3DE;color:#27500A;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #639922}
 .sched-waitlist{background:#FEF9C3;color:#A16207;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #EAB308}
 .sched-pending{background:#FDECEA;color:#9B3A2E;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #F1948A}
+.sched-issue{background:#FCEBEB;color:#791F1F;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #e08080}
 .overlay{background:rgba(0,0,0,.4);position:fixed;inset:0;z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto}
 .modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;margin:auto}
 .modal.sm{max-width:380px}.modal.md{max-width:560px}.modal.lg{max-width:720px}.modal.xl{max-width:1000px}
@@ -131,7 +132,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
 #fPrevBtn:focus,#fNextBtn:focus{outline:none;box-shadow:none}
 .vform-subnav{display:flex;gap:0;border-bottom:.5px solid #e5e3de;background:#f8f7f4;overflow-x:auto;scrollbar-width:none}
 .vform-subnav::-webkit-scrollbar{display:none}
-.fsnb{background:none;border:none;border-bottom:2.5px solid transparent;padding:.6rem .85rem;font-size:13px;font-weight:700;color:#888;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.fsnb{background:none;border:none;border-bottom:2.5px solid transparent;padding:.6rem .85rem;font-size:15px;font-weight:800;color:#888;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px}
 .fsnb:hover{color:#1a1a1a;background:#fff}
 .fsnb.active{color:#1a1a1a;border-bottom-color:#1a1a1a;background:#fff}
 .fsnb.done .fsnb-dot{background:#22c55e}
@@ -216,7 +217,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-21 Rev 3</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-22</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -312,7 +313,7 @@ var invSortCol='status',invSortDir=1; // invoice sort state
 var reportSortCol='',reportSortDir=1; // 1=asc, -1=desc
 var layoutDate='',layoutSpots=[],layoutUnsaved=false,layoutSelectedIds=new Set(),layoutSnapOn=true,layoutSelectMode=false,layoutViewMode='detail'; // 'detail' or 'summary'
 var csvData=[]; // global so it persists across renderManage() calls
-var formTab=0,formTotalTabs=7,formCompletedTabs=new Set();
+var formTab=0,formTotalTabs=8,formCompletedTabs=new Set();
 var formDirty=false;
 window._ep=[];
 
@@ -363,7 +364,7 @@ async function getVendorSnap(vendorId,ds){
 function avc(n){var h=0;for(var i=0;i<(n||'').length;i++)h=(h*31+n.charCodeAt(i))%6;return{bg:AVC[Math.abs(h)],text:AVT[Math.abs(h)]};}
 function ini(n){return String(n||'?').split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);}
 function vsTag(vs){var c=VSC[vs||'active']||VSC.active;return'<span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span>';}
-function schedTag(s){if(s==='approved')return'<span class="sched-approved">Approved</span>';if(s==='waitlist')return'<span class="sched-waitlist">Waitlist</span>';return'<span class="sched-pending">Pending</span>';}
+function schedTag(s){if(s==='approved')return'<span class="sched-approved">Approved</span>';if(s==='waitlist')return'<span class="sched-waitlist">Waitlist</span>';if(s==='issue')return'<span class="sched-issue">⚠️ Issue</span>';return'<span class="sched-pending">Pending</span>';}
 function uid(){return'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function csvCell(v){return'"'+String(v||'').replace(/"/g,'""')+'"';}
@@ -750,6 +751,7 @@ function renderVendors(){
               '<option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option>'+
               '<option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option>'+
               '<option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option>'+
+              '<option value="issue"'+(v.status==='issue'?' selected':'')+'>⚠️ Issue</option>'+
             '</select>'+
             '<select data-set-vs="'+v.id+'" style="font-size:11px;padding:3px 6px;border:.5px solid #d0cec7;border-radius:6px;background:#fff;font-family:inherit;cursor:pointer">'+
               '<option value="active"'+(vs==='active'?' selected':'')+'>🟢 Active</option>'+
@@ -979,6 +981,7 @@ function buildSchedulingMatrix(){
           '<option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option>'+
           '<option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option>'+
           '<option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option>'+
+          '<option value="issue"'+(v.status==='issue'?' selected':'')+'>⚠️ Issue</option>'+
         '</select>'+
       '</td>'+
       dates.map(function(ds){
@@ -1264,7 +1267,7 @@ function buildDayPanel(ds){
             (unassigned>0?'<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806;font-weight:600">⚠️ '+unassigned+' unassigned</span>':'<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">✓ All spots assigned</span>')+
           '</div>':'')+'</div>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">'+
-        '<button class="btn-blue" id="manageDayBtn">+ Manage</button>'+
+        '<button class="btn-blue" id="manageDayBtn">+ Add vendor</button>'+
         '<button class="btn-s" style="font-size:11px" id="exportDayBtn">↓ CSV</button>'+
         '<button class="btn-s" style="font-size:11px" id="closeDayBtn">✕</button>'+
       '</div>'+
@@ -1326,11 +1329,11 @@ function openDayManage(ds,startTab){
   var allShown=approved.concat(waitlisted).concat(pending);
 
   function mkRow(v){
-    var av=avc(v.businessName||'?');
     var cc=catColor(v.category);
     var isWL=v.status==='waitlist';
-    return'<label class="copt" data-vendor-row data-name="'+esc((v.businessName||'').toLowerCase())+'" data-cat="'+esc((v.category||'').toLowerCase())+'">'+
-      '<input type="checkbox" value="'+v.id+'" class="day-check"'+(da.indexOf(v.id)>-1?' checked':'')+' style="width:15px;height:15px;accent-color:#22c55e;flex-shrink:0;margin-top:2px">'+
+    var isChecked=da.indexOf(v.id)>-1;
+    return'<div class="copt" data-vendor-row data-vid="'+v.id+'" data-name="'+esc((v.businessName||'').toLowerCase())+'" data-cat="'+esc((v.category||'').toLowerCase())+'" style="cursor:pointer" onclick="(function(el){var cb=el.querySelector(\'.day-check\');cb.checked=!cb.checked;el.style.background=cb.checked?\'#EAF3DE\':\'#fff\';var cnt=document.getElementById(\'dmCount\');if(cnt){cnt.textContent=document.querySelectorAll(\'.day-check:checked\').length+\' selected\';};})(this)">'+
+      '<input type="checkbox" value="'+v.id+'" class="day-check"'+(isChecked?' checked':'')+' style="width:15px;height:15px;accent-color:#22c55e;flex-shrink:0;margin-top:2px;pointer-events:none">'+
       '<div style="display:flex;align-items:center;gap:8px;flex:1">'+
         '<div style="width:28px;height:28px;border-radius:50%;background:'+cc.bg+';color:'+cc.text+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
         '<div style="flex:1;min-width:0">'+
@@ -1342,7 +1345,7 @@ function openDayManage(ds,startTab){
           '<div style="font-size:10px;color:#888">'+esc(v.category||'—')+(v.boothSize?' · '+esc(v.boothSize):'')+'</div>'+
         '</div>'+
       '</div>'+
-    '</label>';
+    '</div>';
   }
 
   function mkPaymentView(){
@@ -1397,9 +1400,9 @@ function openDayManage(ds,startTab){
   var activeTab='schedule';
 
   document.getElementById('modal-area').innerHTML=
-    '<div class="overlay" id="dmOverlay"><div class="modal md">'+
+    '<div class="overlay" id="dmOverlay"><div class="modal md" style="display:flex;flex-direction:column;max-height:90vh">'+
     '<div class="mtitle">📅 '+ds+'</div>'+
-    '<div style="display:flex;gap:0;margin-bottom:.85rem;border:.5px solid #d0cec7;border-radius:8px;overflow:hidden">'+
+    '<div style="display:flex;gap:0;margin-bottom:.85rem;border:.5px solid #d0cec7;border-radius:8px;overflow:hidden;flex-shrink:0">'+
       '<button id="dmTabSched" style="flex:1;padding:7px;font-size:12px;font-weight:700;font-family:inherit;border:none;cursor:pointer;background:#27500A;color:#fff">📋 Schedule</button>'+
       '<button id="dmTabPay" style="flex:1;padding:7px;font-size:12px;font-weight:700;font-family:inherit;border:none;cursor:pointer;background:#f8f7f4;color:#888">💰 Payments</button>'+
     '</div>'+
@@ -1413,7 +1416,7 @@ function openDayManage(ds,startTab){
           '<button type="button" id="dmClrAll" style="font-size:13px;font-weight:700;padding:7px 14px;border-radius:20px;border:.5px solid #d0cec7;background:#f8f7f4;cursor:pointer;font-family:inherit">Clear all</button>'+
           '<span id="dmCount" style="font-size:10px;color:#888;margin-left:4px;line-height:2">'+da.length+' selected</span>'+
         '</div>'+
-        '<div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:3px" id="vendorList">'+
+        '<div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;flex:1" id="vendorList">'+
           (approved.length?'<div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:4px 2px">Approved</div>'+approved.map(mkRow).join(''):'')+ 
           (waitlisted.length?'<div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:8px 2px 4px">Waitlist</div>'+waitlisted.map(mkRow).join(''):'')+ 
           (pending.length?'<div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:8px 2px 4px">Pending</div>'+pending.map(mkRow).join(''):'')+
@@ -1466,13 +1469,18 @@ function openDayManage(ds,startTab){
     var el=document.getElementById('dmCount');if(el)el.textContent=cnt+' selected';
   }
   if(dmSel)dmSel.addEventListener('click',function(){
-    document.querySelectorAll('[data-vendor-row]:not([style*="none"]) .day-check').forEach(function(cb){cb.checked=true;});
+    document.querySelectorAll('[data-vendor-row]:not([style*="display: none"]):not([style*="display:none"]) .day-check').forEach(function(cb){cb.checked=true;cb.closest('[data-vendor-row]').style.background='#EAF3DE';});
     updateDmCount();
   });
   if(dmClr)dmClr.addEventListener('click',function(){
-    document.querySelectorAll('.day-check').forEach(function(cb){cb.checked=false;});
+    document.querySelectorAll('.day-check').forEach(function(cb){cb.checked=false;cb.closest('[data-vendor-row]').style.background='#fff';});
     updateDmCount();
   });
+  // Initialize background on already-checked rows
+  document.querySelectorAll('.day-check:checked').forEach(function(cb){
+    var row=cb.closest('[data-vendor-row]');if(row)row.style.background='#EAF3DE';
+  });
+
   document.querySelectorAll('.day-check').forEach(function(cb){
     cb.addEventListener('change',updateDmCount);
   });
@@ -1487,25 +1495,45 @@ function openDayManage(ds,startTab){
     for(var i=0;i<wasApproved.length;i++) await persistVendorDates(wasApproved[i]);
     closeMod();renderCalendar();
   });
-  var can=document.createElement('button');can.className='btn-s';can.textContent='Cancel';can.addEventListener('click',closeMod);
-  var sav=document.createElement('button');sav.className='btn-p';sav.textContent='Save';
+  var can=document.createElement('button');can.className='btn-s';can.textContent='Close';can.addEventListener('click',closeMod);
+  var sav=document.createElement('button');sav.className='btn-p';sav.textContent='Save & Close';
   sav.addEventListener('click',async function(){
-    var a=Array.from(document.querySelectorAll('.day-check:checked')).map(function(c){return c.value;});
-    var prev=getApproved(ds);
-    var added=a.filter(function(id){return prev.indexOf(id)===-1;});
-    var removed=prev.filter(function(id){return a.indexOf(id)===-1;});
-    if(a.length){
-      if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};
-      calRows[ds].approved=a;calRows[ds].waitlist=[];
-      await saveCalRow(ds);
-    } else {
-      delete calRows[ds];
-      await sb.from('calendar').delete().eq('date',ds);
+    sav.disabled=true;sav.textContent='Saving…';
+    try{
+      var a=Array.from(document.querySelectorAll('.day-check:checked')).map(function(c){return c.value;});
+      var prev=getApproved(ds);
+      var added=a.filter(function(id){return prev.indexOf(id)===-1;});
+      var removed=prev.filter(function(id){return a.indexOf(id)===-1;});
+      if(a.length){
+        if(!calRows[ds])calRows[ds]={approved:[],waitlist:[],tent_assignments:{}};
+        calRows[ds].approved=a;
+        await saveCalRow(ds);
+      } else {
+        delete calRows[ds];
+        await sb.from('calendar').delete().eq('date',ds);
+      }
+      syncVendorDatesFromCalendar();
+      var toUpdate=added.concat(removed);
+      for(var i=0;i<toUpdate.length;i++) await persistVendorDates(toUpdate[i]);
+      closeMod();
+      selectedCalDay=ds;
+      renderCalendar();
+      // Refresh vendor form date chips if form is open for an affected vendor
+      if(eId&&toUpdate.indexOf(eId)>-1){
+        var chips=document.querySelectorAll('#fDateChips .dc');
+        if(chips.length){
+          var onDate=(calRows[ds]&&(calRows[ds].approved||[]).indexOf(eId)>-1);
+          chips.forEach(function(chip){
+            if((chip.dataset.ds||chip.getAttribute('data-ds'))===ds){
+              if(onDate)chip.classList.add('on');else chip.classList.remove('on');
+            }
+          });
+        }
+      }
+    }catch(e){
+      sav.disabled=false;sav.textContent='Save & Close';
+      alert('Error saving: '+e.message);
     }
-    syncVendorDatesFromCalendar();
-    var toUpdate=added.concat(removed);
-    for(var i=0;i<toUpdate.length;i++) await persistVendorDates(toUpdate[i]);
-    closeMod();renderCalendar();
   });
   foot.appendChild(clr);foot.appendChild(can);foot.appendChild(sav);
 }
@@ -3429,6 +3457,7 @@ function openLayoutSpotPanel(sp){
                 '<option value="pending"'+(v.status==='pending'?' selected':'')+'>Pending</option>'+
                 '<option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option>'+
                 '<option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option>'+
+                '<option value="issue"'+(v.status==='issue'?' selected':'')+'>⚠️ Issue</option>'+
               '</select>'+
             '</div>'+
             '<div>'+
@@ -4033,12 +4062,12 @@ function openForm(id){
       '<div style="font-size:11px;color:#888;margin-top:5px">Complete all sections · use tabs to navigate</div>'+
     '</div>'+
     '<div class="progress-bar"><div class="progress-fill" id="fProgress" style="width:'+(100/formTotalTabs)+'%"></div></div>'+
-    '<div class="vform-subnav" id="fSubnav">'+['Status','Business','Products','Licensing','Booth','General Info','Documents'].map(function(t,i){return'<button class="fsnb'+(i===0?' active':'')+'" data-ftab="'+i+'"><span class="fsnb-dot"></span>'+t+'</button>';}).join('')+'</div>'+
+    '<div class="vform-subnav" id="fSubnav">'+['Status','Business','Products','Licensing','Booth','General Info','Documents','Invoices'].map(function(t,i){return'<button class="fsnb'+(i===0?' active':'')+'" data-ftab="'+i+'"><span class="fsnb-dot"></span>'+t+'</button>';}).join('')+'</div>'+
     // TAB 0
     '<div class="fpanel active" data-fpanel="0"><div class="fsec-title">Vendor status &amp; scheduling</div>'+
     '<div class="fg"><label>Vendor status</label><div class="vs-grid">'+['active','inwork','inactive'].map(function(k){var vc=VSC[k];return'<div class="vs-card'+(vs===k?' '+FVSC[k].cls:'')+'" data-fvs="'+k+'" id="fvsc-'+k+'"><div class="vs-card-dot" style="background:'+vc.dot+'"></div><div class="vs-card-label" style="color:'+(vs===k?FVSC[k].text:'#aaa')+'">'+vc.label+'</div><input type="radio" name="vendorStatus" value="'+k+'"'+(vs===k?' checked':'')+' style="display:none"></div>';}).join('')+'</div></div>'+
     '<div class="fg"><label>Contract</label><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="toggle-grid" style="flex:1"><label class="toggle-card'+(v.contractReceived?' on-contract':'')+'" id="ftc-contract"><div style="font-size:18px">'+(v.contractReceived?'✅':'📄')+'</div><div><div class="tc-label" style="'+(v.contractReceived?'color:#27500A;font-weight:700':'')+'">Contract '+(v.contractReceived?'signed ✓':'not signed')+'</div><div class="tc-sub">'+(v.contractReceived?'On file':'Not yet received')+'</div></div><input type="checkbox" id="fcb-contract"'+(v.contractReceived?' checked':'')+'></label></div>'+(id?'<button type="button" id="fSendContractBtn" style="white-space:nowrap;font-size:12px;padding:8px 14px;border-radius:8px;border:.5px solid #378ADD;background:#E6F1FB;color:#0C447C;cursor:pointer;font-weight:600;font-family:inherit">📧 Send Contract</button>':'')+' <button type="button" id="fDownloadContractBtn" style="white-space:nowrap;font-size:12px;padding:8px 14px;border-radius:8px;border:.5px solid #d0cec7;background:#f8f7f4;color:#555;cursor:pointer;font-weight:600;font-family:inherit">📋 Download PDF</button></div></div>'+
-    '<div class="fg"><label>Application status</label><select id="fAppStatus"><option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option><option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option><option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option></select></div>'+
+    '<div class="fg"><label>Application status</label><select id="fAppStatus" style="color:'+(v.status==='issue'?'#791F1F':'')+';font-weight:'+(v.status==='issue'?'700':'normal')+'"><option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option><option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option><option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option><option value="issue"'+(v.status==='issue'?' selected':'')+'>⚠️ Issue</option></select></div>'+
     '<div class="fg"><label>Market dates attending <span style="font-weight:400;color:#aaa">— tap to select (Fridays Apr 1 – Nov 1, 2026)</span></label>'+
     '<div style="margin-bottom:6px;display:flex;gap:5px;flex-wrap:wrap">'+
       '<button type="button" onclick="(function(){document.querySelectorAll(\'#fDateChips .dc\').forEach(function(c){c.classList.add(\'on\');});})()" style="font-size:13px;font-weight:700;padding:7px 14px;border-radius:20px;border:.5px solid #d0cec7;background:#f8f7f4;cursor:pointer;font-family:inherit">Select all</button>'+
@@ -4122,16 +4151,20 @@ function openForm(id){
     '</div>'+
     '</div>'+
 
+    // TAB 7 — Invoices
+    (id?'<div class="fpanel" data-fpanel="7"><div class="fsec-title">Invoices</div>'+
+    '<div id="fInvoicesPanel"><div style="font-size:12px;color:#aaa;padding:1rem;text-align:center">Loading invoices…</div></div>'+
+    '</div>':'')+
+
     // FOOTER
     '<div class="form-footer">'+
       '<div style="display:flex;justify-content:center;align-items:center;gap:20px;flex:1">'+
         '<button class="btn-s" id="fPrevBtn" disabled style="font-size:16px;font-weight:800;padding:12px 36px;border-radius:10px;min-width:140px">‹ Previous</button>'+
-        '<span style="font-size:11px;color:#888;min-width:50px;text-align:center" id="fTabIndicator">1 of 6</span>'+
+        '<span style="font-size:11px;color:#888;min-width:50px;text-align:center" id="fTabIndicator">1 of 7</span>'+
         '<button class="btn-s" id="fNextBtn" style="font-size:16px;font-weight:800;padding:12px 36px;border-radius:10px;min-width:140px">Next ›</button>'+
       '</div>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
         (id&&v.email?'<button class="btn-blue" id="fEmailBtn">📧 Email vendor</button>':'')+
-        (id?'<button class="btn-g" id="fInvoiceBtn">📄 Invoice</button>':'')+
         (id?'<button class="btn-amber" id="fContractBtn">📋 Contract PDF</button>':'')+
         (id?'<button class="btn-s" id="fProfileBtn">📄 Profile PDF</button>':'')+
         '<button class="btn-p" id="fSaveBtn">Save vendor</button>'+
@@ -4185,12 +4218,119 @@ function openForm(id){
   if(fProfile)fProfile.addEventListener('click',function(){generateVendorProfilePDF(v);});
 
   // Documents tab — load docs when tab 6 is clicked
+  // Invoices tab — load/render when tab 7 is clicked
   document.querySelectorAll('.fsnb').forEach(function(btn){
     btn.addEventListener('click',function(){
       var tabIdx=parseInt(btn.dataset.ftab);
       if(tabIdx===6&&id)setTimeout(function(){attachDocUploadHandlers(id);},100);
+      if(tabIdx===7&&id)setTimeout(function(){renderInvoicesPanel();},100);
     });
   });
+
+  async function renderInvoicesPanel(){
+    var panel=document.getElementById('fInvoicesPanel');
+    if(!panel)return;
+    await loadInvoices();
+    var vendorInvoices=invoices.filter(function(i){return i.vendor_id===id;});
+    var today=new Date().toISOString().slice(0,10);
+
+    // Dates that already have a sent or paid invoice
+    var coveredDates={};
+    vendorInvoices.forEach(function(inv){
+      if(inv.status==='sent'||inv.status==='paid'){
+        (inv.dates||[]).forEach(function(ds){coveredDates[ds]=true;});
+      }
+    });
+
+    // Uninvoiced dates up to today
+    var vDates=id?Object.keys(calRows).filter(function(ds){
+      return ds<=today&&(calRows[ds].approved||[]).indexOf(id)>-1&&!coveredDates[ds];
+    }).sort():[];
+
+    var html=
+      // Summary strip
+      (vendorInvoices.length?
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.85rem">'+
+          '<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">'+
+            vendorInvoices.filter(function(i){return i.status==='paid';}).length+' paid'+
+          '</span>'+
+          '<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#E8EEFF;color:#3050C8;font-weight:600">'+
+            vendorInvoices.filter(function(i){return i.status==='sent';}).length+' sent'+
+          '</span>'+
+          '<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#f0ede6;color:#888;font-weight:600">'+
+            vendorInvoices.filter(function(i){return i.status==='draft';}).length+' draft'+
+          '</span>'+
+        '</div>':'') +
+
+      // Invoice cards
+      (vendorInvoices.length
+        ?vendorInvoices.map(function(inv){
+            var isOverdue=inv.status==='sent'&&inv.due_date&&new Date(inv.due_date)<new Date();
+            var status=isOverdue?'overdue':inv.status;
+            var datesArr=inv.dates||[];
+            return'<div style="padding:.75rem .85rem;background:#f8f7f4;border:.5px solid #e5e3de;border-radius:8px;margin-bottom:6px">'+
+              '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:6px">'+
+                '<div>'+
+                  '<div style="font-size:13px;font-weight:700">'+esc(inv.invoice_number)+'</div>'+
+                  '<div style="font-size:11px;color:#888;margin-top:2px">'+(datesArr.length<=3?datesArr.join(', '):(datesArr.length+' dates'))+' · <strong>$'+parseFloat(inv.total||0).toFixed(2)+'</strong></div>'+
+                '</div>'+
+                invStatusBadge(status)+
+              '</div>'+
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+
+                '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:6px;padding:5px 8px">'+
+                  '<div style="font-size:9px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:2px">Sent</div>'+
+                  '<div style="font-size:11px;font-weight:600;color:'+(inv.sent_at?'#0C447C':'#aaa')+'">'+
+                    (inv.sent_at?'📧 '+fmtDate(inv.sent_at):'—')+'</div>'+
+                '</div>'+
+                '<div style="background:'+(inv.paid_at?'#EAF3DE':'#fff')+';border:.5px solid '+(inv.paid_at?'#639922':'#e5e3de')+';border-radius:6px;padding:5px 8px">'+
+                  '<div style="font-size:9px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:2px">Paid</div>'+
+                  '<div style="font-size:11px;font-weight:600;color:'+(inv.paid_at?'#27500A':'#aaa')+'">'+
+                    (inv.paid_at?'✅ '+fmtDate(inv.paid_at):'—')+'</div>'+
+                  (inv.paid_at&&inv.payment_method?'<div style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#E8EEFF;color:#3050C8;border:.5px solid #5B8BF5">💸 '+esc(inv.payment_method)+'</div>':'')+
+                '</div>'+
+              '</div>'+
+              '<div style="display:flex;gap:5px;flex-wrap:wrap">'+
+                '<button class="btn-s" style="font-size:11px;padding:4px 10px" data-finv-pdf="'+inv.id+'">📄 Detail</button>'+
+                (inv.status!=='paid'?'<button class="btn-blue" style="font-size:11px;padding:4px 10px" data-finv-send="'+inv.id+'">📧 Send</button>':'')+
+                (inv.status!=='paid'?'<button class="btn-p" style="font-size:11px;padding:4px 10px" data-finv-paid="'+inv.id+'">✓ Mark paid</button>':
+                  '<button class="btn-s" style="font-size:11px;padding:4px 10px" data-finv-unpaid="'+inv.id+'">↩ Unmark</button>')+
+                (inv.status!=='paid'?'<button style="font-size:11px;padding:4px 10px;border-radius:6px;border:.5px solid #5B8BF5;background:#E8EEFF;color:#3050C8;cursor:pointer;font-family:inherit;font-weight:600" data-finv-venmo="'+inv.id+'">💸 Venmo</button>':
+                  (inv.payment_method?'<span style="font-size:10px;color:#888;font-weight:600">via '+esc(inv.payment_method)+'</span>':''))+
+                '<button class="btn-danger" style="font-size:11px;padding:4px 10px" data-finv-del="'+inv.id+'">Delete</button>'+
+              '</div>'+
+            '</div>';
+          }).join('')
+        :'<div class="empty" style="margin-bottom:.85rem">No invoices yet for this vendor.</div>')+
+
+      // New invoice button
+      '<button class="btn-p" id="fInvNewBtn" style="width:100%;margin-top:.5rem">+ Create new invoice'+(vDates.length?' ('+vDates.length+' uninvoiced date'+(vDates.length!==1?'s':'')+')':"")+'</button>';
+
+    panel.innerHTML=html;
+
+    // Wire action buttons — reuse existing handlers via data attributes
+    panel.querySelectorAll('[data-finv-pdf]').forEach(function(btn){btn.addEventListener('click',function(){var inv=invoices.find(function(x){return x.id===btn.dataset.finvPdf;});if(inv)generateInvoicePDF(inv);});});
+    panel.querySelectorAll('[data-finv-send]').forEach(function(btn){
+      btn.addEventListener('click',async function(){
+        var inv=invoices.find(function(x){return x.id===btn.dataset.finvSend;});
+        if(!inv||!v.email)return;
+        btn.disabled=true;btn.textContent='Sending…';
+        await sb.from('invoices').update({status:'sent',sent_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
+        inv.status='sent';inv.sent_at=nowISO();
+        var invoiceHTML=buildInvoiceHTML(inv);
+        var sent=await sendEmailResend({to:v.email,subject:'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',html:invoiceHTML,text:'Hi '+(v.contactName||v.businessName)+',\n\nInvoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\nThank you,\nElevation Bend Farmers Market'});
+        if(!sent){generateInvoicePDF(inv);setTimeout(function(){sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market','');},500);}
+        btn.disabled=false;btn.textContent='📧 Send';
+        renderInvoicesPanel();
+      });
+    });
+    panel.querySelectorAll('[data-finv-paid]').forEach(function(btn){btn.addEventListener('click',async function(){var inv=invoices.find(function(x){return x.id===btn.dataset.finvPaid;});if(!inv)return;await sb.from('invoices').update({status:'paid',paid_at:nowISO(),payment_method:'',modified_at:nowISO()}).eq('id',inv.id);inv.status='paid';inv.paid_at=nowISO();inv.payment_method='';renderInvoicesPanel();});});
+    panel.querySelectorAll('[data-finv-unpaid]').forEach(function(btn){btn.addEventListener('click',async function(){var inv=invoices.find(function(x){return x.id===btn.dataset.finvUnpaid;});if(!inv)return;await sb.from('invoices').update({status:'sent',paid_at:null,modified_at:nowISO()}).eq('id',inv.id);inv.status='sent';inv.paid_at=null;renderInvoicesPanel();});});
+    panel.querySelectorAll('[data-finv-venmo]').forEach(function(btn){btn.addEventListener('click',async function(){var inv=invoices.find(function(x){return x.id===btn.dataset.finvVenmo;});if(!inv)return;await sb.from('invoices').update({status:'paid',paid_at:nowISO(),payment_method:'Venmo',modified_at:nowISO()}).eq('id',inv.id);inv.status='paid';inv.paid_at=nowISO();inv.payment_method='Venmo';renderInvoicesPanel();});});
+    panel.querySelectorAll('[data-finv-del]').forEach(function(btn){btn.addEventListener('click',async function(){if(!confirm('Delete this invoice?'))return;var did=btn.dataset.finvDel;var{error}=await sb.from('invoices').delete().eq('id',did);if(error){alert('Error: '+error.message);return;}invoices=invoices.filter(function(x){return x.id!==did;});if(tab==='calendar')renderCalendar();renderInvoicesPanel();});});
+
+    var newInvBtn=document.getElementById('fInvNewBtn');
+    if(newInvBtn)newInvBtn.addEventListener('click',function(){openInvoiceModal(id);});
+  }
   // Email vendor button — shown when editing a vendor who has an email address
   var fEmail=document.getElementById('fEmailBtn');
   if(fEmail){fEmail.addEventListener('click',function(){
@@ -4220,179 +4360,6 @@ function openForm(id){
     foot.appendChild(canBtn);foot.appendChild(sendBtn);
   });}
 
-  // Invoice button — show vendor's invoices + create new
-  var fInv=document.getElementById('fInvoiceBtn');
-  if(fInv){fInv.addEventListener('click',async function(){
-    await loadInvoices();
-    var vendorInvoices=invoices.filter(function(i){return i.vendor_id===id;});    var cc=catColor(v.category);
-    document.getElementById('modal-area').innerHTML=
-      '<div class="overlay" id="fInvOverlay"><div class="modal md" style="max-height:90vh;overflow-y:auto">'+
-      '<div class="mtitle">📄 Invoices — '+esc(v.businessName||'Vendor')+'</div>'+
-
-      // Vendor summary strip
-      '<div style="background:'+cc.bg+';border:.5px solid '+cc.border+';border-radius:8px;padding:.6rem .85rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:8px">'+
-        '<div>'+
-          '<div style="font-size:12px;font-weight:600;color:'+cc.text+'">'+esc(v.businessName)+'</div>'+
-          '<div style="font-size:10px;color:'+cc.text+';opacity:.8">'+esc(v.category||'')+(v.boothSize?' · '+esc(v.boothSize):'')+'</div>'+
-        '</div>'+
-        '<div style="text-align:right">'+
-          '<div style="font-size:11px;color:'+cc.text+'">Fee per date: <strong>$'+feeForBoothSize(v.boothSize).toFixed(2)+'</strong></div>'+
-          '<div style="font-size:10px;color:'+cc.text+';opacity:.7">'+esc(v.boothSize||'no booth size set')+'</div>'+
-        '</div>'+
-      '</div>'+
-
-      // Existing invoices
-      (vendorInvoices.length
-        ?'<div style="margin-bottom:.85rem"><div style="font-size:11px;font-weight:600;color:#555;margin-bottom:.4rem">Existing invoices ('+vendorInvoices.length+')</div>'+
-          '<div style="display:flex;flex-direction:column;gap:6px">'+
-          vendorInvoices.map(function(inv){
-            var isOverdue=inv.status==='sent'&&inv.due_date&&new Date(inv.due_date)<new Date();
-            var status=isOverdue?'overdue':inv.status;
-            var datesArr=inv.dates||[];
-            return'<div style="padding:.75rem .85rem;background:#f8f7f4;border:.5px solid #e5e3de;border-radius:8px;gap:8px">'+
-              '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:6px">'+
-                '<div>'+
-                  '<div style="font-size:13px;font-weight:700">'+esc(inv.invoice_number)+'</div>'+
-                  '<div style="font-size:11px;color:#888;margin-top:2px">'+(datesArr.length<=3?datesArr.join(', '):(datesArr.length+' dates'))+' · <strong>$'+parseFloat(inv.total||0).toFixed(2)+'</strong></div>'+
-                '</div>'+
-                invStatusBadge(status)+
-              '</div>'+
-              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+
-                '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:6px;padding:5px 8px">'+
-                  '<div style="font-size:9px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:2px">Sent</div>'+
-                  '<div style="font-size:11px;font-weight:600;color:'+(inv.sent_at?'#0C447C':'#aaa')+'">'+
-                    (inv.sent_at?'📧 '+fmtDate(inv.sent_at):'—')+
-                  '</div>'+
-                '</div>'+
-                '<div style="background:'+(inv.paid_at?'#EAF3DE':'#fff')+';border:.5px solid '+(inv.paid_at?'#639922':'#e5e3de')+';border-radius:6px;padding:5px 8px">'+
-                  '<div style="font-size:9px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:2px">Paid</div>'+
-                  '<div style="font-size:11px;font-weight:600;color:'+(inv.paid_at?'#27500A':'#aaa')+'">'+
-                    (inv.paid_at?'✅ '+fmtDate(inv.paid_at):'—')+
-                  '</div>'+
-                  (inv.paid_at&&inv.payment_method?'<div style="font-size:9px;font-weight:700;color:#3050C8;margin-top:2px">💸 via '+esc(inv.payment_method)+'</div>':'')+
-                '</div>'+
-              '</div>'+
-              '<div style="display:flex;gap:5px;flex-wrap:wrap">'+
-                '<button class="btn-s" style="font-size:11px;padding:4px 10px" data-finv-pdf="'+inv.id+'">📄 Detail</button>'+
-                (inv.status!=='paid'?'<button class="btn-blue" style="font-size:11px;padding:4px 10px" data-finv-send="'+inv.id+'">📧 Send</button>':'')+
-                (inv.status!=='paid'?'<button class="btn-p" style="font-size:11px;padding:4px 10px" data-finv-paid="'+inv.id+'">✓ Mark paid</button>':
-                  '<button class="btn-s" style="font-size:11px;padding:4px 10px" data-finv-unpaid="'+inv.id+'">↩ Unmark</button>')+
-                (inv.status!=='paid'?'<button style="font-size:11px;padding:4px 10px;border-radius:6px;border:.5px solid #5B8BF5;background:#E8EEFF;color:#3050C8;cursor:pointer;font-family:inherit;font-weight:600" data-finv-venmo="'+inv.id+'">💸 Venmo</button>':
-                  (inv.payment_method?'<span style="font-size:10px;color:#888;font-weight:600">via '+esc(inv.payment_method)+'</span>':''))+
-                '<button class="btn-danger" style="font-size:11px;padding:4px 10px" data-finv-del="'+inv.id+'">Delete</button>'+
-              '</div>'+
-            '</div>';
-          }).join('')+
-          '</div></div>'
-        :'<div class="empty" style="margin-bottom:.85rem">No invoices yet for this vendor.</div>')+
-
-      '<div class="mfoot" id="fInvFoot"></div>'+
-      '</div></div>';
-
-    document.getElementById('fInvOverlay').addEventListener('click',function(e){if(e.target===this)openForm(id||eId);});
-
-    // PDF and mark paid inline
-    document.querySelectorAll('[data-finv-pdf]').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        var inv=invoices.find(function(x){return x.id===btn.dataset.finvPdf;});
-        if(inv)generateInvoicePDF(inv);
-      });
-    });
-    document.querySelectorAll('[data-finv-send]').forEach(function(btn){
-      btn.addEventListener('click',async function(){
-        var inv=invoices.find(function(x){return x.id===btn.dataset.finvSend;});
-        if(!inv||!v.email)return;
-        btn.disabled=true;btn.textContent='Sending…';
-
-        // Generate Stripe link if not already on invoice
-        if(!inv.stripe_payment_link&&STRIPE_PK&&parseFloat(inv.total||0)>0){
-          try{
-            var res=await fetch(SUPABASE_FN_URL+'/stripe-session',{
-              method:'POST',
-              headers:{'Content-Type':'application/json','apikey':SUPA_ANON_KEY||SUPA_KEY,'Authorization':'Bearer '+(SUPA_ANON_KEY||SUPA_KEY)},
-              body:JSON.stringify({action:'create_payment_link',vendorId:v.id,vendorName:v.businessName,amount:parseFloat(inv.total||0),invoiceId:inv.id})
-            });
-            var rd=await res.json();
-            if(rd.url){
-              inv.stripe_payment_link=rd.url;
-              await sb.from('invoices').update({stripe_payment_link:rd.url,modified_at:nowISO()}).eq('id',inv.id);
-            }
-          }catch(e){console.warn('Stripe link failed:',e);}
-        }
-
-        await sb.from('invoices').update({status:'sent',sent_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
-        inv.status='sent';inv.sent_at=nowISO();
-
-        // Send via Resend with full HTML invoice
-        var invoiceHTML=buildInvoiceHTML(inv);
-        var sent=await sendEmailResend({
-          to:v.email,
-          subject:'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',
-          html:invoiceHTML,
-          text:'Hi '+(v.contactName||v.businessName)+',\n\nYour invoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\n'+(inv.stripe_payment_link?'Pay online: '+inv.stripe_payment_link+'\n\n':'')+'Thank you,\nElevation Bend Farmers Market'
-        });
-        if(!sent){
-          generateInvoicePDF(inv);
-          setTimeout(function(){sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market','Hi '+(v.contactName||v.businessName)+',\n\nInvoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\nThank you,\nElevation Bend Farmers Market');},500);
-        }
-        btn.disabled=false;btn.textContent='📧 Send';
-        fInv.click();
-      });
-    });
-    document.querySelectorAll('[data-finv-unpaid]').forEach(function(btn){
-      btn.addEventListener('click',async function(){
-        var inv=invoices.find(function(x){return x.id===btn.dataset.finvUnpaid;});
-        if(!inv)return;
-        await sb.from('invoices').update({status:'sent',paid_at:null,modified_at:nowISO()}).eq('id',inv.id);
-        inv.status='sent';inv.paid_at=null;
-        fInv.click();
-      });
-    });
-    document.querySelectorAll('[data-finv-paid]').forEach(function(btn){
-      btn.addEventListener('click',async function(){
-        var inv=invoices.find(function(x){return x.id===btn.dataset.finvPaid;});
-        if(!inv)return;
-        await sb.from('invoices').update({status:'paid',paid_at:nowISO(),payment_method:'',modified_at:nowISO()}).eq('id',inv.id);
-        v.paymentReceived=true;
-        await sb.from('vendors').update({payment_received:true}).eq('id',v.id);
-        inv.status='paid';inv.paid_at=nowISO();inv.payment_method='';
-        fInv.click();
-      });
-    });
-    document.querySelectorAll('[data-finv-venmo]').forEach(function(btn){
-      btn.addEventListener('click',async function(){
-        var inv=invoices.find(function(x){return x.id===btn.dataset.finvVenmo;});
-        if(!inv)return;
-        await sb.from('invoices').update({status:'paid',paid_at:nowISO(),payment_method:'Venmo',modified_at:nowISO()}).eq('id',inv.id);
-        v.paymentReceived=true;
-        await sb.from('vendors').update({payment_received:true}).eq('id',v.id);
-        inv.status='paid';inv.paid_at=nowISO();inv.payment_method='Venmo';
-        fInv.click();
-      });
-    });
-
-    document.querySelectorAll('[data-finv-del]').forEach(function(btn){
-      btn.addEventListener('click',async function(){
-        if(!confirm('Delete this invoice?'))return;
-        var id=btn.dataset.finvDel;
-        var{error}=await sb.from('invoices').delete().eq('id',id);
-        if(error){alert('Error deleting: '+error.message);return;}
-        invoices=invoices.filter(function(x){return x.id!==id;});
-        if(tab==='calendar')renderCalendar();
-        fInv.click();
-      });
-    });
-
-    var foot=document.getElementById('fInvFoot');
-    var canBtn=document.createElement('button');canBtn.className='btn-s';canBtn.textContent='← Back to vendor';
-    canBtn.addEventListener('click',function(){openForm(id||eId);});
-    var newBtn=document.createElement('button');newBtn.className='btn-p';newBtn.textContent='+ Create new invoice';
-    newBtn.addEventListener('click',async function(){
-      await loadInvoices();
-      openInvoiceModal(id);
-    });
-    foot.appendChild(canBtn);foot.appendChild(newBtn);
-  });}
   // VS cards
   document.querySelectorAll('[data-fvs]').forEach(function(card){card.addEventListener('click',function(){var k=card.dataset.fvs;['active','inwork','inactive'].forEach(function(x){var el=document.getElementById('fvsc-'+x);if(!el)return;el.className='vs-card';el.querySelector('.vs-card-label').style.color='#aaa';el.querySelector('input').checked=false;});card.className='vs-card '+FVSC[k].cls;card.querySelector('.vs-card-label').style.color=FVSC[k].text;card.querySelector('input').checked=true;formDirty=true;});});
   // Toggle cards
@@ -4423,7 +4390,14 @@ function openForm(id){
   var fDownloadContract=document.getElementById('fDownloadContractBtn');
   if(fDownloadContract)fDownloadContract.addEventListener('click',function(){generateContractPDF(v);});
   // App status
-  var fas=document.getElementById('fAppStatus');if(fas)fas.addEventListener('change',function(){document.getElementById('fSchedBadge').innerHTML=schedTag(this.value);});
+  var fas=document.getElementById('fAppStatus');
+  if(fas){
+    fas.style.color=fas.value==='issue'?'#791F1F':'';
+    fas.addEventListener('change',function(){
+      document.getElementById('fSchedBadge').innerHTML=schedTag(this.value);
+      this.style.color=this.value==='issue'?'#791F1F':'';
+    });
+  }
   // Date chips
   document.querySelectorAll('#fDateChips .dc').forEach(function(chip){chip.addEventListener('click',function(){
     chip.classList.toggle('on');
@@ -4876,6 +4850,7 @@ async function renderPayments(){
       if(v){v.paymentReceived=true;await sb.from('vendors').update({payment_received:true,modified_at:nowISO()}).eq('id',v.id);}
       await loadInvoices();
       renderPayments();
+      if(eId===inv.vendor_id){var fp=document.getElementById('fInvoicesPanel');if(fp)await renderInvoicesPanel();}
     });
   });
 
@@ -5336,20 +5311,24 @@ function openInvoiceModal(vendorId){
     '<div id="invDateList" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;overflow-x:hidden;border:.5px solid #e5e3de;border-radius:8px;padding:8px">'+
       (vDates.length
         ?vDates.map(function(d){
-            // Find existing invoice for this vendor+date
+            var today=new Date().toISOString().slice(0,10);
+            var isPast=d<=today;
             var existingInv=invoices.find(function(i){
               return i.vendor_id===vendorId&&(i.dates||[]).indexOf(d)>-1;
             });
             var badge='';
-            var preChecked=!existingInv; // pre-check only uninvoiced dates
+            // Pre-check only uninvoiced dates up to today
+            var preChecked=isPast&&!existingInv;
             if(existingInv){
               if(existingInv.status==='paid')badge='<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#EAF3DE;color:#27500A;margin-left:6px">✅ Paid</span>';
               else if(existingInv.status==='sent')badge='<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#E8F0FB;color:#0C447C;margin-left:6px">📧 Sent — '+existingInv.invoice_number+'</span>';
               else badge='<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#f0ede6;color:#888;margin-left:6px">Draft — '+existingInv.invoice_number+'</span>';
+            } else if(!isPast){
+              badge='<span style="font-size:10px;color:#aaa;margin-left:6px">upcoming</span>';
             }
-            return'<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;padding:4px 0;width:100%">'+
+            return'<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;padding:6px 4px;width:100%;border-bottom:.5px solid #f0ede6">'+
               '<input type="checkbox" value="'+d+'"'+(preChecked?' checked':'')+' style="accent-color:#639922;flex-shrink:0;width:16px;height:16px"> '+
-              '<span style="font-weight:600;color:#1a1a1a;flex:1">'+esc(d)+'</span>'+
+              '<span style="font-weight:600;color:'+(isPast?'#1a1a1a':'#aaa')+'">'+esc(d)+'</span>'+
               badge+
             '</label>';
           }).join('')
@@ -5410,8 +5389,8 @@ function openInvoiceModal(vendorId){
     if(vendorId){
       await openForm(vendorId);
       setTimeout(function(){
-        var fInvBtn=document.getElementById('fInvoiceBtn');
-        if(fInvBtn)fInvBtn.click();
+        var tab7=document.querySelector('.fsnb[data-ftab="7"]');
+        if(tab7)tab7.click();
       },300);
     }else{closeMod();}
   });
