@@ -2580,28 +2580,43 @@ async function sendLayoutToVendor(ds,ids){
     var cc=catColor(sv.category);
     var spotInfo=spot?'<strong>Spot '+spot.num+'</strong>'+(spot.size?' ('+spot.size+')':''):'<span style="color:#a16207">No spot assigned yet</span>';
     var layoutUrl='https://akpelvb2k26.github.io/elevation-bend/layout-viewer.html?date='+encodeURIComponent(ds);
-    var layoutHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:32px;color:#1a1a1a">'+
-      '<div style="font-size:22px;font-weight:800;color:#27500A;margin-bottom:4px">Elevation Bend</div>'+
-      '<div style="font-size:13px;color:#888;margin-bottom:28px;border-bottom:2px solid #e5e3de;padding-bottom:16px">Farmers Market · Bend, Oregon</div>'+
-      '<h2 style="font-size:18px;margin-bottom:4px">Market Layout — '+esc(ds)+'</h2>'+
-      '<p style="color:#888;font-size:13px;margin-bottom:24px">Hi '+esc(sv.contactName||sv.businessName)+', here are your spot details for the upcoming market day.</p>'+
-      '<div style="background:'+cc.bg+';border:2px solid '+cc.border+';border-radius:12px;padding:20px 24px;margin-bottom:24px">'+
-        '<div style="font-size:11px;font-weight:700;color:'+cc.text+';text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Your Spot Assignment</div>'+
-        '<div style="font-size:28px;font-weight:900;color:'+cc.text+';margin-bottom:4px">'+spotInfo+'</div>'+
-        '<div style="font-size:14px;color:'+cc.text+';font-weight:600">'+esc(sv.businessName)+'</div>'+
-        '<div style="font-size:12px;color:'+cc.text+';opacity:.8;margin-top:4px">'+esc(sv.category||'')+'</div>'+
+    // Build the same visual layout used in generateLayoutPDF
+    var maxX=Math.max.apply(null,sp.map(function(s){return(s.x||0)+(s.w||80);}))||800;
+    var maxY=Math.max.apply(null,sp.map(function(s){return(s.y||0)+(s.h||80);}))||600;
+    var scale=Math.min(560/maxX,500/maxY,1);
+
+    var spotDivs=sp.map(function(s){
+      var vid=ta[s.id];var vv=vid?vendors.find(function(x){return x.id===vid;}):null;
+      var isMe=sv.id===vid;
+      var scc=vv?catColor(vv.category):{bg:'#f8f7f4',border:'#d0cec7',text:'#888'};
+      return'<div style="position:absolute;left:'+(s.x*scale)+'px;top:'+(s.y*scale)+'px;width:'+((s.w||80)*scale)+'px;height:'+((s.h||80)*scale)+'px;'+
+        'background:'+scc.bg+';border:'+(isMe?'2.5px solid '+scc.text:'1.5px solid '+scc.border)+';border-radius:4px;'+
+        'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;box-sizing:border-box;overflow:hidden;'+
+        (isMe?'box-shadow:0 0 0 2px '+scc.text+';':'')+'">'+
+        '<div style="font-size:'+(Math.max(8,10*scale))+'px;font-weight:700;color:'+scc.text+'">'+(isMe?'★ ':'')+s.num+'</div>'+
+        (vv?'<div style="font-size:'+(Math.max(6,8*scale))+'px;color:'+scc.text+';text-align:center;line-height:1.2;overflow:hidden">'+esc(vv.businessName)+'</div>':'')+'</div>';
+    }).join('');
+
+    var layoutHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:640px;margin:0 auto;padding:32px;color:#1a1a1a">'+
+      '<div style="font-size:22px;font-weight:800;color:#27500A;margin-bottom:2px">Elevation Bend</div>'+
+      '<div style="font-size:13px;color:#888;margin-bottom:20px;border-bottom:2px solid #e5e3de;padding-bottom:14px">Farmers Market · Bend, Oregon</div>'+
+      '<h2 style="font-size:17px;margin-bottom:4px">Market Layout — '+esc(ds)+'</h2>'+
+      '<p style="color:#888;font-size:13px;margin-bottom:20px">Hi '+esc(sv.contactName||sv.businessName)+', here is your spot and the full market layout. Your spot is marked with ★.</p>'+
+      '<div style="background:'+cc.bg+';border:2px solid '+cc.border+';border-radius:10px;padding:16px 20px;margin-bottom:20px">'+
+        '<div style="font-size:10px;font-weight:700;color:'+cc.text+';text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your Spot</div>'+
+        '<div style="font-size:26px;font-weight:900;color:'+cc.text+';margin-bottom:4px">'+spotInfo+'</div>'+
+        '<div style="font-size:13px;color:'+cc.text+';font-weight:600">'+esc(sv.businessName)+'</div>'+
       '</div>'+
-      '<div style="text-align:center;margin-bottom:24px">'+
-        '<a href="'+layoutUrl+'" style="display:inline-block;background:#27500A;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:14px;font-weight:700">🗺 View Full Market Layout</a>'+
+      '<div style="position:relative;width:'+(maxX*scale)+'px;height:'+(maxY*scale)+'px;background:#f8f7f4;border:1px solid #e5e3de;border-radius:8px;margin-bottom:24px;overflow:hidden">'+
+        spotDivs+
       '</div>'+
-      '<div style="background:#f8f7f4;border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:13px;line-height:1.6">'+
-        '<strong>Market Date:</strong> '+esc(ds)+'<br>'+
-        '<strong>Setup:</strong> Please arrive 1 hour before market opens<br>'+
+      '<div style="background:#f8f7f4;border-radius:8px;padding:14px 18px;font-size:13px;line-height:1.7">'+
+        '<strong>Date:</strong> '+esc(ds)+'<br>'+
+        '<strong>Setup:</strong> Arrive 1 hour before market opens<br>'+
         '<strong>Questions?</strong> Reply to this email'+
       '</div>'+
-      '<div style="font-size:11px;color:#aaa;text-align:center;margin-top:32px;padding-top:16px;border-top:.5px solid #e5e3de">'+
-        'Elevation Bend Farmers Market · Bend, Oregon'+
-      '</div></body></html>';
+      '<div style="font-size:11px;color:#aaa;text-align:center;margin-top:28px;padding-top:14px;border-top:.5px solid #e5e3de">Elevation Bend Farmers Market · Bend, Oregon</div>'+
+    '</body></html>';
     var ok=await sendEmailResend({to:sv.email,subject:'Your Market Spot — '+ds+' — Elevation Bend Farmers Market',html:layoutHtml,text:'Hi '+(sv.contactName||sv.businessName)+',\n\nYour spot for '+ds+' is: '+(spot?'Spot '+spot.num:'not yet assigned')+'.\n\nView layout: '+layoutUrl+'\n\nThank you,\nElevation Bend Farmers Market'});
     if(ok){sentCount++;sentVendors[sv.id]=sentAt;sv.layoutSentAt=sentAt;}
   }
