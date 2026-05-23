@@ -217,7 +217,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-22</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-23</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -740,7 +740,7 @@ function renderVendors(){
     sorted.map(function(v){
       var vs=v.vendorStatus||'active';
       var cc=catColor(v.category);
-      return'<tr style="border-bottom:.5px solid #f0ede6;cursor:pointer" data-edit="'+v.id+'">'+
+      return'<tr style="border-bottom:.5px solid #f0ede6;cursor:pointer" data-edit="'+v.id+'" data-vid="'+v.id+'">'+
         '<td style="padding:8px 10px;max-width:200px;width:180px">'+
           '<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">'+
             '<div style="width:28px;height:28px;border-radius:50%;background:'+cc.bg+';color:'+cc.text+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
@@ -832,7 +832,28 @@ function renderVendors(){
   el.querySelectorAll('[data-del]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();delV(b.dataset.del);});});
 }
 async function setSt(id,val){await sb.from('vendors').update({status:val}).eq('id',id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}var v=vendors.find(function(x){return x.id===id;});if(v){v.status=val;v.modifiedAt=nowISO();}render();}
-async function setVs(id,val){await sb.from('vendors').update({vendor_status:val}).eq('id',id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}var v=vendors.find(function(x){return x.id===id;});if(v){v.vendorStatus=val;v.modifiedAt=nowISO();}render();}
+async function setVs(id,val){
+  await sb.from('vendors').update({vendor_status:val}).eq('id',id);
+  try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}
+  var v=vendors.find(function(x){return x.id===id;});
+  if(v){v.vendorStatus=val;v.modifiedAt=nowISO();}
+  // Update just the affected row without scrolling
+  var row=document.querySelector('tr[data-vid="'+id+'"]');
+  if(row){
+    // Update the status badge cell
+    var statusCell=row.querySelector('[data-vs-cell]');
+    if(statusCell)statusCell.innerHTML=vsTag(val);
+    // Update the border color
+    var tdName=row.querySelector('td:first-child');
+    if(tdName){
+      if(val==='inactive')row.style.opacity='.7';
+      else row.style.opacity='';
+    }
+  } else {
+    renderVendors();
+  }
+  renderStats();
+}
 function loadArchive(){try{var r=localStorage.getItem(ARCHIVE_KEY);return r?JSON.parse(r):[];}catch(e){return[];}}
 function saveArchive(a){try{localStorage.setItem(ARCHIVE_KEY,JSON.stringify(a));}catch(e){}}
 async function delV(id){
@@ -2580,42 +2601,89 @@ async function sendLayoutToVendor(ds,ids){
     var cc=catColor(sv.category);
     var spotInfo=spot?'<strong>Spot '+spot.num+'</strong>'+(spot.size?' ('+spot.size+')':''):'<span style="color:#a16207">No spot assigned yet</span>';
     var layoutUrl='https://akpelvb2k26.github.io/elevation-bend/layout-viewer.html?date='+encodeURIComponent(ds);
-    // Build the same visual layout used in generateLayoutPDF
-    var maxX=Math.max.apply(null,sp.map(function(s){return(s.x||0)+(s.w||80);}))||800;
-    var maxY=Math.max.apply(null,sp.map(function(s){return(s.y||0)+(s.h||80);}))||600;
-    var scale=Math.min(560/maxX,500/maxY,1);
+    // Build layout email using same approach as invoice — clean HTML with embedded styles
+    var maxX=Math.max.apply(null,sp.map(function(s){return(s.x||0)+(s.w||120);}));
+    var maxY=Math.max.apply(null,sp.map(function(s){return(s.y||0)+(s.h||110);}));
+    var scale=Math.min(900/maxX,800/maxY,1.5);
 
     var spotDivs=sp.map(function(s){
       var vid=ta[s.id];var vv=vid?vendors.find(function(x){return x.id===vid;}):null;
       var isMe=sv.id===vid;
-      var scc=vv?catColor(vv.category):{bg:'#f8f7f4',border:'#d0cec7',text:'#888'};
-      return'<div style="position:absolute;left:'+(s.x*scale)+'px;top:'+(s.y*scale)+'px;width:'+((s.w||80)*scale)+'px;height:'+((s.h||80)*scale)+'px;'+
-        'background:'+scc.bg+';border:'+(isMe?'2.5px solid '+scc.text:'1.5px solid '+scc.border)+';border-radius:4px;'+
-        'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;box-sizing:border-box;overflow:hidden;'+
-        (isMe?'box-shadow:0 0 0 2px '+scc.text+';':'')+'">'+
-        '<div style="font-size:'+(Math.max(8,10*scale))+'px;font-weight:700;color:'+scc.text+'">'+(isMe?'★ ':'')+s.num+'</div>'+
-        (vv?'<div style="font-size:'+(Math.max(6,8*scale))+'px;color:'+scc.text+';text-align:center;line-height:1.2;overflow:hidden">'+esc(vv.businessName)+'</div>':'')+'</div>';
+      var scc=vv?catColor(vv.category):{bg:'#f8f7f4',border:'#d0cec7',text:'#aaa'};
+      var sx=Math.round((s.x||0)*scale);
+      var sy=Math.round((s.y||0)*scale);
+      var sw=Math.round((s.w||120)*scale);
+      var sh=Math.round((s.h||110)*scale);
+      var fs=Math.max(11,Math.round(sw/5));
+      return'<div style="position:absolute;left:'+sx+'px;top:'+sy+'px;width:'+sw+'px;height:'+sh+'px;'+
+        'background:'+scc.bg+';border:'+(isMe?'3px solid '+scc.text:'1px solid '+scc.border)+';border-radius:4px;overflow:hidden;box-sizing:border-box;'+
+        'display:flex;align-items:center;justify-content:center;'+
+        (isMe?'outline:2px solid '+scc.text+';outline-offset:2px;':'')+'">'+
+        '<div style="font-size:'+fs+'px;font-weight:800;color:'+scc.text+'">'+(isMe?'&#9733;':'')+s.num+'</div>'+
+      '</div>';
     }).join('');
 
-    var layoutHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:640px;margin:0 auto;padding:32px;color:#1a1a1a">'+
-      '<div style="font-size:22px;font-weight:800;color:#27500A;margin-bottom:2px">Elevation Bend</div>'+
-      '<div style="font-size:13px;color:#888;margin-bottom:20px;border-bottom:2px solid #e5e3de;padding-bottom:14px">Farmers Market · Bend, Oregon</div>'+
-      '<h2 style="font-size:17px;margin-bottom:4px">Market Layout — '+esc(ds)+'</h2>'+
-      '<p style="color:#888;font-size:13px;margin-bottom:20px">Hi '+esc(sv.contactName||sv.businessName)+', here is your spot and the full market layout. Your spot is marked with ★.</p>'+
-      '<div style="background:'+cc.bg+';border:2px solid '+cc.border+';border-radius:10px;padding:16px 20px;margin-bottom:20px">'+
-        '<div style="font-size:10px;font-weight:700;color:'+cc.text+';text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your Spot</div>'+
-        '<div style="font-size:26px;font-weight:900;color:'+cc.text+';margin-bottom:4px">'+spotInfo+'</div>'+
-        '<div style="font-size:13px;color:'+cc.text+';font-weight:600">'+esc(sv.businessName)+'</div>'+
-      '</div>'+
-      '<div style="position:relative;width:'+(maxX*scale)+'px;height:'+(maxY*scale)+'px;background:#f8f7f4;border:1px solid #e5e3de;border-radius:8px;margin-bottom:24px;overflow:hidden">'+
-        spotDivs+
-      '</div>'+
-      '<div style="background:#f8f7f4;border-radius:8px;padding:14px 18px;font-size:13px;line-height:1.7">'+
-        '<strong>Date:</strong> '+esc(ds)+'<br>'+
-        '<strong>Setup:</strong> Arrive 1 hour before market opens<br>'+
-        '<strong>Questions?</strong> Reply to this email'+
-      '</div>'+
-      '<div style="font-size:11px;color:#aaa;text-align:center;margin-top:28px;padding-top:14px;border-top:.5px solid #e5e3de">Elevation Bend Farmers Market · Bend, Oregon</div>'+
+    // Build legend from categories present on this date
+    var legendCats={};
+    sp.forEach(function(s){
+      var vid=ta[s.id];var vv=vid?vendors.find(function(x){return x.id===vid;}):null;
+      if(vv&&vv.category&&!legendCats[vv.category])legendCats[vv.category]=catColor(vv.category);
+    });
+    var legendHtml=Object.keys(legendCats).map(function(cat){
+      var lcc=legendCats[cat];
+      return'<div style="display:flex;align-items:center;gap:6px;white-space:nowrap">'+
+        '<div style="width:14px;height:14px;border-radius:3px;background:'+lcc.bg+';border:1.5px solid '+lcc.border+';flex-shrink:0"></div>'+
+        '<span style="font-size:11px;color:#555">'+esc(cat)+'</span>'+
+      '</div>';
+    }).join('')+
+    '<div style="display:flex;align-items:center;gap:6px;white-space:nowrap">'+
+      '<div style="width:14px;height:14px;border-radius:3px;background:#f8f7f4;border:1px solid #d0cec7;flex-shrink:0"></div>'+
+      '<span style="font-size:11px;color:#555">Unassigned</span>'+
+    '</div>';
+
+    var tableRows=sp.slice().sort(function(a,b){return(a.num||0)-(b.num||0);}).map(function(s){
+      var vid=ta[s.id];var vv=vid?vendors.find(function(x){return x.id===vid;}):null;
+      var isMe=sv.id===vid;
+      var scc=vv?catColor(vv.category):{bg:'#fff',border:'#e5e3de',text:'#888'};
+      return'<tr style="background:'+(isMe?scc.bg:'#fff')+'">'+
+        '<td style="padding:7px 10px;font-weight:700;border-bottom:1px solid #f0ede6;white-space:nowrap">'+(isMe?'&#9733; ':'')+s.num+'</td>'+
+        '<td style="padding:7px 10px;border-bottom:1px solid #f0ede6;font-weight:'+(isMe?700:400)+'">'+(vv?esc(vv.businessName):'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td style="padding:7px 10px;border-bottom:1px solid #f0ede6;color:#888;font-size:12px">'+(vv?esc(vv.category||'—'):'—')+'</td>'+
+        '<td style="padding:7px 10px;border-bottom:1px solid #f0ede6;color:#888;font-size:12px;white-space:nowrap">'+esc(s.size||"10'x10'")+'</td>'+
+      '</tr>';
+    }).join('');
+
+    var layoutHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Market Layout — '+esc(ds)+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;color:#1a1a1a;padding:40px;max-width:1000px;margin:0 auto;}'+
+    '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:16px;border-bottom:2px solid #27500A;}'+
+    '.market-name{font-size:22px;font-weight:800;color:#27500A;}.market-sub{font-size:11px;color:#888;margin-top:3px;}'+
+    '.your-spot{background:'+cc.bg+';border:2px solid '+cc.border+';border-radius:10px;padding:16px 20px;margin-bottom:24px;}'+
+    '.your-spot .label{font-size:10px;font-weight:700;color:'+cc.text+';text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}'+
+    '.your-spot .spot-num{font-size:26px;font-weight:900;color:'+cc.text+';margin-bottom:4px;}'+
+    '.your-spot .biz{font-size:14px;font-weight:600;color:'+cc.text+';}'+
+    '.layout-canvas{position:relative;width:'+(Math.round(maxX*scale))+'px;height:'+(Math.round(maxY*scale))+'px;background:#f0ede6;border:1px solid #d0cec7;border-radius:8px;margin-bottom:28px;overflow:hidden;}'+
+    'table{width:100%;border-collapse:collapse;}th{background:#f8f7f4;text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#888;border-bottom:2px solid #e5e3de;}'+
+    '.footer{margin-top:32px;padding-top:14px;border-top:1px solid #e5e3de;font-size:10px;color:#aaa;text-align:center;line-height:1.7;}'+
+    '@media print{.no-print{display:none;}}</style></head><body>'+
+    '<div class="no-print" style="text-align:right;margin-bottom:16px"><button onclick="window.print()" style="background:#27500A;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600">🖨 Print / Save as PDF</button></div>'+
+    '<div class="header">'+
+      '<div><div class="market-name">Elevation Bend</div><div class="market-sub">Farmers Market · Bend, Oregon</div></div>'+
+      '<div style="text-align:right"><div style="font-size:18px;font-weight:800">Market Layout</div><div style="font-size:13px;color:#888;margin-top:3px">'+esc(ds)+'</div></div>'+
+    '</div>'+
+    '<p style="font-size:13px;color:#888;margin-bottom:20px">Hi '+esc(sv.contactName||sv.businessName)+', here is your spot assignment and the full layout for this market date. Your spot is marked with &#9733;.</p>'+
+    '<div class="your-spot"><div class="label">Your Spot</div><div class="spot-num">'+spotInfo+'</div><div class="biz">'+esc(sv.businessName)+'</div></div>'+
+    '<div style="font-size:13px;font-weight:700;margin-bottom:8px">Market Layout <span style="font-size:11px;font-weight:400;color:#888">— &#9733; marks your spot</span></div>'+
+    '<div class="layout-canvas">'+spotDivs+'</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px;padding:12px 16px;background:#f8f7f4;border-radius:8px;border:.5px solid #e5e3de">'+
+      '<div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;width:100%;margin-bottom:4px">Color Legend</div>'+
+      legendHtml+
+    '</div>'+
+    '<div style="font-size:13px;font-weight:700;margin-bottom:8px">Spot Directory</div>'+
+    '<table><thead><tr><th>Spot</th><th>Vendor</th><th>Category</th><th>Size</th></tr></thead><tbody>'+tableRows+'</tbody></table>'+
+    '<div style="background:#f8f7f4;border-radius:8px;padding:14px 18px;margin-top:24px;font-size:13px;line-height:1.7">'+
+      '<strong>Date:</strong> '+esc(ds)+'&nbsp;&nbsp;·&nbsp;&nbsp;<strong>Setup:</strong> Arrive 1 hour before market opens&nbsp;&nbsp;·&nbsp;&nbsp;<strong>Questions?</strong> Reply to this email'+
+    '</div>'+
+    '<div class="footer">Elevation Bend Farmers Market · Bend, Oregon<br>Thank you for being part of our market community!</div>'+
     '</body></html>';
     var ok=await sendEmailResend({to:sv.email,subject:'Your Market Spot — '+ds+' — Elevation Bend Farmers Market',html:layoutHtml,text:'Hi '+(sv.contactName||sv.businessName)+',\n\nYour spot for '+ds+' is: '+(spot?'Spot '+spot.num:'not yet assigned')+'.\n\nView layout: '+layoutUrl+'\n\nThank you,\nElevation Bend Farmers Market'});
     if(ok){sentCount++;sentVendors[sv.id]=sentAt;sv.layoutSentAt=sentAt;}
