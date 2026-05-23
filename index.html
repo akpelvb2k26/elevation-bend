@@ -831,7 +831,29 @@ function renderVendors(){
   el.querySelectorAll('[data-edit]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();openForm(b.dataset.edit);});});
   el.querySelectorAll('[data-del]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();delV(b.dataset.del);});});
 }
-async function setSt(id,val){await sb.from('vendors').update({status:val}).eq('id',id);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}var v=vendors.find(function(x){return x.id===id;});if(v){v.status=val;v.modifiedAt=nowISO();}render();}
+async function setSt(id,val){
+  await sb.from('vendors').update({status:val}).eq('id',id);
+  try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}
+  var v=vendors.find(function(x){return x.id===id;});
+  if(v){v.status=val;v.modifiedAt=nowISO();}
+  // Update just the affected row without re-rendering
+  var row=document.querySelector('tr[data-vid="'+id+'"]');
+  if(row){
+    var stSel=row.querySelector('[data-set-st]');
+    if(stSel){
+      stSel.style.background=val==='approved'?'#EAF3DE':val==='waitlist'?'#FEF9C3':val==='issue'?'#FCEBEB':'#FDECEA';
+      stSel.style.color=val==='approved'?'#27500A':val==='waitlist'?'#A16207':val==='issue'?'#791F1F':'#9B3A2E';
+    }
+    // Update sched column badge
+    var schedCell=row.querySelector('[data-sched-cell]');
+    if(schedCell)schedCell.innerHTML=schedTag(val);
+  } else if(tab==='calendar'){
+    renderCalendar();
+  } else {
+    renderVendors();
+  }
+  renderStats();
+}
 async function setVs(id,val){
   await sb.from('vendors').update({vendor_status:val}).eq('id',id);
   try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',id);}catch(e){}
@@ -1157,9 +1179,14 @@ function wireSchedulingMatrix(){
   document.querySelectorAll('[data-set-st]').forEach(function(sel){
     sel.addEventListener('change',function(){
       var v=sel.value;
-      sel.style.background=v==='approved'?'#EAF3DE':v==='waitlist'?'#FEF9C3':'#FDECEA';
-      sel.style.color=v==='approved'?'#27500A':v==='waitlist'?'#A16207':'#9B3A2E';
-      setSt(sel.dataset.setSt,v);
+      sel.style.background=v==='approved'?'#EAF3DE':v==='waitlist'?'#FEF9C3':v==='issue'?'#FCEBEB':'#FDECEA';
+      sel.style.color=v==='approved'?'#27500A':v==='waitlist'?'#A16207':v==='issue'?'#791F1F':'#9B3A2E';
+      // Update in-memory and Supabase without re-rendering
+      var id=sel.dataset.setSt;
+      var vendor=vendors.find(function(x){return x.id===id;});
+      if(vendor){vendor.status=v;vendor.modifiedAt=nowISO();}
+      sb.from('vendors').update({status:v,modified_at:nowISO()}).eq('id',id);
+      renderStats();
     });
   });
 
@@ -1421,13 +1448,13 @@ function openDayManage(ds,startTab){
   var activeTab='schedule';
 
   document.getElementById('modal-area').innerHTML=
-    '<div class="overlay" id="dmOverlay"><div class="modal md" style="display:flex;flex-direction:column;max-height:90vh">'+
-    '<div class="mtitle">📅 '+ds+'</div>'+
+    '<div class="overlay" id="dmOverlay"><div class="modal md" style="display:flex;flex-direction:column;max-height:90vh;overflow:hidden">'+
+    '<div class="mtitle" style="flex-shrink:0">📅 '+ds+'</div>'+
     '<div style="display:flex;gap:0;margin-bottom:.85rem;border:.5px solid #d0cec7;border-radius:8px;overflow:hidden;flex-shrink:0">'+
       '<button id="dmTabSched" style="flex:1;padding:7px;font-size:12px;font-weight:700;font-family:inherit;border:none;cursor:pointer;background:#27500A;color:#fff">📋 Schedule</button>'+
       '<button id="dmTabPay" style="flex:1;padding:7px;font-size:12px;font-weight:700;font-family:inherit;border:none;cursor:pointer;background:#f8f7f4;color:#888">💰 Payments</button>'+
     '</div>'+
-    '<div id="dmSchedPanel">'+
+    '<div id="dmSchedPanel" style="overflow-y:auto;flex:1">'+
     (allShown.length===0
       ?'<div class="notice warn">⚠️ No vendors found. Add vendors in the Vendors tab first.</div>'
       :'<div style="font-size:11px;color:#888;margin-bottom:.65rem">'+approved.length+' approved vendor'+(approved.length!==1?'s':'')+' · '+da.length+' currently scheduled. Check all attending this date.</div>'+
@@ -1444,7 +1471,7 @@ function openDayManage(ds,startTab){
         '</div>')+
     '</div>'+
     '<div id="dmPayPanel" style="display:none;max-height:380px;overflow-y:auto">'+mkPaymentView()+'</div>'+
-    '<div class="mfoot" id="dmFoot"></div></div></div>';
+    '<div class="mfoot" id="dmFoot" style="flex-shrink:0"></div></div></div>';
 
   // Tab switching
   document.getElementById('dmTabSched').addEventListener('click',function(){
