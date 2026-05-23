@@ -1449,7 +1449,10 @@ function openDayManage(ds,startTab){
 
   document.getElementById('modal-area').innerHTML=
     '<div class="overlay" id="dmOverlay"><div class="modal md" style="display:flex;flex-direction:column;max-height:90vh;overflow:hidden">'+
-    '<div class="mtitle" style="flex-shrink:0">📅 '+ds+'</div>'+
+    '<div class="mtitle" style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between">'+
+      '<span>📅 '+ds+'</span>'+
+      '<button onclick="closeMod()" style="font-size:12px;font-weight:700;padding:4px 12px;border:.5px solid #d0cec7;border-radius:6px;background:#f8f7f4;cursor:pointer;font-family:inherit;color:#555">Close</button>'+
+    '</div>'+
     '<div style="display:flex;gap:0;margin-bottom:.85rem;border:.5px solid #d0cec7;border-radius:8px;overflow:hidden;flex-shrink:0">'+
       '<button id="dmTabSched" style="flex:1;padding:7px;font-size:12px;font-weight:700;font-family:inherit;border:none;cursor:pointer;background:#27500A;color:#fff">📋 Schedule</button>'+
       '<button id="dmTabPay" style="flex:1;padding:7px;font-size:12px;font-weight:700;font-family:inherit;border:none;cursor:pointer;background:#f8f7f4;color:#888">💰 Payments</button>'+
@@ -1697,6 +1700,7 @@ function renderTents(){
       '<button class="btn-blue" id="autoAssignBtn">⚡ Auto-assign</button>'+
       '<button class="btn-g" id="sendLayoutFromAssignBtn">📤 Send Layout</button>'+
       '<button class="btn-amber" id="goLayoutFromAssignBtn">🗺 Go to Layout</button>'+
+      '<button class="btn-s" id="exportAssignBtn">↓ Export CSV</button>'+
       '<button class="btn-s" id="clearTentDateBtn">Clear assignments</button>'+
     '</div></div>'+
     '<div class="notice" style="margin-bottom:.75rem">'+
@@ -1706,7 +1710,28 @@ function renderTents(){
 
   var sel=document.getElementById('tentDateSel');
   if(sel)sel.addEventListener('change',function(){tentViewDate=this.value;try{renderTents();}catch(e){console.error('renderTents error:',e);}});
-  document.getElementById('autoAssignBtn').addEventListener('click',function(){try{autoAssign();}catch(e){console.error('autoAssign error:',e);}});
+  var expBtn=document.getElementById('exportAssignBtn');
+  if(expBtn)expBtn.addEventListener('click',async function(){
+    var spots=await ensureLayoutCache(tentViewDate);
+    var ta=getTentAssignments(tentViewDate);
+    var rows=[['Spot #','Size','Vendor','Category','Booth Size','Phone','Email','Contract','Electricity']];
+    spots.slice().sort(function(a,b){return(a.num||0)-(b.num||0);}).forEach(function(s){
+      var vid=ta[s.id];
+      var v=vid?vendors.find(function(x){return x.id===vid;}):null;
+      rows.push([
+        s.num||'',
+        s.size||"10'x10'",
+        v?v.businessName||'':'Unassigned',
+        v?v.category||'':'',
+        v?v.boothSize||'':'',
+        v?v.phone||'':'',
+        v?v.email||'':'',
+        v?(v.contractReceived?'Yes':'No'):'',
+        v?v.electricity||'':''
+      ]);
+    });
+    downloadCSV('eb-assignments-'+tentViewDate+'.csv',rows);
+  });
 
   // Go to Layout button
   var glBtn=document.getElementById('goLayoutFromAssignBtn');
@@ -2561,34 +2586,52 @@ async function generateLayoutPDF(ds,recipientIds){
   // Build the spot grid HTML
   var maxX=Math.max.apply(null,spots.map(function(s){return s.x+(s.w||80);}))||800;
   var maxY=Math.max.apply(null,spots.map(function(s){return s.y+(s.h||80);}))||600;
-  var scale=Math.min(700/maxX,500/maxY,1);
+  var scale=Math.min(1400/maxX,1000/maxY,2);
 
   var spotDivs=spots.map(function(s){
     var vid=ta[s.id];var v=vid?vendors.find(function(x){return x.id===vid;}):null;
     var cc=v?catColor(v.category):{bg:'#f8f7f4',border:'#d0cec7',text:'#888'};
     return'<div style="position:absolute;left:'+(s.x*scale)+'px;top:'+(s.y*scale)+'px;width:'+(s.w*scale)+'px;height:'+(s.h*scale)+'px;'+
       'background:'+cc.bg+';border:1.5px solid '+cc.border+';border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;box-sizing:border-box;overflow:hidden">'+
-      '<div style="font-size:'+(Math.max(8,10*scale))+'px;font-weight:700;color:'+cc.text+'">'+s.num+'</div>'+
-      (v?'<div style="font-size:'+(Math.max(7,8*scale))+'px;color:'+cc.text+';text-align:center;line-height:1.2;overflow:hidden">'+esc(v.businessName)+'</div>':'')+'</div>';
+      '<div style="font-size:'+(Math.max(24,28*scale))+'px;font-weight:900;color:'+cc.text+'">'+s.num+'</div>'+
+      (v?'<div style="font-size:'+(Math.max(14,16*scale))+'px;color:'+cc.text+';text-align:center;line-height:1.2;overflow:hidden">'+esc(v.businessName)+'</div>':'')+'</div>';
   }).join('');
 
   win.document.write('<!DOCTYPE html><html><head><title>Market Layout — '+esc(ds)+'</title>'+
-    '<style>body{font-family:-apple-system,sans-serif;max-width:900px;margin:20px auto;padding:0 20px;color:#1a1a1a}'+
+    '<style>body{font-family:-apple-system,sans-serif;max-width:1600px;margin:20px auto;padding:0 20px;color:#1a1a1a}'+
     '@media print{.no-print{display:none}}'+
     '.print-btn{background:#27500A;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;margin-bottom:16px}'+
     'table{width:100%;border-collapse:collapse;margin-top:20px}'+
-    'th{background:#27500A;color:#fff;padding:8px 10px;text-align:left;font-size:12px}'+
-    'td{padding:7px 10px;border-bottom:1px solid #f0ede6;font-size:12px}'+
+    'th{background:#27500A;color:#fff;padding:16px 20px;text-align:left;font-size:24px}'+
+    'td{padding:14px 20px;border-bottom:1px solid #f0ede6;font-size:24px}'+
     'tr:nth-child(even){background:#f8f7f4}'+
     '</style></head><body>'+
     '<div class="no-print"><button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button></div>'+
-    '<h2 style="color:#27500A;margin-bottom:4px">Elevation Bend Farmers Market</h2>'+
-    '<div style="font-size:14px;color:#555;margin-bottom:4px">Market Layout — '+esc(ds)+'</div>'+
-    '<div style="font-size:12px;color:#888;margin-bottom:16px">Generated '+today2+' · '+spots.length+' spots · '+approvedVendors.length+' vendors</div>'+
+    '<h2 style="color:#27500A;margin-bottom:4px;font-size:28px">Elevation Bend Farmers Market</h2>'+
+    '<div style="font-size:28px;color:#555;margin-bottom:4px">Market Layout — '+esc(ds)+'</div>'+
+    '<div style="font-size:24px;color:#888;margin-bottom:16px">Generated '+today2+' · '+spots.length+' spots · '+approvedVendors.length+' vendors</div>'+
 
     // Visual map
     '<div style="position:relative;width:'+(maxX*scale)+'px;height:'+(maxY*scale)+'px;background:#f8f7f4;border:1px solid #e5e3de;border-radius:8px;margin-bottom:24px;overflow:hidden">'+
       spotDivs+
+    '</div>'+
+
+    // Color legend
+    '<div style="margin-bottom:24px">'+
+      '<div style="font-size:22px;font-weight:700;margin-bottom:10px">Legend</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:10px">'+
+        Object.keys(CAT_COLORS).map(function(cat){
+          var c=CAT_COLORS[cat];
+          return'<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:'+c.bg+';border:1.5px solid '+c.border+'">'+
+            '<div style="width:16px;height:16px;border-radius:50%;background:'+c.dot+';flex-shrink:0"></div>'+
+            '<span style="font-size:18px;font-weight:700;color:'+c.text+'">'+esc(cat)+'</span>'+
+          '</div>';
+        }).join('')+
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:#f8f7f4;border:1.5px solid #d0cec7">'+
+          '<div style="width:16px;height:16px;border-radius:50%;background:#ccc;flex-shrink:0"></div>'+
+          '<span style="font-size:18px;font-weight:700;color:#888">Unassigned</span>'+
+        '</div>'+
+      '</div>'+
     '</div>'+
 
     // Assignment table
@@ -2899,6 +2942,7 @@ function renderLayout(){
     '<button class="btn-danger" id="lDelSelBtn" style="display:none">🗑 Remove selected</button>'+
     '<button class="btn-s" id="lSnapBtn">Snap: <span id="lSnapLabel">on</span></button>'+
     '<button class="btn-p" id="saveLayoutBtn" style="margin-left:auto">💾 Save layout for date</button>'+
+    '<button class="btn-s" id="exportLayoutPdfBtn">📄 Export PDF</button>'+
     '<button class="btn-danger" id="deleteLayoutBtn" onclick="deleteCurrentLayout()" title="Delete layout for this date">🗑 Delete layout</button></div>'+
     '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:.65rem .85rem;background:#fff;border:.5px solid #e5e3de;border-radius:10px;margin-bottom:.5rem">'+
       '<span style="font-size:13px;font-weight:800;color:#1a1a1a;margin-right:4px;align-self:center">Vendor Types:</span>'+
@@ -3140,6 +3184,7 @@ function attachLayoutEvents(){
     markLayoutUnsaved();updateLayoutStats();updateLayoutToolbar();
   });
   var lsv=document.getElementById('saveLayoutBtn');if(lsv)lsv.addEventListener('click',saveLayoutForDate);
+  var lepdf=document.getElementById('exportLayoutPdfBtn');if(lepdf)lepdf.addEventListener('click',function(){generateLayoutPDF(layoutDate,null);});
   var la=document.getElementById('addLSpotBtn');if(la)la.addEventListener('click',function(){openAddLayoutModal(false);});
   var lr=document.getElementById('addLRowBtn');if(lr)lr.addEventListener('click',function(){openAddLayoutModal(true);});
   var canvas=document.getElementById('layoutCanvas');
@@ -3404,7 +3449,7 @@ function renderLayoutSpot(sp){
             :'<div class="lspot-cat">'+esc(sp.vendorCat)+'</div>')
         :'<div style="font-size:9px;color:#aaa;margin-top:6px;text-align:center">click to assign</div>')+
       '<div class="lspot-size">'+dims.label+'</div>'+
-      '<div style="font-size:8px;font-weight:700;color:'+lcc.text+';opacity:.55;text-align:center;margin-top:2px;letter-spacing:.06em">SPOT '+sp.num+'</div>';
+      '<div style="font-size:13px;font-weight:900;color:'+lcc.text+';text-align:center;margin-top:2px">'+sp.num+'</div>';
   }
 
   document.getElementById('layoutCanvas').appendChild(el);
