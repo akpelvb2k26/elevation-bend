@@ -217,7 +217,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-26 Rev 1a</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-26 Rev 2</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -5869,13 +5869,20 @@ function renderCommsCompose(){
   document.getElementById('cSendBtn').addEventListener('click',async function(){
     var r=getRecipients();
     if(!r.length){alert('No recipients with email addresses in this selection.');return;}
-    var emails=r.map(function(v){return v.email;});
     var subj=(document.getElementById('cSubject').value||'').trim();
     var body=(document.getElementById('cBody').value||'').trim();
+    if(!subj||!body){alert('Please enter a subject and message.');return;}
     var btn=this;btn.disabled=true;btn.textContent='Sending…';
-    var ok=await sendEmailResend({bcc:emails,subject:subj,text:body,to:'noreply@resend.dev'});
-    if(!ok)sendEmail(emails.join(','),subj,body);
+    var sent=0,failed=0;
+    for(var i=0;i<r.length;i++){
+      var v=r[i];
+      var personalBody=body.replace(/\bHi,/g,'Hi '+(v.contactName||v.businessName)+',');
+      var ok=await sendEmailResend({to:v.email,subject:subj,text:personalBody});
+      if(ok)sent++;else failed++;
+      btn.textContent='Sending… '+sent+'/'+r.length;
+    }
     btn.disabled=false;btn.textContent='📧 Send Email';
+    alert('✅ Sent '+sent+' email'+(sent!==1?'s':'')+'.'+(failed?' ⚠️ '+failed+' failed.':''));
   });
 }
 
@@ -5944,10 +5951,8 @@ function renderCommsLayout(){
     var ds=(document.getElementById('layoutEmailDate')||{}).value;if(!ds)return;
     var recips=getLayoutRecips(ds);
     if(!recips.length){alert('No vendors with email addresses for '+ds+'.');return;}
-    var btn=this;btn.disabled=true;btn.textContent='Sending…';
-    var ids=recips.map(function(v){return v.id;});
-    await sendLayoutToVendor(ds,ids);
-    btn.disabled=false;btn.textContent='📧 Send to all vendors for this date';
+    closeMod();
+    sendLayoutToVendors(ds);
   });
 }
 
