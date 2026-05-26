@@ -217,7 +217,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-26 Rev 1</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-26 Rev 1a</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -1728,6 +1728,8 @@ function renderTents(){
   var sel=document.getElementById('tentDateSel');
   if(sel)sel.addEventListener('change',function(){tentViewDate=this.value;try{renderTents();}catch(e){console.error('renderTents error:',e);}});
   var expBtn=document.getElementById('exportAssignBtn');
+  var aaBtn=document.getElementById('autoAssignBtn');
+  if(aaBtn)aaBtn.addEventListener('click',function(){try{autoAssign();}catch(e){console.error('autoAssign error:',e);}});
   if(expBtn)expBtn.addEventListener('click',async function(){
     var spots=await ensureLayoutCache(tentViewDate);
     var ta=getTentAssignments(tentViewDate);
