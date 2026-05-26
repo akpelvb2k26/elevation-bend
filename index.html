@@ -217,7 +217,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-23</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-26</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -1228,7 +1228,7 @@ function buildDayPanel(ds){
   var assigned=Object.keys(ta).filter(function(k){return ta[k];}).length;
   var unassigned=appV.length-assigned;
 
-  // Payment buckets — invoice counts as paid for this date if it covers ds and status=paid
+  // Payment buckets — paid = invoice for this date is paid, outstanding = sent/draft invoice only
   var paidV=[],outstandingV=[];
   appV.concat(wlV).forEach(function(v){
     var inv=invoices.filter(function(i){
@@ -1236,7 +1236,7 @@ function buildDayPanel(ds){
     }).sort(function(a,b){return(b.created_at||'').localeCompare(a.created_at||'');});
     var latest=inv[0]||null;
     if(latest&&latest.status==='paid') paidV.push({v:v,inv:latest});
-    else outstandingV.push({v:v,inv:latest});
+    else if(latest&&(latest.status==='sent'||latest.status==='draft')) outstandingV.push({v:v,inv:latest});
   });
 
   function vcard(v,isWL){
@@ -1279,7 +1279,7 @@ function buildDayPanel(ds){
         '<div style="font-size:10px;color:#888;margin-top:2px">'+esc(v.boothSize||'—')+'</div>'+
         '<div style="margin-top:4px">'+badge+'</div>'+
       '</div>'+
-      '<div style="font-size:13px;font-weight:700;color:'+(isPaid?'#27500A':'#a16207');+'flex-shrink:0">'+(fee?'$'+fee.toFixed(2):'—')+'</div>'+
+      '<div style="font-size:13px;font-weight:700;color:'+(isPaid?'#27500A':'#a16207')+';flex-shrink:0">'+(fee?'$'+fee.toFixed(2):'—')+'</div>'+
     '</div>';
   }
 
@@ -1331,16 +1331,22 @@ function buildDayPanel(ds){
   '</div>';
 
   setTimeout(function(){
+    var panel=document.querySelector('.day-report');
+    if(!panel)return;
+    var tabSched=panel.querySelector('#dayTabSched');
+    var tabPaid=panel.querySelector('#dayTabPaid');
+    var tabOut=panel.querySelector('#dayTabOut');
     // Tab switching
-    document.querySelectorAll('[data-daytab]').forEach(function(btn){
+    panel.querySelectorAll('[data-daytab]').forEach(function(btn){
       btn.addEventListener('click',function(){
-        document.querySelectorAll('[data-daytab]').forEach(function(b){b.style=tabBtn;});
-        btn.style=tabBtnActive;
-        document.getElementById('dayTabSched').style.display='none';
-        document.getElementById('dayTabPaid').style.display='none';
-        document.getElementById('dayTabOut').style.display='none';
+        panel.querySelectorAll('[data-daytab]').forEach(function(b){b.setAttribute('style',tabBtn);});
+        btn.setAttribute('style',tabBtnActive);
+        if(tabSched)tabSched.style.display='none';
+        if(tabPaid)tabPaid.style.display='none';
+        if(tabOut)tabOut.style.display='none';
         var which=btn.dataset.daytab;
-        document.getElementById('dayTab'+which.charAt(0).toUpperCase()+which.slice(1)).style.display='';
+        var target=which==='sched'?tabSched:which==='paid'?tabPaid:tabOut;
+        if(target)target.style.display='';
       });
     });
     var mb=document.getElementById('manageDayBtn');if(mb)mb.addEventListener('click',function(){openDayManage(ds);});
