@@ -217,7 +217,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-26 Rev 2</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-26 Rev 3</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -4488,10 +4488,24 @@ function openForm(id){
         var inv=invoices.find(function(x){return x.id===btn.dataset.finvSend;});
         if(!inv||!v.email)return;
         btn.disabled=true;btn.textContent='Sending…';
+
+        // Generate Stripe payment link if configured
+        if(STRIPE_PK&&(!inv.stripe_payment_link)){
+          try{
+            var res=await fetch(SUPABASE_FN_URL+'/stripe-session',{
+              method:'POST',
+              headers:{'Content-Type':'application/json','apikey':SUPA_ANON_KEY||SUPA_KEY,'Authorization':'Bearer '+(SUPA_ANON_KEY||SUPA_KEY)},
+              body:JSON.stringify({action:'create_payment_link',vendorId:v.id,vendorName:v.businessName,amount:inv.total||0})
+            });
+            var rd=await res.json();
+            if(rd.url){inv.stripe_payment_link=rd.url;await sb.from('invoices').update({stripe_payment_link:rd.url,modified_at:nowISO()}).eq('id',inv.id);}
+          }catch(e){console.warn('Stripe link failed:',e);}
+        }
+
         await sb.from('invoices').update({status:'sent',sent_at:nowISO(),modified_at:nowISO()}).eq('id',inv.id);
         inv.status='sent';inv.sent_at=nowISO();
         var invoiceHTML=buildInvoiceHTML(inv);
-        var sent=await sendEmailResend({to:v.email,subject:'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',html:invoiceHTML,text:'Hi '+(v.contactName||v.businessName)+',\n\nInvoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\nThank you,\nElevation Bend Farmers Market'});
+        var sent=await sendEmailResend({to:v.email,subject:'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market',html:invoiceHTML,text:'Hi '+(v.contactName||v.businessName)+',\n\nInvoice '+inv.invoice_number+' for $'+parseFloat(inv.total||0).toFixed(2)+'.\n\n'+(inv.stripe_payment_link?'Pay online: '+inv.stripe_payment_link+'\n\n':'')+'Thank you,\nElevation Bend Farmers Market'});
         if(!sent){generateInvoicePDF(inv);setTimeout(function(){sendEmail(v.email,'Invoice '+inv.invoice_number+' — Elevation Bend Farmers Market','');},500);}
         btn.disabled=false;btn.textContent='📧 Send';
         renderInvoicesPanel();
