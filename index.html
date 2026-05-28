@@ -219,7 +219,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-27</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-28</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -707,10 +707,10 @@ function renderVendors(){
   var el=document.getElementById('main-content');
   var allV=vendors.filter(function(v){
     if(vsFilter==='all')return true;
-    if(vsFilter==='approved')return v.status==='approved';
+    if(vsFilter==='approved')return v.status==='approved'||v.status==='approved_og';
     if(vsFilter==='waitlist')return v.status==='waitlist';
     if(vsFilter==='pending')return v.status==='pending';
-    if(vsFilter==='eligible')return v.status==='approved'&&(v.vendorStatus||'active')==='active';
+    if(vsFilter==='eligible')return (v.status==='approved'||v.status==='approved_og')&&(v.vendorStatus||'active')==='active';
     if(vsFilter==='contract')return v.contractReceived;
     if(vsFilter==='payment')return v.paymentReceived;
     return true;
@@ -4414,7 +4414,7 @@ function openForm(id){
   // Always sync selectedDates from calRows before opening so chips reflect current calendar state
   syncVendorDatesFromCalendar();
   formDirty=false;
-  eId=id||null;formTab=0;formCompletedTabs=new Set();
+  eId=id||null;var savedTab=formTab;formTab=0;formCompletedTabs=new Set();
   var v=id?vendors.find(function(x){return x.id===id;}):{};if(!v)v={};
   window._ep=(v.photos||[]).slice();
   var vs=v.vendorStatus||'active',allDates=getMarketDates();
@@ -4578,6 +4578,8 @@ function openForm(id){
   var fo2=document.getElementById('formOverlay');
   if(fo2)fo2.querySelectorAll('.fsnb').forEach(function(b){b.addEventListener('click',function(){goFormTab(parseInt(b.dataset.ftab));});});
   formDirty=false;
+  // Restore the tab the user was on when navigating between vendors
+  if(savedTab>0)setTimeout(function(){goFormTab(savedTab);},0);
   document.querySelectorAll('#formOverlay input,#formOverlay textarea,#formOverlay select').forEach(function(el){el.addEventListener('change',function(){formDirty=true;});el.addEventListener('input',function(){formDirty=true;});});
   document.querySelectorAll('#formOverlay .ropt').forEach(function(lbl){lbl.addEventListener('click',function(){formDirty=true;});});
   document.querySelectorAll('#formOverlay .dc').forEach(function(chip){chip.addEventListener('click',function(){formDirty=true;});});
@@ -6425,7 +6427,7 @@ function renderCommsCompose(){
       Object.keys(CAT_COLORS).map(function(cat){return'<option value="cat:'+cat+'">Category: '+cat.split(' / ')[0]+'</option>';}).join('')+
     '</select></div>'+
 
-    '<div class="fg" id="cRecipPreview" style="font-size:11px;color:#888;padding:.4rem .6rem;background:#f8f7f4;border-radius:6px;margin-top:-8px"></div>'+
+    '<div class="fg" id="cRecipPreview" style="font-size:14px;font-weight:600;color:#27500A;padding:.5rem .75rem;background:#EAF3DE;border-radius:6px;margin-top:-8px;border:.5px solid #c5e0a8"></div>'+
 
     '<div class="fg"><label>Subject</label><input id="cSubject" value="Elevation Bend Farmers Market" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit"></div>'+
     '<div class="fg"><label>Message</label><textarea id="cBody" style="width:100%;height:160px;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical" placeholder="Type your message here…"></textarea></div>'+
@@ -6450,7 +6452,27 @@ function renderCommsCompose(){
   function updatePreview(){
     var r=getRecipients();
     var prev=document.getElementById('cRecipPreview');
-    if(prev)prev.textContent=r.length+' recipient'+(r.length!==1?'s':'')+': '+r.slice(0,3).map(function(v){return v.businessName;}).join(', ')+(r.length>3?' + '+(r.length-3)+' more':'');
+    if(!prev)return;
+    var type=document.getElementById('cRecipType').value;
+    var summary=r.length+' recipient'+(r.length!==1?'s':'')+': '+r.slice(0,3).map(function(v){return v.businessName;}).join(', ')+(r.length>3?' + '+(r.length-3)+' more':'');
+    var viewAllBtn=r.length>3?'<button type="button" id="cViewAllBtn" style="margin-left:10px;font-size:11px;padding:2px 8px;border-radius:10px;border:.5px solid #639922;background:#fff;color:#27500A;cursor:pointer;font-family:inherit;font-weight:600">View all</button>':'';
+    prev.innerHTML='<span>'+summary+'</span>'+viewAllBtn;
+    var vab=document.getElementById('cViewAllBtn');
+    if(vab)vab.addEventListener('click',function(){
+      // Toggle full list
+      var fullList=document.getElementById('cRecipFull');
+      if(fullList){fullList.remove();return;}
+      var div=document.createElement('div');
+      div.id='cRecipFull';
+      div.style.cssText='margin-top:6px;max-height:220px;overflow-y:auto;border:.5px solid #c5e0a8;border-radius:6px;background:#fff;font-size:14px;';
+      div.innerHTML=r.slice().sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');}).map(function(v,i){
+        return'<div style="padding:5px 10px;border-bottom:.5px solid #f0ede6;display:flex;align-items:center;gap:8px;background:'+(i%2===0?'#fff':'#f8f7f4')+'">'+
+          '<span style="font-weight:600;flex:1">'+esc(v.businessName||'')+'</span>'+
+          '<span style="color:#888;font-size:11px">'+esc(v.email||'')+'</span>'+
+        '</div>';
+      }).join('');
+      prev.appendChild(div);
+    });
   }
 
   document.getElementById('cRecipType').addEventListener('change',updatePreview);
@@ -6614,15 +6636,15 @@ function renderCommsGroups(){
     commsView='compose';
     renderComms();
     // Pre-select this group in the recipient dropdown
-    var sel=document.getElementById('cRecipSel');
-    if(sel){
-      // Find and select the group option
-      Array.from(sel.options).forEach(function(opt){
-        if(opt.value==='group:'+g.id)sel.value='group:'+g.id;
-      });
-    }
-    var subj=document.getElementById('cSubject');
-    if(subj)subj.focus();
+    setTimeout(function(){
+      var sel=document.getElementById('cRecipType');
+      if(sel){
+        sel.value='group:'+g.id;
+        sel.dispatchEvent(new Event('change'));
+      }
+      var subj=document.getElementById('cSubject');
+      if(subj)subj.focus();
+    },50);
   });});
 }
 
@@ -7296,8 +7318,10 @@ function openGroupModal(groupId){
       '<select id="gFilterStatus" style="width:100%;border:.5px solid #d0cec7;border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit">'+
         '<option value="">All statuses</option>'+
         '<option value="approved">Approved</option>'+
+        '<option value="approved_og">★ Approved & OG</option>'+
         '<option value="pending">Pending</option>'+
         '<option value="waitlist">Waitlist</option>'+
+        '<option value="issue">Issue</option>'+
       '</select></div>'+
     '</div>'+
     // Date filter (full width)
@@ -7318,7 +7342,7 @@ function openGroupModal(groupId){
     // Vendor list
     '<div style="max-height:320px;overflow-y:auto;border:.5px solid #e5e3de;border-radius:8px" id="gMemberList">'+
     '<table style="width:100%;border-collapse:collapse">'+
-      vendors.map(function(v){
+      vendors.slice().sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');}).map(function(v){
         var av=avc(v.businessName||'?');
         var cc=catColor(v.category);
         return'<tr class="g-member-opt" style="border-bottom:.5px solid #f0ede6;cursor:pointer"'+
@@ -7402,13 +7426,16 @@ function openGroupModal(groupId){
     if(!name){alert('Please enter a group name.');return;}
     var ids=Array.from(document.querySelectorAll('.g-member-cb:checked')).map(function(c){return c.value;});
     var row={name:name,member_ids:ids};
+    savBtn.disabled=true;savBtn.textContent='Saving…';
     if(g){
-      await sb.from('vendor_groups').update(row).eq('id',g.id);
+      var{error:ue}=await sb.from('vendor_groups').update(row).eq('id',g.id);
+      if(ue){alert('Error saving group: '+ue.message);savBtn.disabled=false;savBtn.textContent='Save group';return;}
       var idx=vendorGroups.findIndex(function(x){return x.id===g.id;});
       if(idx>-1)vendorGroups[idx]=Object.assign({},g,row);
     } else {
       row.id=uid();
-      await sb.from('vendor_groups').upsert(row);
+      var{error:ie}=await sb.from('vendor_groups').insert(row);
+      if(ie){alert('Error saving group: '+ie.message);savBtn.disabled=false;savBtn.textContent='Save group';return;}
       vendorGroups.push(row);
     }
     closeMod();renderComms();
