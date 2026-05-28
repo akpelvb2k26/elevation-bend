@@ -105,6 +105,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
 .lspot.dragging{cursor:grabbing;z-index:100;opacity:.88;border-color:#378ADD;box-shadow:0 4px 16px rgba(0,0,0,.12)}
 .lspot.lsel{border-color:#639922;box-shadow:0 0 0 2.5px #c0dd97;z-index:20}
 .lspot.locc{background:#EAF3DE;border-color:#639922}
+.lspot.log{border-color:#DC2626!important;border-width:3px!important;box-shadow:0 0 0 1px #DC2626}
 .lspot.ltruck{border-style:dashed}
 .lspot-del{position:absolute;top:-7px;right:-7px;width:18px;height:18px;border-radius:50%;background:#791F1F;border:1.5px solid #fff;color:#fff;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:30;font-family:inherit;line-height:1}
 .lspot:hover .lspot-del,.lspot.lsel .lspot-del{display:flex}
@@ -122,8 +123,9 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
 .report-wrap{background:#fff;border:.5px solid #e5e3de;border-radius:12px;overflow:hidden;margin-bottom:.85rem}
 .sched-approved{background:#EAF3DE;color:#27500A;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #639922}
 .sched-waitlist{background:#FEF9C3;color:#A16207;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #EAB308}
-.sched-pending{background:#FDECEA;color:#9B3A2E;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #F1948A}
-.sched-issue{background:#FCEBEB;color:#791F1F;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #e08080}
+.sched-pending{background:#FCEBEB;color:#791F1F;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #e08080}
+.sched-issue{background:#FEF9C3;color:#A16207;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #EAB308}
+.sched-og{background:#FEE2E2;color:#9B1C1C;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block;border:.5px solid #F87171}
 .overlay{background:rgba(0,0,0,.4);position:fixed;inset:0;z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto}
 .modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;margin:auto}
 .modal.sm{max-width:380px}.modal.md{max-width:560px}.modal.lg{max-width:720px}.modal.xl{max-width:1000px}
@@ -140,8 +142,8 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
 .fsnb.active .fsnb-dot{background:#1a1a1a}
 .progress-bar{height:3px;background:#f0ede6}
 .progress-fill{height:3px;background:#22c55e;transition:width .25s}
-.fpanel{display:none;padding:1.1rem 1.25rem;min-height:320px;overflow-y:visible}
-.fpanel.active{display:block}
+.fpanel{display:none;padding:1.1rem 1.25rem;flex:1;overflow-y:auto;overflow-x:hidden}
+.fpanel.active{display:block;flex:1}
 .fsec-title{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.85rem;padding-bottom:.4rem;border-bottom:.5px solid #e5e3de}
 .fg{margin-bottom:.75rem}
 .fg label{font-size:13px;color:#555;display:block;margin-bottom:4px;font-weight:700}
@@ -182,7 +184,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
 .info-strip{display:flex;gap:12px;flex-wrap:wrap;padding:.6rem .85rem;background:#f8f7f4;border-radius:8px;border:.5px solid #e5e3de;margin-top:.5rem}
 .isl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.04em}
 .isv{font-size:11px;font-weight:600;margin-top:2px}
-.form-footer{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.25rem;border-top:.5px solid #e5e3de;gap:8px;flex-wrap:wrap}
+.form-footer{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.25rem;border-top:.5px solid #e5e3de;gap:8px;flex-wrap:wrap;min-height:70px;flex-shrink:0}
 .upload-zone{border:1.5px dashed #d0cec7;border-radius:10px;padding:1rem;text-align:center;cursor:pointer;color:#aaa;font-size:12px}
 .upload-zone:hover{border-color:#378ADD;background:#E6F1FB}
 .notice{font-size:12px;color:#888;padding:.5rem .65rem;background:#f8f7f4;border-radius:8px;border:.5px solid #e5e3de;margin-bottom:.65rem;line-height:1.5}
@@ -217,7 +219,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-26 Rev 3</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-27</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -313,7 +315,7 @@ var invSortCol='status',invSortDir=1; // invoice sort state
 var reportSortCol='',reportSortDir=1; // 1=asc, -1=desc
 var layoutDate='',layoutSpots=[],layoutUnsaved=false,layoutSelectedIds=new Set(),layoutSnapOn=true,layoutSelectMode=false,layoutViewMode='detail'; // 'detail' or 'summary'
 var csvData=[]; // global so it persists across renderManage() calls
-var formTab=0,formTotalTabs=8,formCompletedTabs=new Set();
+var formTab=0,formTotalTabs=9,formCompletedTabs=new Set();
 var formDirty=false;
 window._ep=[];
 
@@ -364,7 +366,7 @@ async function getVendorSnap(vendorId,ds){
 function avc(n){var h=0;for(var i=0;i<(n||'').length;i++)h=(h*31+n.charCodeAt(i))%6;return{bg:AVC[Math.abs(h)],text:AVT[Math.abs(h)]};}
 function ini(n){return String(n||'?').split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);}
 function vsTag(vs){var c=VSC[vs||'active']||VSC.active;return'<span class="tag '+c.tagCls+'"><span class="vs-dot" style="background:'+c.dot+'"></span>'+c.label+'</span>';}
-function schedTag(s){if(s==='approved')return'<span class="sched-approved">Approved</span>';if(s==='waitlist')return'<span class="sched-waitlist">Waitlist</span>';if(s==='issue')return'<span class="sched-issue">⚠️ Issue</span>';return'<span class="sched-pending">Pending</span>';}
+function schedTag(s){if(s==='approved')return'<span class="sched-approved">Approved</span>';if(s==='approved_og')return'<span class="sched-og">★ Approved & OG</span>';if(s==='waitlist')return'<span class="sched-waitlist">Waitlist</span>';if(s==='issue')return'<span class="sched-issue">⚠️ Issue</span>';return'<span class="sched-pending">Pending</span>';}
 function uid(){return'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function csvCell(v){return'"'+String(v||'').replace(/"/g,'""')+'"';}
@@ -393,7 +395,7 @@ function getApproved(ds){
 }
 function getWaitlist(ds){return(calRows[ds]&&calRows[ds].waitlist)||[];}
 function getTentAssignments(ds){return(calRows[ds]&&calRows[ds].tent_assignments)||{};}
-function eligibleVendors(){return vendors.filter(function(v){return v.status==='approved'&&(v.vendorStatus||'active')==='active';}).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});}
+function eligibleVendors(){return vendors.filter(function(v){return (v.status==='approved'||v.status==='approved_og')&&(v.vendorStatus||'active')==='active';}).sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');});}
 function lKey(ds){return'eb_layout_'+ds;}
 function lDatesKey(){return'eb_layout_dates';}
 function snapV(v){return layoutSnapOn?Math.round(v/20)*20:v;}
@@ -433,6 +435,8 @@ document.getElementById('signout-btn').addEventListener('click',async function()
 });
 async function checkSession(){var{data}=await sb.auth.getSession();if(data.session){currentUser=data.session.user;enterApp();}}
 function enterApp(){
+  // Check for e-signature request (vendor clicking their sign link — no login needed)
+  if(window.location.search.indexOf('sign=')>-1){checkForSigningRequest();return;}
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
   document.getElementById('user-email').textContent=currentUser.email;
@@ -491,6 +495,9 @@ async function ensureSchema(){
   // Add optional columns if they don't exist — safe to run multiple times
   var sqls=[
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS contract_received BOOLEAN DEFAULT false",
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS contract_token TEXT DEFAULT ''",
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS contract_signed_at TEXT DEFAULT ''",
+    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS contract_signed_name TEXT DEFAULT ''",
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS payment_received BOOLEAN DEFAULT false",
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''",
     "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS booth_fee NUMERIC DEFAULT 0",
@@ -544,7 +551,7 @@ async function persistVendorDates(vid){
   try{await sb.from('vendors').update({selected_dates:v.selectedDates}).eq('id',vid);try{await sb.from('vendors').update({modified_at:nowISO()}).eq('id',vid);}catch(e){}}
   catch(e){console.warn('Could not persist vendor dates:',e.message);}
 }
-function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local||r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.own_setup_comment||r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',boothFee:r.booth_fee||0,photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
+function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local||r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.own_setup_comment||r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',boothFee:r.booth_fee||0,photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,contractToken:r.contract_token||'',contractSignedAt:r.contract_signed_at||'',contractSignedName:r.contract_signed_name||'',paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
 async function saveVendorDB(data,id){
   var isNew=!id;
   // ── Core row — only columns that definitely exist in base Supabase vendors table ──
@@ -588,6 +595,9 @@ async function saveVendorDB(data,id){
     modified_at:nowISO(),
     selected_dates:data.selectedDates||[],
     contract_received:!!data.contractReceived,
+    contract_token:data.contractToken||'',
+    contract_signed_at:data.contractSignedAt||'',
+    contract_signed_name:data.contractSignedName||'',
     payment_received:!!data.paymentReceived,
     notes:data.notes||'',
     booth_fee:data.boothFee||0
@@ -729,7 +739,7 @@ function renderVendors(){
       vTh('name','Business')+
       vTh('contact','Contact')+
       vTh('category','Category')+
-      vTh('sched','Sched.')+
+      vTh('sched','State')+
       vTh('vstatus','Status')+
       vTh('dates','Dates')+
       vTh('contract','Contract')+
@@ -750,6 +760,7 @@ function renderVendors(){
             '<select data-set-st="'+v.id+'" style="font-size:11px;padding:3px 6px;border:.5px solid #d0cec7;border-radius:6px;font-family:inherit;cursor:pointer;font-weight:600;background:'+(v.status==='approved'?'#EAF3DE':v.status==='waitlist'?'#FEF9C3':'#FDECEA')+';color:'+(v.status==='approved'?'#27500A':v.status==='waitlist'?'#A16207':'#9B3A2E')+'">'+
               '<option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option>'+
               '<option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option>'+
+              '<option value="approved_og"'+(v.status==='approved_og'?' selected':'')+'>★ Approved & OG</option>'+
               '<option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option>'+
               '<option value="issue"'+(v.status==='issue'?' selected':'')+'>⚠️ Issue</option>'+
             '</select>'+
@@ -1183,8 +1194,8 @@ function wireSchedulingMatrix(){
   document.querySelectorAll('[data-set-st]').forEach(function(sel){
     sel.addEventListener('change',function(){
       var v=sel.value;
-      sel.style.background=v==='approved'?'#EAF3DE':v==='waitlist'?'#FEF9C3':v==='issue'?'#FCEBEB':'#FDECEA';
-      sel.style.color=v==='approved'?'#27500A':v==='waitlist'?'#A16207':v==='issue'?'#791F1F':'#9B3A2E';
+      sel.style.background=v==='approved'?'#EAF3DE':v==='approved_og'?'#FEE2E2':v==='waitlist'?'#FEF9C3':v==='issue'?'#FEF9C3':'#FCEBEB';
+      sel.style.color=v==='approved'?'#27500A':v==='approved_og'?'#9B1C1C':v==='waitlist'?'#A16207':v==='issue'?'#A16207':'#791F1F';
       // Update in-memory and Supabase without re-rendering
       var id=sel.dataset.setSt;
       var vendor=vendors.find(function(x){return x.id===id;});
@@ -2610,8 +2621,11 @@ async function generateLayoutPDF(ds,recipientIds){
   var spotDivs=spots.map(function(s){
     var vid=ta[s.id];var v=vid?vendors.find(function(x){return x.id===vid;}):null;
     var cc=v?catColor(v.category):{bg:'#f8f7f4',border:'#d0cec7',text:'#888'};
+    var isOG=v&&v.status==='approved_og';
+    var borderStyle=isOG?'3px solid #DC2626':'1.5px solid '+cc.border;
+    var boxShadow=isOG?'box-shadow:0 0 0 2px #DC2626;':'';
     return'<div style="position:absolute;left:'+(s.x*scale)+'px;top:'+(s.y*scale)+'px;width:'+(s.w*scale)+'px;height:'+(s.h*scale)+'px;'+
-      'background:'+cc.bg+';border:1.5px solid '+cc.border+';border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;box-sizing:border-box;overflow:hidden">'+
+      'background:'+cc.bg+';border:'+borderStyle+';border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;box-sizing:border-box;overflow:hidden;'+boxShadow+'">'+
       '<div style="font-size:'+(Math.max(24,28*scale))+'px;font-weight:900;color:'+cc.text+'">'+s.num+'</div>'+
       (v?'<div style="font-size:'+(Math.max(14,16*scale))+'px;color:'+cc.text+';text-align:center;line-height:1.2;overflow:hidden">'+esc(v.businessName)+'</div>':'')+'</div>';
   }).join('');
@@ -2649,6 +2663,10 @@ async function generateLayoutPDF(ds,recipientIds){
         '<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:#f8f7f4;border:1.5px solid #d0cec7">'+
           '<div style="width:16px;height:16px;border-radius:50%;background:#ccc;flex-shrink:0"></div>'+
           '<span style="font-size:18px;font-weight:700;color:#888">Unassigned</span>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:#fff;border:3px solid #DC2626">'+
+          '<div style="width:16px;height:16px;border-radius:50%;background:#DC2626;flex-shrink:0"></div>'+
+          '<span style="font-size:18px;font-weight:700;color:#DC2626">★ Approved &amp; OG</span>'+
         '</div>'+
       '</div>'+
     '</div>'+
@@ -2790,6 +2808,161 @@ async function sendLayoutToVendor(ds,ids){
   setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4000);
   // Refresh assignments view
   if(tab==='tents')renderTents();
+}
+
+function generateSignedContractPDF(v){
+  var win=window.open('','_blank','width=800,height=1000,scrollbars=yes');
+  var dates=(v.selectedDates||[]).sort().join(', ')||'— to be confirmed';
+  var signedDate=v.contractSignedAt?new Date(v.contractSignedAt).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):'';
+  var signedTime=v.contractSignedAt?new Date(v.contractSignedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZoneName:'short'}):'';
+  var today2=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  win.document.write('<!DOCTYPE html><html><head><title>Signed Contract — '+esc(v.businessName)+'</title>'+
+    '<style>body{font-family:Georgia,serif;max-width:750px;margin:40px auto;padding:0 30px;color:#1a1a1a;line-height:1.7}'+
+    '@media print{.no-print{display:none}body{margin:20px}}'+
+    'h1{color:#27500A;font-size:22px;border-bottom:2px solid #639922;padding-bottom:10px}'+
+    'h2{color:#27500A;font-size:15px;margin-top:28px;margin-bottom:8px}'+
+    '.box{border:1.5px solid #1a1a1a;padding:8px 12px;border-radius:4px;margin:8px 0;min-height:36px;background:#fafafa}'+
+    '.print-btn{background:#27500A;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;margin-bottom:20px}'+
+    'p{margin:8px 0}</style></head><body>'+
+    '<div class="no-print"><button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button></div>'+
+    '<div style="background:#EAF3DE;border:1.5px solid #639922;border-radius:10px;padding:16px 20px;margin-bottom:24px;font-family:sans-serif">'+
+      '<div style="font-size:16px;font-weight:700;color:#27500A;margin-bottom:4px">&#9989; Electronically Signed Contract</div>'+
+      '<div style="font-size:12px;color:#27500A">Signed under the federal E-SIGN Act (15 U.S.C. §7001 et seq.)</div>'+
+    '</div>'+
+    '<h1>Elevation Bend Farmers Market<br><span style="font-size:15px;font-weight:400;color:#555">Vendor Participation Agreement — 2026 Season</span></h1>'+
+    '<h2>1. Parties</h2>'+
+    '<p><strong>Business Name:</strong> <span class="box">'+esc(v.businessName||'')+'</span></p>'+
+    '<p><strong>Contact:</strong> <span class="box">'+esc(v.contactName||'')+'</span></p>'+
+    '<p><strong>Email:</strong> <span class="box">'+esc(v.email||'')+'</span></p>'+
+    '<p><strong>Category:</strong> <span class="box">'+esc(v.category||'')+'</span></p>'+
+    '<h2>2. Market Dates</h2>'+
+    '<div class="box" style="min-height:60px">'+esc(dates)+'</div>'+
+    '<h2>3. Booth</h2>'+
+    '<p><strong>Size:</strong> <span class="box">'+esc(v.boothSize||"10'x10'")+'</span></p>'+
+    '<h2>4. Fees</h2>'+
+    '<p>Booth fee per market day: <strong>$'+((v.boothFee>0?v.boothFee:feeForBoothSize(v.boothSize)||0)).toFixed(2)+'</strong></p>'+
+    '<h2>5. Products</h2>'+
+    '<div class="box" style="min-height:50px">'+esc(v.products||'As described in vendor application')+'</div>'+
+    '<h2>6. Rules</h2>'+
+    '<p>Vendor agrees to set up by 7:45am, remain for the full market, keep their space clean, maintain required insurance, and comply with all Market management directions.</p>'+
+    '<div style="margin-top:40px;padding:24px;background:#EAF3DE;border:2px solid #639922;border-radius:10px;font-family:sans-serif">'+
+      '<div style="display:inline-block;background:#27500A;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:14px">&#9989; ELECTRONICALLY SIGNED</div>'+
+      '<p><strong>Signed by:</strong> '+esc(v.contractSignedName||'')+'</p>'+
+      '<p><strong>Date:</strong> '+signedDate+'</p>'+
+      '<p><strong>Time:</strong> '+signedTime+'</p>'+
+      '<p><strong>Email:</strong> '+esc(v.email||'')+'</p>'+
+      '<p style="font-size:11px;color:#555;margin-top:12px;border-top:1px solid #c5e0a8;padding-top:10px">'+
+        'This electronic signature is legally binding under the federal E-SIGN Act (15 U.S.C. §7001 et seq.) and UETA. '+
+        'The signatory typed their full legal name and clicked "I Agree &amp; Sign". Timestamp recorded at time of signing.'+
+      '</p>'+
+    '</div>'+
+    '<div style="margin-top:28px;font-family:sans-serif;font-size:11px;color:#aaa;text-align:center;border-top:1px solid #e5e3de;padding-top:14px">'+
+      'Elevation Bend Farmers Market · Bend, Oregon · Generated '+today2+
+    '</div></body></html>');
+  win.document.close();
+}
+
+function generateFoodContractPDF(v){
+  var win=window.open('','_blank','width=800,height=1000,scrollbars=yes');
+  var dates=(v.selectedDates||[]).sort().join(', ')||'— to be confirmed';
+  var fee='$'+(v.boothFee||0).toFixed(2);
+  var today2=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  win.document.write('<!DOCTYPE html><html><head><title>Food Vendor Contract — '+esc(v.businessName)+'</title>'+
+    '<style>body{font-family:Georgia,serif;max-width:750px;margin:40px auto;padding:0 30px;color:#1a1a1a;line-height:1.7}'+
+    '@media print{.no-print{display:none}body{margin:20px}}'+
+    'h1{color:#92400E;font-size:22px;border-bottom:2px solid #D97706;padding-bottom:10px}'+
+    'h2{color:#92400E;font-size:15px;margin-top:28px;margin-bottom:8px}'+
+    '.field{border-bottom:1.5px solid #1a1a1a;display:inline-block;min-width:200px;margin:0 4px}'+
+    '.box{border:1.5px solid #1a1a1a;padding:8px 12px;border-radius:4px;margin:8px 0;min-height:36px;background:#fafafa}'+
+    '.sig-line{border-bottom:1.5px solid #1a1a1a;margin-top:50px;margin-bottom:5px}'+
+    '.sig-block{display:inline-block;width:47%;vertical-align:top;margin-right:5%}'+
+    '.print-btn{background:#92400E;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;margin-bottom:20px}'+
+    '.highlight{background:#FEF9C3;padding:4px 8px;border-radius:4px;border:.5px solid #EAB308}'+
+    'p{margin:8px 0}</style></head><body>'+
+    '<div class="no-print"><button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button></div>'+
+    '<h1>🍽 Elevation Bend Farmers Market<br><span style="font-size:15px;font-weight:400;color:#555">Prepared Food &amp; Food Truck Vendor Agreement — 2026 Season</span></h1>'+
+    '<p style="font-size:13px;color:#888">Generated: '+today2+'</p>'+
+
+    '<h2>1. Parties</h2>'+
+    '<p>This agreement is between <strong>Elevation Bend Farmers Market</strong> ("Market") located in Bend, Oregon, and:</p>'+
+    '<p><strong>Business Name:</strong> <span class="box">'+esc(v.businessName||'')+'</span></p>'+
+    '<p><strong>Contact Name:</strong> <span class="box">'+esc(v.contactName||'')+'</span></p>'+
+    '<p><strong>Email:</strong> <span class="box">'+esc(v.email||'')+'</span> &nbsp; <strong>Phone:</strong> <span class="box">'+esc(v.phone||'')+'</span></p>'+
+    '<p><strong>Business Category:</strong> <span class="box">'+esc(v.category||'Prepared Food Vendor')+'</span></p>'+
+
+    '<h2>2. Market Dates</h2>'+
+    '<p>Vendor is approved to participate on the following market dates (Fridays, 8am–1pm):</p>'+
+    '<div class="box" style="min-height:60px">'+esc(dates)+'</div>'+
+
+    '<h2>3. Space &amp; Equipment</h2>'+
+    '<p><strong>Space size:</strong> <span class="box">'+esc(v.boothSize||"Food truck / trailer")+'</span></p>'+
+    '<p><strong>Electricity required:</strong> <span class="box">'+esc(v.electricity||'No')+'</span></p>'+
+    '<p>Vendor must operate within their assigned space only. Vehicles, trailers, and equipment must remain within the designated footprint. No staking into pavement without prior Market approval.</p>'+
+
+    '<h2>4. Fees</h2>'+
+    '<p><strong>Booth fee per market day:</strong> <span class="field">'+fee+'</span></p>'+
+    '<p>Fees are due no later than 7 days prior to each market date. Failure to pay may result in forfeiture of the reserved spot.</p>'+
+
+    '<h2>5. Menu &amp; Products</h2>'+
+    '<p>Vendor agrees to sell only the food items listed below. Menu changes must be approved in writing by Market management prior to the market date.</p>'+
+    '<div class="box" style="min-height:80px">'+esc(v.products||'As described in vendor application')+'</div>'+
+
+    '<h2>6. Health &amp; Safety Requirements</h2>'+
+    '<p class="highlight">⚠️ All required licenses and permits must be current and posted visibly at the booth at all times.</p>'+
+    '<p>Vendor must comply with all applicable Deschutes County and Oregon Department of Agriculture food safety regulations, including but not limited to:</p>'+
+    '<ul style="margin:8px 0 8px 24px">'+
+      '<li>Current Oregon Food Handler permits for all staff</li>'+
+      '<li>Temporary Restaurant License or Mobile Food Unit License issued by Deschutes County Environmental Health</li>'+
+      '<li>Proper handwashing station (if serving food requiring hand contact)</li>'+
+      '<li>Food-safe temperature maintenance (hot foods ≥135°F, cold foods ≤41°F)</li>'+
+      '<li>Covered waste receptacle and grease containment</li>'+
+    '</ul>'+
+    '<p><strong>Licenses on file:</strong> <span class="box" style="min-width:300px">'+esc(v.licenses||'')+'</span></p>'+
+    '<p><strong>Food documentation on file:</strong> <span class="box" style="min-width:300px">'+esc((v.foodDocs||[]).join(', ')||'')+'</span></p>'+
+
+    '<h2>7. Fire Safety</h2>'+
+    '<p>Vendors using open flame, propane, or cooking equipment must maintain a minimum 10-foot clearance from other structures and must have a Type K or ABC fire extinguisher accessible and within certification date. Vendors operating enclosed cooking units must have their fire suppression systems current. Proof of fire suppression certification may be required upon request.</p>'+
+
+    '<h2>8. Waste &amp; Grease Disposal</h2>'+
+    '<p>Vendor is responsible for all waste removal including used cooking oil/grease. Grease may not be disposed of in Market trash receptacles, drains, or on the ground. Vendor must transport waste off-site.</p>'+
+
+    '<h2>9. Liability Insurance</h2>'+
+    '<p>Vendor must maintain general liability insurance of no less than $1,000,000 per occurrence and $2,000,000 aggregate. Elevation Bend Farmers Market must be listed as an additional insured. Certificate of Insurance must be provided prior to the first market date.</p>'+
+    '<p><strong>Insurance carrier:</strong> <span class="box" style="min-width:300px">'+esc(v.liability||'')+'</span></p>'+
+
+    '<h2>10. Market Rules</h2>'+
+    '<ul style="margin:8px 0 8px 24px">'+
+      '<li>Setup begins no earlier than 6:00am. All vendors must be fully set up by 7:45am.</li>'+
+      '<li>No vehicle movement on the market grounds between 7:45am and 1:15pm.</li>'+
+      '<li>Vendor must remain for the full market duration unless otherwise approved.</li>'+
+      '<li>Generator use requires pre-approval and must meet noise level requirements.</li>'+
+      '<li>Vendor is responsible for leaving their space clean and free of waste.</li>'+
+    '</ul>'+
+
+    '<h2>11. Agreement</h2>'+
+    '<p>By signing below, Vendor agrees to all terms in this agreement and confirms that all required permits, licenses, and insurance are current and will be maintained throughout the market season.</p>'+
+
+    '<div style="margin-top:40px;display:flex;gap:5%">'+
+      '<div class="sig-block">'+
+        '<div class="sig-line"></div>'+
+        '<p style="font-size:12px">Vendor Signature &nbsp;&nbsp;&nbsp; Date</p>'+
+        '<div class="sig-line" style="margin-top:30px"></div>'+
+        '<p style="font-size:12px">Printed Name &amp; Title</p>'+
+      '</div>'+
+      '<div class="sig-block">'+
+        '<div class="sig-line"></div>'+
+        '<p style="font-size:12px">Market Manager Signature &nbsp;&nbsp;&nbsp; Date</p>'+
+        '<div class="sig-line" style="margin-top:30px"></div>'+
+        '<p style="font-size:12px">Printed Name</p>'+
+      '</div>'+
+    '</div>'+
+
+    '<div style="margin-top:48px;padding:16px;background:#f8f7f4;border-radius:8px;font-size:11px;color:#888;line-height:1.5">'+
+      'Elevation Bend Farmers Market · Bend, Oregon · This is a placeholder food vendor contract. '+
+      'Please review with legal counsel before use. Market management retains the right to revoke participation for violations of these terms.'+
+    '</div>'+
+    '</body></html>');
+  win.document.close();
 }
 
 function sendLayoutToVendors(ds){
@@ -3426,7 +3599,12 @@ function renderLayoutSpot(sp){
   el.style.cssText='left:'+sp.x+'px;top:'+sp.y+'px;width:'+sp.w+'px;height:'+spotH+'px';
   var dims=LSIZES[sp.size]||LSIZES['10x10'];
   var lcc=sp.vendorName?catColor(sp.vendorCat):{bg:'#fff',border:'#d0cec7',text:'#888'};
-  el.style.background=lcc.bg;el.style.borderColor=lcc.border;el.style.borderWidth='2px';
+  var spotVendor=sp.vendorId?vendors.find(function(x){return x.id===sp.vendorId;}):null;
+  var isOG=spotVendor&&spotVendor.status==='approved_og';
+  el.style.background=lcc.bg;
+  el.style.borderColor=isOG?'#DC2626':lcc.border;
+  el.style.borderWidth=isOG?'3px':'2px';
+  if(isOG)el.style.boxShadow='0 0 0 1px #DC2626';
 
   if(layoutViewMode==='summary'){
     // Summary: colored spot number only, click shows popup
@@ -4131,7 +4309,7 @@ async function restoreCompleteBackup(file){
   }catch(e){alert('Error restoring backup: '+e.message);}
 }
 
-function downloadCSV(fn,rows){var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);}
+function downloadCSV(fn,rows){var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);}
 function exportFullVendorReport(){
   if(!vendors.length){alert('No vendor data to export.');return;}
   var rows=[['Business Name','Contact','Email','Phone','Category','App. Status','Vendor Status','Booth Size','Contract','Payment Received','Selected Dates','# Dates','Invoice #','Invoice Status','Invoice Sent','Invoice Paid','Invoice Total','Attendance','Months','Why Join','Values','Additional Info','Created','Modified']];
@@ -4198,14 +4376,39 @@ function exportFullVendorReport(){
 }
 
 function exportVendorsCSV(filter){
-  var list=filter==='all'?vendors:vendors.filter(function(v){return v.status===filter;});
+  var list=filter==='all'?vendors:vendors.filter(function(v){return v.status===filter||( filter==='approved'&&v.status==='approved_og');});
   if(!list.length){alert('No vendors to export.');return;}
   var rows=[['Vendor Status','Contract','Payment','App. Status','Business Name','Contact','Email','Phone','Website','Social','Category','Products','Locally Produced','Price Range','Licenses','Food Docs','Liability','Booth Size','Electricity','Attendance','Why Join','Values','Additional Info','Selected Dates','Created','Modified']];
-  list.forEach(function(v){rows.push([v.vendorStatus||'active',v.contractReceived?'Yes':'No',v.paymentReceived?'Yes':'No',v.status||'pending',v.businessName||'',v.contactName||'',v.email||'',v.phone||'',v.website||'',v.social||'',v.category||'',v.products||'',v.local||'',(v.priceRange||[]).join('; '),v.licenses||'',(v.foodDocs||[]).join('; '),v.liability||'',v.boothSize||'',v.electricity||'',v.attendance||'',v.whyJoin||'',v.values||'',v.additionalInfo||'',(v.selectedDates||[]).join('; '),fmtDT(v.createdAt),fmtDT(v.modifiedAt)]);});
+  list.forEach(function(v){
+    var appStatus=v.status==='approved_og'?'Approved & OG':v.status==='approved'?'Approved':v.status==='waitlist'?'Waitlist':v.status==='issue'?'Issue':'Pending';
+    var createdStr=v.createdAt?new Date(v.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    var modifiedStr=v.modifiedAt?new Date(v.modifiedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    rows.push([v.vendorStatus||'active',v.contractReceived?'Yes':'No',v.paymentReceived?'Yes':'No',appStatus,v.businessName||'',v.contactName||'',v.email||'',v.phone||'',v.website||'',v.social||'',v.category||'',v.products||'',v.local||'',(v.priceRange||[]).join('; '),v.licenses||'',(v.foodDocs||[]).join('; '),v.liability||'',v.boothSize||'',v.electricity||'',v.attendance||'',v.whyJoin||'',v.values||'',v.additionalInfo||'',(v.selectedDates||[]).join('; '),createdStr,modifiedStr]);
+  });
   downloadCSV('eb-vendors-'+filter+'-'+today()+'.csv',rows);closeMod();
 }
 function exportTentsCSV(){var rows=[['Date','Spot','Size','Vendor Name','Category','Vendor Status']];getMarketDates().forEach(function(ds){var ta=getTentAssignments(ds);tents.forEach(function(t){var vid=ta[t.id];var v=vid?vendors.find(function(x){return x.id===vid;}):null;rows.push([ds,t.num,t.size,v?v.businessName:'',v?v.category||'':'',v?v.vendorStatus||'active':'']);});});downloadCSV('eb-tents-'+today()+'.csv',rows);closeMod();}
-function exportCalCSV(){var allDates=getMarketDates();if(!allDates.length){alert('No market dates scheduled.');return;}var rows=[['Date','Approved Vendors','Waitlisted Vendors']];allDates.forEach(function(ds){var av=getApproved(ds).map(function(id){var v=vendors.find(function(x){return x.id===id;});return v?v.businessName:'';}).filter(Boolean).join('; ');var wv=getWaitlist(ds).map(function(id){var v=vendors.find(function(x){return x.id===id;});return v?v.businessName:'';}).filter(Boolean).join('; ');rows.push([ds,av,wv]);});downloadCSV('eb-calendar-'+today()+'.csv',rows);closeMod();}
+function exportCalCSV(){
+  var allDates=getMarketDates();
+  if(!allDates.length){alert('No market dates scheduled.');return;}
+  var rows=[['Date','Vendor','Status','Category','Booth Size','Electricity','Phone','Email','Contract']];
+  allDates.forEach(function(ds){
+    var approved=getApproved(ds);
+    var waitlist=getWaitlist(ds);
+    approved.forEach(function(id){
+      var v=vendors.find(function(x){return x.id===id;});
+      if(!v)return;
+      rows.push([ds,v.businessName||'',v.status==='approved_og'?'Approved & OG':'Approved',v.category||'',v.boothSize||'',v.electricity||'',v.phone||'',v.email||'',v.contractReceived?'Yes':'No']);
+    });
+    waitlist.forEach(function(id){
+      var v=vendors.find(function(x){return x.id===id;});
+      if(!v)return;
+      rows.push([ds,v.businessName||'','Waitlist',v.category||'',v.boothSize||'',v.electricity||'',v.phone||'',v.email||'',v.contractReceived?'Yes':'No']);
+    });
+  });
+  downloadCSV('eb-calendar-'+today()+'.csv',rows);
+  closeMod();
+}
 // ── TABBED VENDOR FORM ────────────────────────────────────────────────────
 function openForm(id){
   // Always sync selectedDates from calRows before opening so chips reflect current calendar state
@@ -4219,7 +4422,7 @@ function openForm(id){
   var selectedDates=id?Object.keys(calRows).filter(function(ds){return(calRows[ds].approved||[]).indexOf(id)>-1;}).sort():[];
   var cats=['Farm / Produce Grower','Rancher / Eggs / Meat / Dairy','Baked Goods','Specialty Food / Packaged Goods','Prepared Food Vendor','Artisan / Maker','Flowers / Plants / Herbal Goods','Other'];
   function rads(name,opts,val,ck,cv){return opts.map(function(o){return'<label class="ropt'+(val===o?' sel':'')+'" data-rn="'+name+'" data-rv="'+esc(o)+'"><input type="radio" name="'+name+'" value="'+esc(o)+'"'+(val===o?' checked':'')+' style="margin-top:2px;flex-shrink:0;accent-color:#22c55e"><span>'+esc(o)+'</span></label>'+(ck&&o===ck?'<div class="sub-field" id="sub_'+name+'" style="'+(val===ck?'':'display:none')+'"><textarea id="cmt_'+name+'" placeholder="Describe…">'+esc(cv||'')+'</textarea></div>':'');}).join('');}
-  var html='<div class="modal xl" style="padding:0;overflow-y:auto;max-height:95vh;display:flex;flex-direction:column">'+
+  var html='<div class="modal xl" style="padding:0;overflow:hidden;height:95vh;max-height:95vh;display:flex;flex-direction:column">'+
     '<div style="padding:.85rem 1.25rem;border-bottom:.5px solid #e5e3de;text-align:center;position:relative">'+
       '<div style="font-size:22px;font-weight:800;color:#1a1a1a;letter-spacing:-.02em">'+(id?esc(v.businessName||'Vendor'):'New vendor application')+'</div>'+
       (id?'<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:5px;flex-wrap:wrap">'+
@@ -4236,12 +4439,14 @@ function openForm(id){
       '<div style="font-size:11px;color:#888;margin-top:5px">Complete all sections · use tabs to navigate</div>'+
     '</div>'+
     '<div class="progress-bar"><div class="progress-fill" id="fProgress" style="width:'+(100/formTotalTabs)+'%"></div></div>'+
-    '<div class="vform-subnav" id="fSubnav">'+['Status','Business','Products','Licensing','Booth','General Info','Documents','Invoices'].map(function(t,i){return'<button class="fsnb'+(i===0?' active':'')+'" data-ftab="'+i+'"><span class="fsnb-dot"></span>'+t+'</button>';}).join('')+'</div>'+
+    '<div class="vform-subnav" id="fSubnav">'+['Status','Business','Products','Licensing','Booth','General Info','Documents','Invoices','Venmo'].map(function(t,i){return'<button class="fsnb'+(i===0?' active':'')+'" data-ftab="'+i+'"><span class="fsnb-dot"></span>'+t+'</button>';}).join('')+'</div>'+
     // TAB 0
     '<div class="fpanel active" data-fpanel="0"><div class="fsec-title">Vendor status &amp; scheduling</div>'+
     '<div class="fg"><label>Vendor status</label><div class="vs-grid">'+['active','inwork','inactive'].map(function(k){var vc=VSC[k];return'<div class="vs-card'+(vs===k?' '+FVSC[k].cls:'')+'" data-fvs="'+k+'" id="fvsc-'+k+'"><div class="vs-card-dot" style="background:'+vc.dot+'"></div><div class="vs-card-label" style="color:'+(vs===k?FVSC[k].text:'#aaa')+'">'+vc.label+'</div><input type="radio" name="vendorStatus" value="'+k+'"'+(vs===k?' checked':'')+' style="display:none"></div>';}).join('')+'</div></div>'+
-    '<div class="fg"><label>Contract</label><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="toggle-grid" style="flex:1"><label class="toggle-card'+(v.contractReceived?' on-contract':'')+'" id="ftc-contract"><div style="font-size:18px">'+(v.contractReceived?'✅':'📄')+'</div><div><div class="tc-label" style="'+(v.contractReceived?'color:#27500A;font-weight:700':'')+'">Contract '+(v.contractReceived?'signed ✓':'not signed')+'</div><div class="tc-sub">'+(v.contractReceived?'On file':'Not yet received')+'</div></div><input type="checkbox" id="fcb-contract"'+(v.contractReceived?' checked':'')+'></label></div>'+(id?'<button type="button" id="fSendContractBtn" style="white-space:nowrap;font-size:12px;padding:8px 14px;border-radius:8px;border:.5px solid #378ADD;background:#E6F1FB;color:#0C447C;cursor:pointer;font-weight:600;font-family:inherit">📧 Send Contract</button>':'')+' <button type="button" id="fDownloadContractBtn" style="white-space:nowrap;font-size:12px;padding:8px 14px;border-radius:8px;border:.5px solid #d0cec7;background:#f8f7f4;color:#555;cursor:pointer;font-weight:600;font-family:inherit">📋 Download PDF</button></div></div>'+
-    '<div class="fg"><label>Application status</label><select id="fAppStatus" style="color:'+(v.status==='issue'?'#791F1F':'')+';font-weight:'+(v.status==='issue'?'700':'normal')+'"><option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option><option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option><option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option><option value="issue"'+(v.status==='issue'?' selected':'')+'>⚠️ Issue</option></select></div>'+
+    '<div class="fg"><label>Contract</label><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="toggle-grid" style="flex:1"><label class="toggle-card'+(v.contractReceived?' on-contract':'')+'" id="ftc-contract"><div style="font-size:18px">'+(v.contractReceived?'✅':'📄')+'</div><div><div class="tc-label" style="'+(v.contractReceived?'color:#27500A;font-weight:700':'')+'">Contract '+(v.contractReceived?'signed ✓':'not signed')+'</div><div class="tc-sub">'+(v.contractReceived?(v.contractSignedName?'Signed by: '+v.contractSignedName+(v.contractSignedAt?' on '+new Date(v.contractSignedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''):'On file'):'Not yet received')+'</div></div><input type="checkbox" id="fcb-contract"'+(v.contractReceived?' checked':'')+'></label></div>'+
+      (v.contractReceived&&v.contractSignedName?'<button type="button" id="fViewSignedContractBtn" style="white-space:nowrap;font-size:12px;padding:8px 14px;border-radius:8px;border:1.5px solid #639922;background:#EAF3DE;color:#27500A;cursor:pointer;font-weight:700;font-family:inherit">📄 View Signed Contract</button>':'')+
+    '</div></div>'+
+    '<div class="fg"><label>Application status</label><select id="fAppStatus" style="color:'+(v.status==='issue'?'#791F1F':'')+';font-weight:'+(v.status==='issue'?'700':'normal')+'"><option value="pending"'+((!v.status||v.status==='pending')?' selected':'')+'>Pending</option><option value="approved"'+(v.status==='approved'?' selected':'')+'>Approved</option><option value="approved_og"'+(v.status==='approved_og'?' selected':'')+'>★ Approved & OG</option><option value="waitlist"'+(v.status==='waitlist'?' selected':'')+'>Waitlist</option><option value="issue"'+(v.status==='issue'?' selected':'')+'>⚠️ Issue</option></select></div>'+
     '<div class="fg"><label>Market dates attending <span style="font-weight:400;color:#aaa">— tap to select (Fridays Apr 1 – Nov 1, 2026)</span></label>'+
     '<div style="margin-bottom:6px;display:flex;gap:5px;flex-wrap:wrap">'+
       '<button type="button" onclick="(function(){document.querySelectorAll(\'#fDateChips .dc\').forEach(function(c){c.classList.add(\'on\');});})()" style="font-size:13px;font-weight:700;padding:7px 14px;border-radius:20px;border:.5px solid #d0cec7;background:#f8f7f4;cursor:pointer;font-family:inherit">Select all</button>'+
@@ -4330,6 +4535,11 @@ function openForm(id){
     '<div id="fInvoicesPanel"><div style="font-size:12px;color:#aaa;padding:1rem;text-align:center">Loading invoices…</div></div>'+
     '</div>':'')+
 
+    // TAB 8 — Venmo Payments
+    (id?'<div class="fpanel" data-fpanel="8"><div class="fsec-title">Venmo Payments</div>'+
+    '<div id="fVenmoPanel"><div style="font-size:12px;color:#aaa;padding:1rem;text-align:center">Loading Venmo payments…</div></div>'+
+    '</div>':'')+
+
     // FOOTER
     '<div class="form-footer">'+
       '<div style="display:flex;justify-content:center;align-items:center;gap:20px;flex:1">'+
@@ -4340,7 +4550,11 @@ function openForm(id){
       '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
         (id&&v.email?'<button class="btn-blue" id="fEmailBtn">📧 Email vendor</button>':'')+
         (id?'<button class="btn-amber" id="fContractBtn">📋 Contract PDF</button>':'')+
+        (id?'<button class="btn-amber" id="fFoodContractBtn" style="background:#D97706">🍽 Food Contract PDF</button>':'')+
+        (id&&v.email?'<button id="fEsignBtn" style="white-space:nowrap;font-size:12px;padding:8px 14px;border-radius:8px;border:1.5px solid #378ADD;background:#E6F1FB;color:#0C447C;cursor:pointer;font-weight:700;font-family:inherit">✍️ Send Vendor E-Sign</button>':'')+
+        (id&&v.email?'<button id="fFoodEsignBtn" style="white-space:nowrap;font-size:12px;padding:8px 14px;border-radius:8px;border:1.5px solid #D97706;background:#FEF3C7;color:#92400E;cursor:pointer;font-weight:700;font-family:inherit">🍽 Send Food E-Sign</button>':'')+
         (id?'<button class="btn-s" id="fProfileBtn">📄 Profile PDF</button>':'')+
+      '<div style="display:flex;justify-content:center;gap:10px;width:100%;margin-top:8px">'+
         '<button class="btn-p" id="fSaveBtn">Save vendor</button>'+
         '<button class="btn-s" id="fCancelBtn">Close form</button>'+
       '</div>'+
@@ -4388,6 +4602,14 @@ function openForm(id){
   // Contract PDF button
   var fContract=document.getElementById('fContractBtn');
   if(fContract)fContract.addEventListener('click',function(){generateContractPDF(v);});
+  var fFoodContract=document.getElementById('fFoodContractBtn');
+  if(fFoodContract)fFoodContract.addEventListener('click',function(){generateFoodContractPDF(v);});
+  var fEsign=document.getElementById('fEsignBtn');
+  if(fEsign)fEsign.addEventListener('click',function(){sendContractForESign(v,'standard');});
+  var fFoodEsign=document.getElementById('fFoodEsignBtn');
+  if(fFoodEsign)fFoodEsign.addEventListener('click',function(){sendContractForESign(v,'food');});
+  var fViewSigned=document.getElementById('fViewSignedContractBtn');
+  if(fViewSigned)fViewSigned.addEventListener('click',function(){generateSignedContractPDF(v);});
   var fProfile=document.getElementById('fProfileBtn');
   if(fProfile)fProfile.addEventListener('click',function(){generateVendorProfilePDF(v);});
 
@@ -4398,8 +4620,72 @@ function openForm(id){
       var tabIdx=parseInt(btn.dataset.ftab);
       if(tabIdx===6&&id)setTimeout(function(){attachDocUploadHandlers(id);},100);
       if(tabIdx===7&&id)setTimeout(function(){renderInvoicesPanel();},100);
+      if(tabIdx===8&&id)setTimeout(function(){renderVenmoPanel();},100);
     });
   });
+
+  function renderVenmoPanel(){
+    var panel=document.getElementById('fVenmoPanel');
+    if(!panel)return;
+    var all=getVenmoPayments();
+    // Match by vendor business name, contact name, or any name fragment
+    var vName=(v.businessName||'').toLowerCase();
+    var vContact=(v.contactName||'').toLowerCase();
+    var matched=all.filter(function(r){
+      var to=(r.to||'').toLowerCase();
+      var from=(r.from||'').toLowerCase();
+      return to.indexOf(vName)>-1||to.indexOf(vContact)>-1||
+             from.indexOf(vName)>-1||from.indexOf(vContact)>-1||
+             (vName&&vName.split(' ').some(function(w){return w.length>2&&(to.indexOf(w)>-1||from.indexOf(w)>-1);}));
+    });
+
+    if(!all.length){
+      panel.innerHTML='<div style="text-align:center;padding:1.5rem;color:#aaa;font-size:12px">No Venmo payments imported yet.<br><br><button class="btn-p" id="fVenmoImportBtn" style="font-size:12px">📂 Import Venmo CSV</button></div>';
+      document.getElementById('fVenmoImportBtn').addEventListener('click',triggerVenmoImport);
+      return;
+    }
+
+    var totalIn=matched.filter(function(r){return r.amount>0;}).reduce(function(s,r){return s+r.amount;},0);
+    var totalOut=matched.filter(function(r){return r.amount<0;}).reduce(function(s,r){return s+r.amount;},0);
+
+    panel.innerHTML=
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+          (matched.length?'<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">'+matched.length+' transaction'+(matched.length!==1?'s':'')+'</span>':'<span style="font-size:11px;color:#aaa">No matching transactions</span>')+
+          (totalIn?'<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">In: $'+totalIn.toFixed(2)+'</span>':'')+
+          (totalOut?'<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#FCEBEB;color:#791F1F;font-weight:600">Out: $'+Math.abs(totalOut).toFixed(2)+'</span>':'')+
+        '</div>'+
+        '<button class="btn-s" id="fVenmoImportBtn" style="font-size:11px">📂 Import Venmo CSV</button>'+
+      '</div>'+
+      (matched.length
+        ?'<div style="border:.5px solid #e5e3de;border-radius:8px;overflow:hidden">'+
+          '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+            '<thead><tr style="background:#f8f7f4">'+
+              '<th style="text-align:left;padding:7px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-size:10px;font-weight:700;text-transform:uppercase">Date</th>'+
+              '<th style="text-align:left;padding:7px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-size:10px;font-weight:700;text-transform:uppercase">Type</th>'+
+              '<th style="text-align:left;padding:7px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-size:10px;font-weight:700;text-transform:uppercase">Note</th>'+
+              '<th style="text-align:left;padding:7px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-size:10px;font-weight:700;text-transform:uppercase">From</th>'+
+              '<th style="text-align:left;padding:7px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-size:10px;font-weight:700;text-transform:uppercase">To</th>'+
+              '<th style="text-align:right;padding:7px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-size:10px;font-weight:700;text-transform:uppercase">Amount</th>'+
+            '</tr></thead><tbody>'+
+            matched.map(function(r){
+              var isIn=r.amount>0;
+              return'<tr style="border-bottom:.5px solid #f0ede6">'+
+                '<td style="padding:7px 10px;font-size:11px;white-space:nowrap;color:#888">'+esc(r.date)+'</td>'+
+                '<td style="padding:7px 10px;font-size:11px">'+esc(r.type)+'</td>'+
+                '<td style="padding:7px 10px;font-size:11px;color:#555">'+esc(r.note||'—')+'</td>'+
+                '<td style="padding:7px 10px;font-size:11px;color:#888">'+esc(r.from||'—')+'</td>'+
+                '<td style="padding:7px 10px;font-size:11px;color:#888">'+esc(r.to||'—')+'</td>'+
+                '<td style="padding:7px 10px;font-size:12px;font-weight:700;text-align:right;color:'+(isIn?'#27500A':'#791F1F')+'">'+
+                  (isIn?'+':'')+r.amountRaw+
+                '</td>'+
+              '</tr>';
+            }).join('')+
+          '</tbody></table></div>'
+        :'<div style="font-size:12px;color:#aaa;padding:1rem;text-align:center">No Venmo transactions found matching this vendor\'s name.</div>');
+
+    document.getElementById('fVenmoImportBtn').addEventListener('click',triggerVenmoImport);
+  }
 
   async function renderInvoicesPanel(){
     var panel=document.getElementById('fInvoicesPanel');
@@ -4580,7 +4866,7 @@ function openForm(id){
   // App status
   var fas=document.getElementById('fAppStatus');
   if(fas){
-    fas.style.color=fas.value==='issue'?'#791F1F':'';
+    fas.style.color=fas.value==='issue'?'#A16207':fas.value==='approved_og'?'#9B1C1C':'';
     fas.addEventListener('change',function(){
       document.getElementById('fSchedBadge').innerHTML=schedTag(this.value);
       this.style.color=this.value==='issue'?'#791F1F':'';
@@ -4658,7 +4944,8 @@ async function saveV(){
     savedV.modifiedAt=nowISO();
   }
   renderStats();
-  renderVendors();
+  if(tab==='vendors') renderVendors();
+  else if(tab==='calendar') renderCalendar();
   // Stay on form — confirm saved and clear dirty flag
   formDirty=false;
   if(btn){btn.textContent='✅ Saved!';setTimeout(function(){btn.disabled=false;btn.textContent='Save vendor';},1800);}
@@ -4670,7 +4957,302 @@ async function saveV(){
 }
 
 
-// ── PAYMENTS TAB ──────────────────────────────────────────────────────────
+// ── E-SIGNATURE ──────────────────────────────────────────────────────────────
+async function sendContractForESign(v,type){
+  // Show preview modal first
+  var isFood=type==='food';
+  var fee=(v.boothFee>0?v.boothFee:feeForBoothSize(v.boothSize)||0);
+  var dates=(v.selectedDates||[]).sort().slice(0,5).join(', ')+(v.selectedDates&&v.selectedDates.length>5?' +'+( v.selectedDates.length-5)+' more':'');
+
+  document.getElementById('modal-area').innerHTML=
+    '<div class="overlay" id="esignPreviewOverlay"><div class="modal md" style="max-height:90vh;overflow-y:auto">'+
+    '<div class="mtitle">'+(isFood?'🍽 Food E-Sign':'✍️ Vendor E-Sign')+' — '+esc(v.businessName)+'</div>'+
+    '<div style="background:#f8f7f4;border-radius:8px;padding:.85rem;margin-bottom:.85rem;font-size:12px;line-height:1.7">'+
+      '<div style="font-weight:700;margin-bottom:6px;font-size:13px">'+(isFood?'Food Vendor Agreement':'Vendor Participation Agreement')+' · 2026 Season</div>'+
+      '<div><strong>Vendor:</strong> '+esc(v.businessName||'')+'</div>'+
+      '<div><strong>Contact:</strong> '+esc(v.contactName||'')+'</div>'+
+      '<div><strong>Email:</strong> '+esc(v.email||'')+'</div>'+
+      '<div><strong>Category:</strong> '+esc(v.category||'')+'</div>'+
+      '<div><strong>Booth Size:</strong> '+esc(v.boothSize||'')+'</div>'+
+      '<div><strong>Fee per date:</strong> $'+fee.toFixed(2)+'</div>'+
+      '<div><strong>Dates:</strong> '+esc(dates||'None selected')+'</div>'+
+    '</div>'+
+    '<div style="font-size:12px;color:#555;background:#EAF3DE;border-radius:8px;padding:.75rem;margin-bottom:.85rem">'+
+      '📧 An email will be sent to <strong>'+esc(v.email)+'</strong> with a unique link. When the vendor clicks the link, types their name, and clicks "I Agree &amp; Sign", the contract will be marked as signed automatically.'+
+    '</div>'+
+    '<div class="mfoot">'+
+      '<button id="esignPreviewCancel" class="btn-s">Cancel</button>'+
+      '<button id="esignPreviewPDF" class="btn-amber">📄 Preview Contract</button>'+
+      '<button id="esignPreviewSend" class="btn-p">📧 Send for E-Sign</button>'+
+    '</div></div></div>';
+
+  document.getElementById('esignPreviewOverlay').addEventListener('click',function(e){if(e.target===this)closeMod();});
+  document.getElementById('esignPreviewCancel').addEventListener('click',closeMod);
+  document.getElementById('esignPreviewPDF').addEventListener('click',function(){
+    if(isFood)generateFoodContractPDF(v);else generateContractPDF(v);
+  });
+  document.getElementById('esignPreviewSend').addEventListener('click',async function(){
+    var btn=this;btn.disabled=true;btn.textContent='Sending…';
+    closeMod();
+    await doSendContractForESign(v,type);
+  });
+}
+
+async function doSendContractForESign(v,type){
+  var token=uid()+uid();
+  await sb.from('vendors').update({contract_token:token,modified_at:nowISO()}).eq('id',v.id);
+  v.contractToken=token;
+  var appUrl=window.location.href.split('?')[0];
+  var signUrl=appUrl+'?sign='+token+'&type='+(type||'standard');
+  var isFood=type==='food';
+  var subject='Please sign your '+(isFood?'Food Vendor':'Vendor')+' Agreement — Elevation Bend Farmers Market';
+  var html='<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:32px;color:#1a1a1a">'+
+    '<div style="font-size:22px;font-weight:800;color:#27500A;margin-bottom:4px">Elevation Bend</div>'+
+    '<div style="font-size:13px;color:#888;margin-bottom:24px;border-bottom:2px solid #e5e3de;padding-bottom:12px">Farmers Market · Bend, Oregon</div>'+
+    '<h2 style="font-size:18px;margin-bottom:8px">Please sign your vendor agreement</h2>'+
+    '<p style="font-size:14px;color:#555;margin-bottom:20px">Hi '+esc(v.contactName||v.businessName)+', your '+(isFood?'Food Vendor':'Vendor Participation')+' Agreement for the 2026 market season is ready for your signature.</p>'+
+    '<div style="text-align:center;margin:28px 0">'+
+      '<a href="'+signUrl+'" style="display:inline-block;background:#27500A;color:#fff;text-decoration:none;padding:16px 32px;border-radius:10px;font-size:16px;font-weight:700">&#9997;&#65039; Review &amp; Sign Agreement</a>'+
+    '</div>'+
+    '<p style="font-size:12px;color:#888">This link is unique to you. By clicking Sign I Agree you are providing your electronic signature.</p>'+
+    '<div style="font-size:11px;color:#aaa;margin-top:28px;padding-top:14px;border-top:.5px solid #e5e3de;text-align:center">Elevation Bend Farmers Market · Bend, Oregon</div>'+
+    '</body></html>';
+  var ok=await sendEmailResend({to:v.email,subject:subject,html:html,text:'Hi '+(v.contactName||v.businessName)+',\n\nPlease sign your vendor agreement at:\n'+signUrl+'\n\nThank you,\nElevation Bend Farmers Market'});
+  if(ok){
+    alert('Contract sent to '+v.email+' for e-signature.');
+    startContractPoll(v.id);
+  }
+  else{alert('Email failed. Share this link with the vendor:\n\n'+signUrl);window.open(signUrl,'_blank');startContractPoll(v.id);}
+}
+
+async function checkForSigningRequest(){
+  var params=new URLSearchParams(window.location.search);
+  var token=params.get('sign');
+  var type=params.get('type');
+  if(!token)return false;
+  var{data,error}=await sb.from('vendors').select('*').eq('contract_token',token).single();
+  if(error||!data){
+    document.body.innerHTML='<div style="font-family:sans-serif;max-width:600px;margin:80px auto;padding:32px;text-align:center"><h2 style="color:#791F1F">Invalid or expired link</h2><p>This signing link is no longer valid. Please contact the market manager.</p></div>';
+    return true;
+  }
+  if(data.contract_received&&!data.contract_token){
+    document.body.innerHTML='<div style="font-family:sans-serif;max-width:600px;margin:80px auto;padding:32px;text-align:center">'+
+      '<div style="font-size:48px;margin-bottom:16px">&#9989;</div>'+
+      '<h2 style="color:#27500A">Already signed</h2>'+
+      '<p>This agreement was signed by <strong>'+esc(data.contract_signed_name||data.contact_name||'')+'</strong>'+(data.contract_signed_at?' on '+new Date(data.contract_signed_at).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):'')+'. No further action needed.</p></div>';
+    return true;
+  }
+  showSigningPage(dbToV(data),type||'standard',token);
+  return true;
+}
+
+function showSigningPage(v,type,token){
+  var dates=(v.selectedDates||[]).sort().join(', ')||'— to be confirmed';
+  var today2=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var isFood=type==='food';
+  var col=isFood?'#92400E':'#27500A';var bdr=isFood?'#D97706':'#639922';
+  document.body.innerHTML=
+    '<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:40px 30px;color:#1a1a1a;line-height:1.7">'+
+    '<div style="font-family:-apple-system,sans-serif;background:#EAF3DE;border:1.5px solid #639922;border-radius:10px;padding:16px 20px;margin-bottom:28px">'+
+      '<div style="font-weight:700;color:#27500A">&#128203; E-Signature Request — Elevation Bend Farmers Market</div>'+
+    '</div>'+
+    '<h1 style="color:'+col+';font-size:22px;border-bottom:2px solid '+bdr+';padding-bottom:10px">'+(isFood?'&#127374; Food Vendor Agreement':'Vendor Participation Agreement')+
+      '<br><span style="font-size:14px;font-weight:400;color:#555">2026 Season · Bend, Oregon</span></h1>'+
+    '<p><strong>Business:</strong> '+esc(v.businessName||'')+'</p>'+
+    '<p><strong>Contact:</strong> '+esc(v.contactName||'')+'</p>'+
+    '<p><strong>Category:</strong> '+esc(v.category||'')+'</p>'+
+    '<p><strong>Booth Size:</strong> '+esc(v.boothSize||'')+'</p>'+
+    '<h2 style="color:'+col+';font-size:15px;margin-top:20px">Market Dates</h2><p>'+esc(dates)+'</p>'+
+    '<h2 style="color:'+col+';font-size:15px;margin-top:20px">Products'+(isFood?' / Menu':'')+'</h2><p>'+esc(v.products||'As described in application')+'</p>'+
+    '<h2 style="color:'+col+';font-size:15px;margin-top:20px">Fees</h2>'+
+    '<p>Booth fee: <strong>$'+(v.boothFee||0).toFixed(2)+' per market day</strong>, due 7 days before each date.</p>'+
+    (isFood?'<h2 style="color:'+col+';font-size:15px;margin-top:20px">Health &amp; Safety</h2>'+
+    '<p>Vendor must maintain all required Oregon and Deschutes County food handling permits, a current Temporary Restaurant or Mobile Food Unit License, proper handwashing, food-safe temperatures, and grease containment. Fire extinguisher required for open flame.</p>':'') +
+    '<h2 style="color:'+col+';font-size:15px;margin-top:20px">Rules</h2>'+
+    '<p>Setup by 7:45am. No vehicle movement 7:45am–1:15pm. Remain full market. Leave space clean. Follow all Market management directions.</p>'+
+    '<h2 style="color:'+col+';font-size:15px;margin-top:20px">Liability Insurance</h2>'+
+    '<p>Minimum $1,000,000 per occurrence. Elevation Bend Farmers Market must be listed as additional insured.</p>'+
+    '<div style="font-family:-apple-system,sans-serif;margin-top:36px;padding:24px;background:#f8f7f4;border-radius:12px;border:1.5px solid #e5e3de">'+
+      '<div style="font-size:16px;font-weight:700;margin-bottom:12px">&#9997;&#65039; Electronic Signature</div>'+
+      '<p style="font-size:13px;color:#555;margin-bottom:16px">By typing your full legal name and clicking "I Agree &amp; Sign", you are providing your electronic signature under the federal E-SIGN Act.</p>'+
+      '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Full legal name:</label>'+
+      '<input id="esignName" type="text" placeholder="Your full legal name" style="width:100%;padding:12px 14px;border:1.5px solid #d0cec7;border-radius:8px;font-size:15px;font-family:-apple-system,sans-serif;box-sizing:border-box;margin-bottom:16px">'+
+      '<div style="font-size:11px;color:#aaa;margin-bottom:16px">Timestamp and browser information will be recorded.</div>'+
+      '<button id="esignBtn" style="width:100%;padding:16px;background:#27500A;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;font-family:-apple-system,sans-serif">&#9989; I Agree &amp; Sign</button>'+
+      '<div id="esignStatus" style="margin-top:12px;font-size:13px;text-align:center"></div>'+
+    '</div></div>';
+
+  document.getElementById('esignBtn').addEventListener('click',async function(){
+    var name=(document.getElementById('esignName').value||'').trim();
+    if(!name){document.getElementById('esignStatus').innerHTML='<span style="color:#791F1F">Please type your full legal name.</span>';return;}
+    var btn=document.getElementById('esignBtn');btn.disabled=true;btn.textContent='Signing…';
+    var signedAt=new Date().toISOString();
+    var{error}=await sb.from('vendors').update({
+      contract_received:true,contract_signed_name:name,
+      contract_signed_at:signedAt,contract_token:'',modified_at:signedAt
+    }).eq('contract_token',token);
+    if(error){btn.disabled=false;btn.textContent='I Agree & Sign';document.getElementById('esignStatus').innerHTML='<span style="color:#791F1F">Error saving. Please try again.</span>';return;}
+    document.body.innerHTML='<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:80px auto;padding:32px;text-align:center">'+
+      '<div style="font-size:64px;margin-bottom:16px">&#9989;</div>'+
+      '<h2 style="color:#27500A;font-size:24px;margin-bottom:12px">Agreement Signed!</h2>'+
+      '<p style="font-size:15px;color:#555">Thank you, <strong>'+esc(name)+'</strong>. Your signature has been recorded on '+new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})+'.</p>'+
+      '<div style="margin-top:28px;padding:16px;background:#EAF3DE;border-radius:10px;font-size:13px;color:#27500A">Elevation Bend Farmers Market · We look forward to seeing you at the market!</div>'+
+    '</div>';
+  });
+}
+
+// ── CONTRACT SIGNING POLL ────────────────────────────────────────────────────
+var contractPollTimer=null;
+function startContractPoll(vendorId){
+  if(contractPollTimer)clearInterval(contractPollTimer);
+  contractPollTimer=setInterval(async function(){
+    var{data}=await sb.from('vendors').select('contract_received,contract_signed_name,contract_signed_at').eq('id',vendorId).single();
+    if(data&&data.contract_received){
+      clearInterval(contractPollTimer);contractPollTimer=null;
+      // Update in-memory vendor
+      var v=vendors.find(function(x){return x.id===vendorId;});
+      if(v){
+        v.contractReceived=true;
+        v.contractSignedName=data.contract_signed_name||'';
+        v.contractSignedAt=data.contract_signed_at||'';
+      }
+      // Show notification
+      var signedName=data.contract_signed_name||'vendor';
+      var signedDate=data.contract_signed_at?new Date(data.contract_signed_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+      // Update contract toggle in open form if still open
+      var ftc=document.getElementById('ftc-contract');
+      if(ftc){
+        ftc.className='toggle-card on-contract';
+        ftc.querySelector('.tc-label').textContent='Contract signed ✓';
+        ftc.querySelector('.tc-label').style.color='#27500A';
+        ftc.querySelector('.tc-label').style.fontWeight='700';
+        ftc.querySelector('.tc-sub').textContent='Signed by: '+signedName+(signedDate?' on '+signedDate:'');
+        ftc.querySelector('input').checked=true;
+        var icon=ftc.querySelector('div:first-child');if(icon)icon.textContent='✅';
+      }
+      // Update vendor table row contract cell if visible
+      var row=document.querySelector('tr[data-vid="'+vendorId+'"]');
+      if(row){var cell=row.querySelector('[data-contract-cell]');if(cell)cell.innerHTML='<span style="color:#27500A;font-size:14px">✅</span>';}
+      // Toast notification
+      showToast('✅ Contract signed by '+signedName+'!','#27500A');
+    }
+  },15000); // poll every 15 seconds
+}
+function stopContractPoll(){if(contractPollTimer){clearInterval(contractPollTimer);contractPollTimer=null;}}
+
+function showToast(msg,color){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(color||'#27500A')+';color:#fff;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;font-family:-apple-system,sans-serif;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.2);transition:opacity .4s';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},400);},4000);
+}
+
+
+function getVenmoPayments(){
+  try{return JSON.parse(localStorage.getItem('eb_venmo_payments')||'[]');}catch(e){return[];}
+}
+function saveVenmoPayments(rows){
+  localStorage.setItem('eb_venmo_payments',JSON.stringify(rows));
+}
+
+function triggerVenmoImport(){
+  // Remove any existing hidden input first
+  var old=document.getElementById('venmoFileInputHidden');if(old)old.remove();
+  var inp=document.createElement('input');
+  inp.type='file';inp.accept='.csv';inp.id='venmoFileInputHidden';
+  inp.style.cssText='position:fixed;top:-100px;left:-100px;opacity:0;width:1px;height:1px;';
+  document.body.appendChild(inp);
+  inp.addEventListener('change',function(){
+    var file=inp.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var text=e.target.result;
+
+      // Proper CSV parser that handles quoted fields with commas
+      function parseCSVLine(line){
+        var result=[],cur='',inQ=false;
+        for(var i=0;i<line.length;i++){
+          var c=line[i];
+          if(c==='"'){inQ=!inQ;}
+          else if(c===','&&!inQ){result.push(cur.trim());cur='';}
+          else cur+=c;
+        }
+        result.push(cur.trim());
+        return result;
+      }
+
+      var lines=text.split('\n');
+      // Find header row — look for row containing 'Datetime' and 'Type'
+      var headerIdx=-1;
+      for(var i=0;i<lines.length;i++){
+        if(lines[i].indexOf('Datetime')>-1&&lines[i].indexOf('Type')>-1){headerIdx=i;break;}
+      }
+      if(headerIdx<0){alert('Could not find Venmo header row. Make sure this is a Venmo statement CSV.');return;}
+
+      var headers=parseCSVLine(lines[headerIdx]);
+      var idxId=headers.indexOf('ID');
+      var idxDatetime=headers.indexOf('Datetime');
+      var idxType=headers.indexOf('Type');
+      var idxStatus=headers.indexOf('Status');
+      var idxNote=headers.indexOf('Note');
+      var idxFrom=headers.indexOf('From');
+      var idxTo=headers.indexOf('To');
+      var idxAmount=headers.findIndex(function(h){return h.indexOf('Amount (total)')>-1;});
+
+      var rows=[];
+      for(var i=headerIdx+1;i<lines.length;i++){
+        var line=lines[i];
+        if(!line.trim())continue;
+        var cols=parseCSVLine(line);
+        var txId=(cols[idxId]||'').trim();
+        var dt=(cols[idxDatetime]||'').trim();
+        var type=(cols[idxType]||'').trim();
+        var status=(cols[idxStatus]||'').trim();
+        var note=(cols[idxNote]||'').trim();
+        var from=(cols[idxFrom]||'').trim();
+        var to=(cols[idxTo]||'').trim();
+        var amtRaw=(cols[idxAmount]||'').trim();
+        // Must have a numeric transaction ID and valid datetime
+        if(!txId||!/^\d{10,}$/.test(txId))continue;
+        if(!dt||!type)continue;
+        // Parse amount — Venmo uses "- $395.00" for outgoing
+        var amtNum=parseFloat(amtRaw.replace(/[^0-9.]/g,''))||0;
+        if(amtRaw.indexOf('-')>-1)amtNum=-amtNum;
+        var dateStr=dt.indexOf('T')>-1?dt.split('T')[0]:dt;
+        rows.push({id:txId,date:dateStr,type:type,status:status,note:note,from:from,to:to,amountRaw:amtRaw,amount:amtNum});
+      }
+      var existing=getVenmoPayments();
+      // Deduplicate by Venmo transaction ID
+      var existingIds=new Set(existing.map(function(e){return e.id;}));
+      var merged=existing.slice();
+      var added=0;
+      rows.forEach(function(r){
+        if(r.id&&existingIds.has(r.id))return;
+        merged.push(r);
+        if(r.id)existingIds.add(r.id);
+        added++;
+      });
+      saveVenmoPayments(merged);
+      var statusEl=document.getElementById('venmoImportStatus');
+      var msg='✅ Imported '+added+' new Venmo transaction'+(added!==1?'s':'')+'. '+(rows.length-added)+' duplicates skipped. Total stored: '+merged.length+'.';
+      if(statusEl)statusEl.textContent=msg;
+      alert(msg);
+      // Refresh panel if open
+      var vp=document.getElementById('fVenmoPanel');if(vp&&typeof renderVenmoPanel==='function')renderVenmoPanel();
+      // Refresh view all if open
+      var ap=document.getElementById('venmoAllPanel');if(ap&&ap.style.display!=='none'){document.getElementById('venmoViewAllBtn')&&document.getElementById('venmoViewAllBtn').click();document.getElementById('venmoViewAllBtn')&&document.getElementById('venmoViewAllBtn').click();}
+    };
+    reader.readAsText(file);
+    inp.remove();
+  });
+  inp.click();
+}
+
+// Also expose a Manage tab import button
+function importVenmoFromManage(){triggerVenmoImport();}
+
+
 // Stripe embedded dashboard + per-vendor payment tracking.
 // mailto: send is used now; swap sendEmail() for Gmail API later.
 
@@ -6078,6 +6660,18 @@ function renderManage(){
       '</div>'+
     '</div>'+
 
+    '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem;margin-bottom:.85rem">'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:4px">💸 Import Venmo Statement</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:.85rem;line-height:1.6">Upload a Venmo account statement CSV to track payments. Transactions are matched to vendors by name and shown in the Venmo tab on each vendor form.</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.65rem">'+
+        '<button type="button" class="btn-p" id="venmoImportBtn" style="font-size:12px">📂 Import Venmo CSV</button>'+
+        '<button type="button" class="btn-s" id="venmoViewAllBtn" style="font-size:12px">📋 View all imports</button>'+
+        '<button type="button" class="btn-danger" id="venmoClearBtn" style="font-size:12px">🗑 Clear all</button>'+
+      '</div>'+
+      '<div id="venmoImportStatus" style="font-size:11px;color:#27500A;margin-top:.25rem"></div>'+
+      '<div id="venmoAllPanel" style="display:none;margin-top:.85rem"></div>'+
+    '</div>'+
+
     '<div style="background:#fff;border:.5px solid #e5e3de;border-radius:12px;padding:1.25rem">'+
       '<div style="font-size:13px;font-weight:700;margin-bottom:4px">📥 Import vendors from CSV</div>'+
       '<div style="font-size:11px;color:#888;margin-bottom:.85rem;line-height:1.6">Upload a CSV file to bulk-add vendors. Existing vendors with the same email are updated, new ones are created.<br><br>'+
@@ -6179,8 +6773,30 @@ function renderManage(){
   document.getElementById('exportAllBtn').addEventListener('click',function(){exportVendorsCSV('all');});
   document.getElementById('exportApprBtn').addEventListener('click',function(){exportVendorsCSV('approved');});
   document.getElementById('exportPayBtn').addEventListener('click',function(){
-    var rows=[['Vendor','Email','Category','Booth Fee ($)','Payment Status','Contract']];
-    vendors.filter(function(v){return v.status==='approved';}).forEach(function(v){rows.push([v.businessName||'',v.email||'',v.category||'',(v.boothFee||0).toFixed(2),v.paymentReceived?'Paid':'Unpaid',v.contractReceived?'Received':'Pending']);});
+    var rows=[['Vendor','Email','Category','Booth Size','Invoice #','Invoice Total ($)','Invoice Status','Sent Date','Paid Date','Payment Method','Contract']];
+    vendors.filter(function(v){return v.status==='approved'||v.status==='approved_og';}).forEach(function(v){
+      // Get all invoices for this vendor sorted newest first
+      var vInvoices=invoices.filter(function(i){return i.vendor_id===v.id;}).sort(function(a,b){return(b.created_at||'').localeCompare(a.created_at||'');});
+      if(vInvoices.length){
+        vInvoices.forEach(function(inv){
+          rows.push([
+            v.businessName||'',
+            v.email||'',
+            v.category||'',
+            v.boothSize||'',
+            inv.invoice_number||'',
+            parseFloat(inv.total||0).toFixed(2),
+            inv.status||'draft',
+            inv.sent_at?inv.sent_at.split('T')[0]:'',
+            inv.paid_at?inv.paid_at.split('T')[0]:'',
+            inv.payment_method||'',
+            v.contractReceived?'Received':'Pending'
+          ]);
+        });
+      } else {
+        rows.push([v.businessName||'',v.email||'',v.category||'',v.boothSize||'','','','no invoice','','','',v.contractReceived?'Received':'Pending']);
+      }
+    });
     downloadCSV('eb-payments-'+today()+'.csv',rows);
   });
   document.getElementById('exportCalBtn2').addEventListener('click',exportCalCSV);
@@ -6409,6 +7025,63 @@ function renderManage(){
 
   // File pick button
   var pickBtn=document.getElementById('csvPickBtn');
+  var venmoBtn=document.getElementById('venmoImportBtn');
+  if(venmoBtn)venmoBtn.addEventListener('click',function(){triggerVenmoImport();});
+
+  var venmoViewBtn=document.getElementById('venmoViewAllBtn');
+  if(venmoViewBtn)venmoViewBtn.addEventListener('click',function(){
+    var panel=document.getElementById('venmoAllPanel');
+    if(!panel)return;
+    if(panel.style.display!=='none'){panel.style.display='none';venmoViewBtn.textContent='📋 View all imports';return;}
+    var all=getVenmoPayments();
+    if(!all.length){panel.innerHTML='<div style="font-size:12px;color:#aaa;padding:.75rem">No Venmo transactions imported yet.</div>';panel.style.display='';return;}
+    // Sort by date desc
+    all.sort(function(a,b){return(b.date||'').localeCompare(a.date||'');});
+    var totalIn=all.filter(function(r){return r.amount>0;}).reduce(function(s,r){return s+r.amount;},0);
+    var totalOut=all.filter(function(r){return r.amount<0;}).reduce(function(s,r){return s+r.amount;},0);
+    panel.innerHTML=
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.65rem">'+
+        '<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#f8f7f4;color:#555;font-weight:600">'+all.length+' transactions</span>'+
+        (totalIn?'<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#EAF3DE;color:#27500A;font-weight:600">In: $'+totalIn.toFixed(2)+'</span>':'')+
+        (totalOut?'<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#FCEBEB;color:#791F1F;font-weight:600">Out: $'+Math.abs(totalOut).toFixed(2)+'</span>':'')+
+      '</div>'+
+      '<div style="border:.5px solid #e5e3de;border-radius:8px;overflow:hidden;max-height:400px;overflow-y:auto">'+
+      '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+        '<thead><tr style="background:#f8f7f4;position:sticky;top:0">'+
+          '<th style="text-align:left;padding:6px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-weight:700;white-space:nowrap">Date</th>'+
+          '<th style="text-align:left;padding:6px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-weight:700">Type</th>'+
+          '<th style="text-align:left;padding:6px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-weight:700">From</th>'+
+          '<th style="text-align:left;padding:6px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-weight:700">To</th>'+
+          '<th style="text-align:left;padding:6px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-weight:700">Note</th>'+
+          '<th style="text-align:right;padding:6px 10px;border-bottom:.5px solid #e5e3de;color:#888;font-weight:700">Amount</th>'+
+        '</tr></thead><tbody>'+
+        all.map(function(r,i){
+          var isIn=r.amount>0;
+          return'<tr style="border-bottom:.5px solid #f0ede6;background:'+(i%2===0?'#fff':'#fafafa')+'">'+
+            '<td style="padding:6px 10px;white-space:nowrap;color:#888">'+esc(r.date)+'</td>'+
+            '<td style="padding:6px 10px">'+esc(r.type)+'</td>'+
+            '<td style="padding:6px 10px">'+esc(r.from||'—')+'</td>'+
+            '<td style="padding:6px 10px">'+esc(r.to||'—')+'</td>'+
+            '<td style="padding:6px 10px;color:#555;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.note||'')+'">'+esc(r.note||'—')+'</td>'+
+            '<td style="padding:6px 10px;text-align:right;font-weight:700;color:'+(isIn?'#27500A':'#791F1F')+'">'+esc(r.amountRaw)+'</td>'+
+          '</tr>';
+        }).join('')+
+      '</tbody></table></div>';
+    panel.style.display='';
+    venmoViewBtn.textContent='▲ Hide imports';
+  });
+
+  var venmoClearBtn=document.getElementById('venmoClearBtn');
+  if(venmoClearBtn)venmoClearBtn.addEventListener('click',function(){
+    var all=getVenmoPayments();
+    if(!all.length){alert('No Venmo transactions to clear.');return;}
+    if(!confirm('Clear all '+all.length+' Venmo transactions? This cannot be undone.'))return;
+    saveVenmoPayments([]);
+    var panel=document.getElementById('venmoAllPanel');
+    if(panel){panel.style.display='none';}
+    document.getElementById('venmoViewAllBtn').textContent='📋 View all imports';
+    alert('✅ All Venmo transactions cleared.');
+  });
   var fileInp=document.getElementById('csvFileInput');
   if(pickBtn&&fileInp){
     pickBtn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();fileInp.click();});
@@ -6788,7 +7461,13 @@ function sendEmail(to,subject,body){
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────
-checkSession();
+// Check for e-sign link before anything else
+if(window.location.search.indexOf('sign=')>-1){
+  document.getElementById('auth-screen').style.display='none';
+  checkForSigningRequest();
+} else {
+  checkSession();
+}
 </script>
 </body>
 </html>
