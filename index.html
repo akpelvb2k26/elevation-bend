@@ -219,7 +219,7 @@ nav{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:.85re
     <button class="signout-btn" id="signout-btn">Sign out</button>
   </div>
   <div class="hdr">
-    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-05-28</span></div></div>
+    <div><div class="hdr-title">Elevation Bend</div><div class="hdr-sub">Farmers Market Vendors <span style="font-size:10px;font-weight:700;color:#1a1a1a;margin-left:6px">v2026-06-01</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-g" id="exportBtn">↓ Export</button>
       <button class="btn-p" id="newBtn">+ New vendor</button>
@@ -554,9 +554,11 @@ async function persistVendorDates(vid){
 function dbToV(r){return{id:r.id,vendorStatus:r.vendor_status||'active',status:r.status||'pending',businessName:r.business_name||'',contactName:r.contact_name||'',email:r.email||'',phone:r.phone||'',website:r.website||'',social:r.social||'',category:r.category||'',categoryComment:r.category_comment||'',products:r.products||'',productDesc:r.product_desc||'',local:r.local||r.local_produced||'',localComment:r.local_comment||'',priceRange:r.price_range||[],licenses:r.licenses||'',licensesComment:r.licenses_comment||'',foodDocs:r.food_docs||[],liability:r.liability||'',boothSize:r.booth_size||'',ownSetup:r.own_setup||'',ownSetupComment:r.own_setup_comment||r.setup_comment||'',electricity:r.electricity||'',attendance:r.attendance||'',months:r.months||'',whyJoin:r.why_join||'',values:r.values||'',additionalInfo:r.additional_info||'',notes:r.notes||'',boothFee:r.booth_fee||0,photos:r.photos||[],selectedDates:r.selected_dates||[],contractReceived:!!r.contract_received,contractToken:r.contract_token||'',contractSignedAt:r.contract_signed_at||'',contractSignedName:r.contract_signed_name||'',paymentReceived:!!r.payment_received,createdAt:r.created_at||'',modifiedAt:r.modified_at||r.created_at||''};}
 async function saveVendorDB(data,id){
   var isNew=!id;
-  // ── Core row — only columns that definitely exist in base Supabase vendors table ──
-  var row={
-    id:id||uid(),
+  var vid=id||uid();
+  var now=nowISO();
+
+  // All form fields mapped to DB columns
+  var allCols={
     vendor_status:data.vendorStatus||'active',
     status:data.status||'pending',
     business_name:data.businessName||'',
@@ -585,42 +587,152 @@ async function saveVendorDB(data,id){
     why_join:data.whyJoin||'',
     values:data.values||'',
     additional_info:data.additionalInfo||'',
-    photos:[]
-  };
-  var{error}=await sb.from('vendors').upsert(row);
-  if(error){alert('Error saving vendor: '+error.message);return null;}
-
-  // ── Update all optional columns in one call ──────────────────────────────
-  var optUpdate={
-    modified_at:nowISO(),
+    notes:data.notes||'',
     selected_dates:data.selectedDates||[],
     contract_received:!!data.contractReceived,
-    contract_token:data.contractToken||'',
-    contract_signed_at:data.contractSignedAt||'',
-    contract_signed_name:data.contractSignedName||'',
     payment_received:!!data.paymentReceived,
-    notes:data.notes||'',
-    booth_fee:data.boothFee||0
+    booth_fee:data.boothFee||0,
+    modified_at:now
   };
-  if(isNew)optUpdate.created_at=nowISO();
-  var{error:oe}=await sb.from('vendors').update(optUpdate).eq('id',row.id);
-  if(oe){
-    // Fallback: try each column individually in case some don't exist yet
-    var optionals=[
-      {modified_at:nowISO()},
-      {selected_dates:data.selectedDates||[]},
-      {contract_received:!!data.contractReceived},
-      {payment_received:!!data.paymentReceived},
-      {notes:data.notes||''},
-      {booth_fee:data.boothFee||0},
-    ];
-    for(var i=0;i<optionals.length;i++){
-      var{error:oe2}=await sb.from('vendors').update(optionals[i]).eq('id',row.id);
-      if(oe2)console.warn('Column skip:',Object.keys(optionals[i])[0],oe2.message);
+
+  if(isNew){
+    // INSERT new vendor
+    var insertRow=Object.assign({id:vid,created_at:now},allCols);
+    var{error:ie}=await sb.from('vendors').insert(insertRow);
+    if(ie){
+      // Fallback: some optional columns may not exist yet - insert core fields only
+      var safe={id:vid,created_at:now,modified_at:now,
+        vendor_status:allCols.vendor_status,status:allCols.status,
+        business_name:allCols.business_name,contact_name:allCols.contact_name,
+        email:allCols.email,phone:allCols.phone,website:allCols.website,
+        social:allCols.social,category:allCols.category,products:allCols.products
+      };
+      var{error:ie2}=await sb.from('vendors').insert(safe);
+      if(ie2){alert('Error creating vendor: '+ie2.message);return null;}
+      // Patch remaining optional columns one at a time
+      var safeKeys=Object.keys(safe);
+      var opts=Object.keys(allCols).filter(function(k){return safeKeys.indexOf(k)===-1;});
+      for(var i=0;i<opts.length;i++){
+        var patch={};patch[opts[i]]=allCols[opts[i]];
+        var{error:pe}=await sb.from('vendors').update(patch).eq('id',vid);
+        if(pe)console.warn('Column skip on insert:',opts[i],pe.message);
+      }
+    }
+  } else {
+    // UPDATE existing vendor - patch every column, never touch photos
+    var{error:ue}=await sb.from('vendors').update(allCols).eq('id',vid);
+    if(ue){
+      // Fallback: update column-by-column so one bad column doesn't block the rest
+      console.warn('Bulk update failed, trying column-by-column:',ue.message);
+      var cols=Object.keys(allCols);
+      for(var i=0;i<cols.length;i++){
+        var p={};p[cols[i]]=allCols[cols[i]];
+        var{error:ce}=await sb.from('vendors').update(p).eq('id',vid);
+        if(ce)console.warn('Column skip:',cols[i],ce.message);
+      }
     }
   }
-  return row.id;
+
+  // Extended columns that may not exist in all deployments
+  var extended={contract_token:data.contractToken||'',contract_signed_at:data.contractSignedAt||'',contract_signed_name:data.contractSignedName||''};
+  var{error:xe}=await sb.from('vendors').update(extended).eq('id',vid);
+  if(xe)console.warn('Extended cols skip:',xe.message);
+
+  return vid;
 }
+
+// ── VENDOR HISTORY ───────────────────────────────────────────────────────────
+var HISTORY_FIELD_LABELS={
+  vendorStatus:'Vendor status',status:'Application status',businessName:'Business name',
+  contactName:'Contact name',email:'Email',phone:'Phone',website:'Website',social:'Social',
+  category:'Category',categoryComment:'Category comment',products:'Products',
+  productDesc:'Product description',local:'Locally produced',localComment:'Local comment',
+  priceRange:'Price range',licenses:'Licenses',licensesComment:'License comment',
+  foodDocs:'Food docs',liability:'Liability insurance',boothSize:'Booth size',
+  ownSetup:'Own setup',ownSetupComment:'Own setup comment',electricity:'Electricity',
+  attendance:'Attendance',months:'Months',whyJoin:'Why join',values:'Values',
+  additionalInfo:'Additional info',notes:'Notes',boothFee:'Booth fee',
+  contractReceived:'Contract received',paymentReceived:'Payment received',
+  selectedDates:'Market dates'
+};
+function diffVendor(oldV,newData){
+  var changes=[];
+  var fields=Object.keys(HISTORY_FIELD_LABELS);
+  fields.forEach(function(f){
+    var oldVal=oldV?oldV[f]:undefined;
+    var newVal=newData[f];
+    // normalise for comparison
+    var os=Array.isArray(oldVal)?oldVal.slice().sort().join(', '):(oldVal==null?'':String(oldVal));
+    var ns=Array.isArray(newVal)?newVal.slice().sort().join(', '):(newVal==null?'':String(newVal));
+    if(os!==ns)changes.push({field:f,label:HISTORY_FIELD_LABELS[f]||f,from:os,to:ns});
+  });
+  return changes;
+}
+async function saveVendorHistory(vendorId,changes,isNew){
+  if(!changes.length&&!isNew)return;
+  var user=sb.auth&&sb.auth.getUser?((await sb.auth.getUser()).data&&(await sb.auth.getUser()).data.user):null;
+  var row={
+    id:uid(),
+    vendor_id:vendorId,
+    changed_at:nowISO(),
+    changed_by:(user&&user.email)||'unknown',
+    is_new_vendor:!!isNew,
+    changes:JSON.stringify(changes)
+  };
+  var{error}=await sb.from('vendor_history').insert(row);
+  if(error)console.warn('History save failed:',error.message);
+}
+async function openVendorHistory(vendorId,vendorName){
+  var el=document.createElement('div');
+  el.className='overlay';el.id='historyOverlay';
+  el.innerHTML=
+    '<div class="modal lg" style="max-height:82vh;display:flex;flex-direction:column">'+
+      '<div class="mtitle" style="display:flex;align-items:center;justify-content:space-between">'+
+        '<span>🕓 Change history — '+esc(vendorName||'Vendor')+'</span>'+
+        '<button class="iBtn" id="closeHistBtn" style="font-size:16px;padding:2px 8px">✕</button>'+
+      '</div>'+
+      '<div id="histBody" style="overflow-y:auto;flex:1;padding:.5rem 0">'+
+        '<div style="text-align:center;padding:2rem;color:#888;font-size:13px">Loading…</div>'+
+      '</div>'+
+      '<div class="mfoot"><button class="btn-s" id="closeHistBtn2">Close</button></div>'+
+    '</div>';
+  document.getElementById('modal-area').insertAdjacentElement('beforeend',el);
+  function closeHist(){el.remove();}
+  document.getElementById('closeHistBtn').addEventListener('click',closeHist);
+  document.getElementById('closeHistBtn2').addEventListener('click',closeHist);
+  el.addEventListener('click',function(e){if(e.target===el)closeHist();});
+  // Load records
+  var{data,error}=await sb.from('vendor_history').select('*').eq('vendor_id',vendorId).order('changed_at',{ascending:false});
+  var body=document.getElementById('histBody');
+  if(error){body.innerHTML='<div style="padding:1rem;color:#c00;font-size:13px">Could not load history: '+esc(error.message)+'</div>';return;}
+  if(!data||!data.length){body.innerHTML='<div style="padding:2rem;text-align:center;color:#888;font-size:13px">No history recorded yet.<br><span style="font-size:11px">Changes will be tracked from the next save.</span></div>';return;}
+  var html=data.map(function(row){
+    var changes=[];try{changes=JSON.parse(row.changes||'[]');}catch(e){}
+    var dt=row.changed_at?new Date(row.changed_at):null;
+    var dtStr=dt?dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'Unknown time';
+    var badge=row.is_new_vendor?'<span style="background:#D1FAE5;color:#065F46;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;margin-left:6px">New vendor</span>':'';
+    var changesHtml=changes.length
+      ?changes.map(function(c){
+          return'<div style="display:flex;gap:8px;align-items:flex-start;padding:3px 0;border-bottom:.5px solid #f0ede8;font-size:12px">'+
+            '<span style="min-width:130px;color:#666;font-weight:500;flex-shrink:0">'+esc(c.label)+'</span>'+
+            '<span style="color:#c0392b;text-decoration:line-through;flex:1;word-break:break-word">'+esc(c.from||'—')+'</span>'+
+            '<span style="color:#aaa;flex-shrink:0">→</span>'+
+            '<span style="color:#27ae60;flex:1;word-break:break-word">'+esc(c.to||'—')+'</span>'+
+          '</div>';
+        }).join('')
+      :'<div style="font-size:12px;color:#aaa;font-style:italic">No field changes recorded</div>';
+    return'<div style="border:.5px solid #e5e3de;border-radius:10px;margin:.5rem .75rem;overflow:hidden">'+
+      '<div style="background:#f8f7f4;padding:.55rem .85rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">'+
+        '<div style="font-size:12px;font-weight:700;color:#222">'+esc(dtStr)+badge+'</div>'+
+        '<div style="font-size:11px;color:#888">by '+esc(row.changed_by||'unknown')+'</div>'+
+      '</div>'+
+      '<div style="padding:.6rem .85rem">'+changesHtml+'</div>'+
+    '</div>';
+  }).join('');
+  body.innerHTML=html;
+}
+// ── END VENDOR HISTORY ───────────────────────────────────────────────────────
+
 async function saveCalRow(ds){
   var row=calRows[ds];
   var hasTents=row&&Object.keys(row.tent_assignments||{}).length>0;
@@ -707,10 +819,10 @@ function renderVendors(){
   var el=document.getElementById('main-content');
   var allV=vendors.filter(function(v){
     if(vsFilter==='all')return true;
-    if(vsFilter==='approved')return v.status==='approved'||v.status==='approved_og';
+    if(vsFilter==='approved')return v.status==='approved';
     if(vsFilter==='waitlist')return v.status==='waitlist';
     if(vsFilter==='pending')return v.status==='pending';
-    if(vsFilter==='eligible')return (v.status==='approved'||v.status==='approved_og')&&(v.vendorStatus||'active')==='active';
+    if(vsFilter==='eligible')return v.status==='approved'&&(v.vendorStatus||'active')==='active';
     if(vsFilter==='contract')return v.contractReceived;
     if(vsFilter==='payment')return v.paymentReceived;
     return true;
@@ -4414,7 +4526,7 @@ function openForm(id){
   // Always sync selectedDates from calRows before opening so chips reflect current calendar state
   syncVendorDatesFromCalendar();
   formDirty=false;
-  eId=id||null;var savedTab=formTab;formTab=0;formCompletedTabs=new Set();
+  eId=id||null;formTab=0;formCompletedTabs=new Set();
   var v=id?vendors.find(function(x){return x.id===id;}):{};if(!v)v={};
   window._ep=(v.photos||[]).slice();
   var vs=v.vendorStatus||'active',allDates=getMarketDates();
@@ -4556,6 +4668,7 @@ function openForm(id){
         (id?'<button class="btn-s" id="fProfileBtn">📄 Profile PDF</button>':'')+
       '<div style="display:flex;justify-content:center;gap:10px;width:100%;margin-top:8px">'+
         '<button class="btn-p" id="fSaveBtn">Save vendor</button>'+
+        (id?'<button class="btn-s" id="fHistoryBtn" style="background:#f0ede8;border-color:#d0cec7">🕓 History</button>':'')+
         '<button class="btn-s" id="fCancelBtn">Close form</button>'+
       '</div>'+
     '</div></div>';
@@ -4578,8 +4691,6 @@ function openForm(id){
   var fo2=document.getElementById('formOverlay');
   if(fo2)fo2.querySelectorAll('.fsnb').forEach(function(b){b.addEventListener('click',function(){goFormTab(parseInt(b.dataset.ftab));});});
   formDirty=false;
-  // Restore the tab the user was on when navigating between vendors
-  if(savedTab>0)setTimeout(function(){goFormTab(savedTab);},0);
   document.querySelectorAll('#formOverlay input,#formOverlay textarea,#formOverlay select').forEach(function(el){el.addEventListener('change',function(){formDirty=true;});el.addEventListener('input',function(){formDirty=true;});});
   document.querySelectorAll('#formOverlay .ropt').forEach(function(lbl){lbl.addEventListener('click',function(){formDirty=true;});});
   document.querySelectorAll('#formOverlay .dc').forEach(function(chip){chip.addEventListener('click',function(){formDirty=true;});});
@@ -4587,6 +4698,12 @@ function openForm(id){
   document.getElementById('fCancelBtn').addEventListener('click',function(){if(confirmDiscard())closeMod();});
   document.getElementById('formOverlay').addEventListener('click',function(e){if(e.target===this){if(confirmDiscard())closeMod();}});
   document.getElementById('fSaveBtn').addEventListener('click',saveV);
+  if(id&&document.getElementById('fHistoryBtn')){
+    document.getElementById('fHistoryBtn').addEventListener('click',function(){
+      var vName=(vendors.find(function(x){return x.id===id;})||{}).businessName||'Vendor';
+      openVendorHistory(id,vName);
+    });
+  }
 
   // Vendor navigation buttons
   var navList=window._vendorNavList||[];
@@ -4902,8 +5019,14 @@ async function saveV(){
   var oldDates=eId?Object.keys(calRows).filter(function(ds){return(calRows[ds].approved||[]).indexOf(eId)>-1;}).sort():[];
   var currentV=eId?vendors.find(function(x){return x.id===eId;}):null;
   var data={vendorStatus:(function(){var sel=document.querySelector('#formOverlay [data-fvs] input:checked');return sel?sel.value:'active';})()||'active',status:((document.getElementById('fAppStatus')||{}).value||'pending'),contractReceived:!!((document.getElementById('fcb-contract')||{}).checked),paymentReceived:!!((document.getElementById('fcb-payment')||{}).checked),selectedDates:newDates,businessName:biz,contactName:contact,email:((document.getElementById('f_email')||{}).value||'').trim(),phone:((document.getElementById('f_phone')||{}).value||'').trim(),website:((document.getElementById('f_web')||{}).value||'').trim(),social:((document.getElementById('f_social')||{}).value||'').trim(),category:cat,categoryComment:cat==='Other'?((document.getElementById('cmt_category')||{}).value||''):'',products:((document.getElementById('f_products')||{}).value||'').trim(),productDesc:((document.getElementById('f_prodDesc')||{}).value||'').trim(),local:getR('local'),localComment:((document.getElementById('cmt_local')||{}).value||''),priceRange:Array.from(document.querySelectorAll('#priceChecks input:checked')).map(function(c){return c.value;}),licenses:getR('licenses'),licensesComment:((document.getElementById('cmt_licenses')||{}).value||''),foodDocs:Array.from(document.querySelectorAll('#fdChecks input:checked')).map(function(c){return c.value;}),liability:getR('liability'),boothSize:((document.getElementById('sel_boothSize')||{}).value||''),ownSetup:getR('ownSetup'),ownSetupComment:((document.getElementById('cmt_ownSetup')||{}).value||''),electricity:getR('electricity'),attendance:getR('attendance'),months:((document.getElementById('f_months_status')||document.getElementById('f_months')||{}).value||'').trim(),whyJoin:((document.getElementById('f_whyJoin')||{}).value||'').trim(),values:((document.getElementById('f_values')||{}).value||'').trim(),additionalInfo:((document.getElementById('f_addl')||{}).value||'').trim(),notes:((document.getElementById('f_notes')||{}).value||'').trim(),boothFee:(currentV&&currentV.boothFee)||0,photos:[]};
+  // Snapshot old state for diff BEFORE saving
+  var isNewVendor=!eId;
+  var oldVendorSnap=eId?Object.assign({},vendors.find(function(x){return x.id===eId;})):null;
   var savedId=await saveVendorDB(data,eId);
   if(!savedId){resetBtn();alert('Save failed — could not write vendor to database.');return;}
+  // Write history record (non-blocking, fire and forget)
+  var histChanges=diffVendor(oldVendorSnap,data);
+  saveVendorHistory(savedId,histChanges,isNewVendor).catch(function(e){console.warn('History error:',e);});
   // Sync calRows with the new date selection
   for(var i=0;i<newDates.length;i++){
     var ds=newDates[i];
@@ -4931,19 +5054,44 @@ async function saveV(){
   // Update in-memory vendor so the list reflects the new state immediately
   var savedV=vendors.find(function(x){return x.id===savedId;});
   if(savedV){
+    // Sync ALL fields — not just a subset — so reopening the form shows correct values
     savedV.vendorStatus=data.vendorStatus;
     savedV.status=data.status;
     savedV.businessName=data.businessName;
     savedV.contactName=data.contactName;
     savedV.email=data.email;
     savedV.phone=data.phone;
+    savedV.website=data.website;
+    savedV.social=data.social;
     savedV.category=data.category;
+    savedV.categoryComment=data.categoryComment;
+    savedV.products=data.products;
+    savedV.productDesc=data.productDesc;
+    savedV.local=data.local;
+    savedV.localComment=data.localComment;
+    savedV.priceRange=data.priceRange;
+    savedV.licenses=data.licenses;
+    savedV.licensesComment=data.licensesComment;
+    savedV.foodDocs=data.foodDocs;
+    savedV.liability=data.liability;
     savedV.boothSize=data.boothSize;
+    savedV.ownSetup=data.ownSetup;
+    savedV.ownSetupComment=data.ownSetupComment;
     savedV.electricity=data.electricity;
+    savedV.attendance=data.attendance;
+    savedV.months=data.months;
+    savedV.whyJoin=data.whyJoin;
+    savedV.values=data.values;
+    savedV.additionalInfo=data.additionalInfo;
+    savedV.notes=data.notes;
     savedV.contractReceived=data.contractReceived;
     savedV.paymentReceived=data.paymentReceived;
-    savedV.notes=data.notes;
+    savedV.selectedDates=data.selectedDates;
     savedV.modifiedAt=nowISO();
+  } else if(isNewVendor){
+    // New vendor — add to in-memory list
+    var nv=Object.assign({},data);nv.id=savedId;nv.modifiedAt=nowISO();nv.createdAt=nowISO();
+    vendors.push(nv);
   }
   renderStats();
   if(tab==='vendors') renderVendors();
@@ -6427,7 +6575,10 @@ function renderCommsCompose(){
       Object.keys(CAT_COLORS).map(function(cat){return'<option value="cat:'+cat+'">Category: '+cat.split(' / ')[0]+'</option>';}).join('')+
     '</select></div>'+
 
-    '<div class="fg" id="cRecipPreview" style="font-size:14px;font-weight:600;color:#27500A;padding:.5rem .75rem;background:#EAF3DE;border-radius:6px;margin-top:-8px;border:.5px solid #c5e0a8"></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:-8px;margin-bottom:.75rem">'+
+      '<div id="cRecipPreview" style="flex:1;font-size:11px;color:#888;padding:.4rem .6rem;background:#f8f7f4;border-radius:6px"></div>'+
+      '<button class="btn-s" id="cViewMembers" style="font-size:11px;white-space:nowrap;flex-shrink:0">👥 View members</button>'+
+    '</div>'+
 
     '<div class="fg"><label>Subject</label><input id="cSubject" value="Elevation Bend Farmers Market" style="width:100%;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit"></div>'+
     '<div class="fg"><label>Message</label><textarea id="cBody" style="width:100%;height:160px;border:.5px solid #d0cec7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical" placeholder="Type your message here…"></textarea></div>'+
@@ -6452,31 +6603,57 @@ function renderCommsCompose(){
   function updatePreview(){
     var r=getRecipients();
     var prev=document.getElementById('cRecipPreview');
-    if(!prev)return;
-    var type=document.getElementById('cRecipType').value;
-    var summary=r.length+' recipient'+(r.length!==1?'s':'')+': '+r.slice(0,3).map(function(v){return v.businessName;}).join(', ')+(r.length>3?' + '+(r.length-3)+' more':'');
-    var viewAllBtn=r.length>3?'<button type="button" id="cViewAllBtn" style="margin-left:10px;font-size:11px;padding:2px 8px;border-radius:10px;border:.5px solid #639922;background:#fff;color:#27500A;cursor:pointer;font-family:inherit;font-weight:600">View all</button>':'';
-    prev.innerHTML='<span>'+summary+'</span>'+viewAllBtn;
-    var vab=document.getElementById('cViewAllBtn');
-    if(vab)vab.addEventListener('click',function(){
-      // Toggle full list
-      var fullList=document.getElementById('cRecipFull');
-      if(fullList){fullList.remove();return;}
-      var div=document.createElement('div');
-      div.id='cRecipFull';
-      div.style.cssText='margin-top:6px;max-height:220px;overflow-y:auto;border:.5px solid #c5e0a8;border-radius:6px;background:#fff;font-size:14px;';
-      div.innerHTML=r.slice().sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');}).map(function(v,i){
-        return'<div style="padding:5px 10px;border-bottom:.5px solid #f0ede6;display:flex;align-items:center;gap:8px;background:'+(i%2===0?'#fff':'#f8f7f4')+'">'+
-          '<span style="font-weight:600;flex:1">'+esc(v.businessName||'')+'</span>'+
-          '<span style="color:#888;font-size:11px">'+esc(v.email||'')+'</span>'+
-        '</div>';
-      }).join('');
-      prev.appendChild(div);
-    });
+    if(prev)prev.textContent=r.length+' recipient'+(r.length!==1?'s':'')+': '+r.slice(0,3).map(function(v){return v.businessName;}).join(', ')+(r.length>3?' + '+(r.length-3)+' more':'');
   }
 
   document.getElementById('cRecipType').addEventListener('change',updatePreview);
   updatePreview();
+
+  document.getElementById('cViewMembers').addEventListener('click',function(){
+    var type=document.getElementById('cRecipType').value;
+    var allMembers=getRecipients();
+    // For group selections, also include members without email in the view
+    if(type.startsWith('group:')){
+      var gid=type.slice(6);var g=vendorGroups.find(function(x){return x.id===gid;});
+      if(g)allMembers=vendors.filter(function(v){return(g.member_ids||[]).indexOf(v.id)>-1;});
+    }
+    var selLabel=document.getElementById('cRecipType').options[document.getElementById('cRecipType').selectedIndex].text;
+    var rows=allMembers.map(function(v){
+      var cc=catColor(v.category);
+      return'<tr style="cursor:pointer" data-vid="'+v.id+'" title="Open '+esc(v.businessName||'vendor')+'">'+
+        '<td><div style="display:flex;align-items:center;gap:7px">'+
+          '<div style="width:28px;height:28px;border-radius:50%;background:'+cc.bg+';color:'+cc.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
+          '<span style="font-weight:600">'+esc(v.businessName||'—')+'</span>'+
+        '</div></td>'+
+        '<td>'+catBadge(v.category)+'</td>'+
+        '<td style="font-size:11px;color:#555">'+esc(v.email||'—')+'</td>'+
+        '<td>'+vsTag(v.vendorStatus||'active')+'</td>'+
+      '</tr>';
+    }).join('');
+    var html=
+      '<div class="overlay" id="membersOverlay">'+
+        '<div class="modal lg" style="max-height:80vh;display:flex;flex-direction:column">'+
+          '<div class="mtitle" style="display:flex;align-items:center;justify-content:space-between">'+
+            '<span>👥 '+esc(selLabel)+' — '+allMembers.length+' vendor'+(allMembers.length!==1?'s':'')+'</span>'+
+            '<button class="iBtn" id="closeMembersModal" style="font-size:16px;padding:2px 8px">✕</button>'+
+          '</div>'+
+          (allMembers.length
+            ?'<div style="overflow-y:auto;flex:1"><div class="report-wrap" style="margin:0"><table class="report-table"><thead><tr><th>Vendor</th><th>Category</th><th>Email</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'
+            :'<div class="empty" style="margin:1rem">No vendors in this selection.</div>')+
+          '<div class="mfoot"><button class="btn-s" id="closeMembersModal2">Close</button></div>'+
+        '</div>'+
+      '</div>';
+    var area=document.getElementById('modal-area');
+    area.insertAdjacentHTML('beforeend',html);
+    var overlay=document.getElementById('membersOverlay');
+    function closeMembers(){overlay.remove();}
+    document.getElementById('closeMembersModal').addEventListener('click',closeMembers);
+    document.getElementById('closeMembersModal2').addEventListener('click',closeMembers);
+    overlay.addEventListener('click',function(e){if(e.target===overlay)closeMembers();});
+    overlay.querySelectorAll('tr[data-vid]').forEach(function(row){
+      row.addEventListener('click',function(){closeMembers();openForm(row.dataset.vid);});
+    });
+  });
 
   document.getElementById('cCopyEmails').addEventListener('click',function(){
     var r=getRecipients();
@@ -6603,7 +6780,7 @@ function renderCommsGroups(){
               '<tbody>'+
               members.map(function(v){
                 var cc=catColor(v.category);
-                return'<tr>'+
+                return'<tr data-edit-vendor-grp="'+v.id+'" style="cursor:pointer" title="Open '+esc(v.businessName||'vendor')+'">'+
                   '<td><div style="display:flex;align-items:center;gap:7px">'+
                     '<div style="width:24px;height:24px;border-radius:50%;background:'+cc.bg+';color:'+cc.text+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+ini(v.businessName||'?')+'</div>'+
                     '<span style="font-size:12px;font-weight:600">'+esc(v.businessName||'—')+'</span>'+
@@ -6621,7 +6798,8 @@ function renderCommsGroups(){
 
   document.getElementById('newGroupBtn').addEventListener('click',function(){openGroupModal(null);});
   el.querySelectorAll('[data-edit-group]').forEach(function(b){b.addEventListener('click',function(){openGroupModal(b.dataset.editGroup);});});
-  el.querySelectorAll('[data-edit-vendor-grp]').forEach(function(b){b.addEventListener('click',function(){openForm(b.dataset.editVendorGrp);});});
+  el.querySelectorAll('tr[data-edit-vendor-grp]').forEach(function(row){row.addEventListener('click',function(e){if(e.target.closest('button'))return;openForm(row.dataset.editVendorGrp);});});
+  el.querySelectorAll('button[data-edit-vendor-grp]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();openForm(b.dataset.editVendorGrp);});});
   el.querySelectorAll('[data-del-group]').forEach(function(b){b.addEventListener('click',async function(){
     if(!confirm('Delete this group?'))return;
     await sb.from('vendor_groups').delete().eq('id',b.dataset.delGroup);
@@ -6636,15 +6814,15 @@ function renderCommsGroups(){
     commsView='compose';
     renderComms();
     // Pre-select this group in the recipient dropdown
-    setTimeout(function(){
-      var sel=document.getElementById('cRecipType');
-      if(sel){
-        sel.value='group:'+g.id;
-        sel.dispatchEvent(new Event('change'));
-      }
-      var subj=document.getElementById('cSubject');
-      if(subj)subj.focus();
-    },50);
+    var sel=document.getElementById('cRecipSel');
+    if(sel){
+      // Find and select the group option
+      Array.from(sel.options).forEach(function(opt){
+        if(opt.value==='group:'+g.id)sel.value='group:'+g.id;
+      });
+    }
+    var subj=document.getElementById('cSubject');
+    if(subj)subj.focus();
   });});
 }
 
@@ -7318,10 +7496,8 @@ function openGroupModal(groupId){
       '<select id="gFilterStatus" style="width:100%;border:.5px solid #d0cec7;border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit">'+
         '<option value="">All statuses</option>'+
         '<option value="approved">Approved</option>'+
-        '<option value="approved_og">★ Approved & OG</option>'+
         '<option value="pending">Pending</option>'+
         '<option value="waitlist">Waitlist</option>'+
-        '<option value="issue">Issue</option>'+
       '</select></div>'+
     '</div>'+
     // Date filter (full width)
@@ -7342,7 +7518,7 @@ function openGroupModal(groupId){
     // Vendor list
     '<div style="max-height:320px;overflow-y:auto;border:.5px solid #e5e3de;border-radius:8px" id="gMemberList">'+
     '<table style="width:100%;border-collapse:collapse">'+
-      vendors.slice().sort(function(a,b){return(a.businessName||'').localeCompare(b.businessName||'');}).map(function(v){
+      vendors.map(function(v){
         var av=avc(v.businessName||'?');
         var cc=catColor(v.category);
         return'<tr class="g-member-opt" style="border-bottom:.5px solid #f0ede6;cursor:pointer"'+
@@ -7426,16 +7602,13 @@ function openGroupModal(groupId){
     if(!name){alert('Please enter a group name.');return;}
     var ids=Array.from(document.querySelectorAll('.g-member-cb:checked')).map(function(c){return c.value;});
     var row={name:name,member_ids:ids};
-    savBtn.disabled=true;savBtn.textContent='Saving…';
     if(g){
-      var{error:ue}=await sb.from('vendor_groups').update(row).eq('id',g.id);
-      if(ue){alert('Error saving group: '+ue.message);savBtn.disabled=false;savBtn.textContent='Save group';return;}
+      await sb.from('vendor_groups').update(row).eq('id',g.id);
       var idx=vendorGroups.findIndex(function(x){return x.id===g.id;});
       if(idx>-1)vendorGroups[idx]=Object.assign({},g,row);
     } else {
       row.id=uid();
-      var{error:ie}=await sb.from('vendor_groups').insert(row);
-      if(ie){alert('Error saving group: '+ie.message);savBtn.disabled=false;savBtn.textContent='Save group';return;}
+      await sb.from('vendor_groups').upsert(row);
       vendorGroups.push(row);
     }
     closeMod();renderComms();
